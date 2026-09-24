@@ -226,6 +226,24 @@ export default async function EventDetailPage({
                 </div>
               </section>
 
+              {event.poster ? (
+                <SectionBlock id="poster" title="Poster Kegiatan">
+                  <p className="-mt-1 mb-5 text-sm leading-relaxed text-muted">
+                    Poster resmi dari tim desain, ditampilkan utuh tanpa dipotong.
+                  </p>
+                  <figure className="overflow-hidden rounded-card border border-line bg-canvas-deep/40 p-3 sm:p-5">
+                    <Image
+                      src={event.poster.src}
+                      alt={event.poster.alt}
+                      width={event.poster.width ?? 1080}
+                      height={event.poster.height ?? 1350}
+                      sizes="(max-width: 640px) 90vw, 460px"
+                      className="mx-auto w-full max-w-[460px] rounded-xl shadow-soft"
+                    />
+                  </figure>
+                </SectionBlock>
+              ) : null}
+
               <SectionBlock id="agenda" title="Agenda Kegiatan">
                 <EventAgenda items={event.agenda} />
               </SectionBlock>

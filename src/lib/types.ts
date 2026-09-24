@@ -84,7 +84,14 @@ export interface EventRecord {
   /** Long description, one string per paragraph. */
   description: string[];
   category: EventCategory;
+  /** Wide image used for card and hero crops. */
   cover: ImageAsset;
+  /**
+   * The designer's original poster, usually Instagram portrait (4:5).
+   * Shown uncropped — the card letterboxes it over a blurred copy of itself,
+   * and the detail page renders it at full size.
+   */
+  poster?: ImageAsset;
   /** ISO date-time of the first and last day. */
   startDate: string;
   endDate: string;

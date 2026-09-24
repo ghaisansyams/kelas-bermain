@@ -61,10 +61,10 @@ Hanya satu, dan bersifat opsional:
 | Nama | Fungsi | Default |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Basis URL absolut untuk metadata SEO, Open Graph, sitemap, dan canonical | `https://kelas-bermain.vercel.app` |
-| `NEXT_PUBLIC_GALLERY_DRIVE_URL` | URL folder Google Drive yang ditautkan di halaman Galeri | kosong |
+| `NEXT_PUBLIC_GALLERY_DRIVE_URL` | URL folder Google Drive yang ditautkan di halaman Galeri | folder produksi di `src/data/gallery.ts` |
 
-Keduanya opsional. Selama `NEXT_PUBLIC_GALLERY_DRIVE_URL` kosong, halaman Galeri menampilkan
-status "tautan belum diisi" alih-alih tautan mati.
+Keduanya opsional. `NEXT_PUBLIC_GALLERY_DRIVE_URL` hanya perlu diisi bila folder Drive
+berpindah tanpa ingin mengubah kode.
 
 Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 
@@ -97,6 +97,22 @@ Dua bidang yang spesifik untuk program anak:
   karena ini hal pertama yang dicari orang tua.
 - `parentName` pada `Registration` — formulir mendata **anak** (nama, usia, sekolah) dan
   **orang tua/wali** (nama, email, WhatsApp) secara terpisah.
+
+### Poster desainer (format Instagram)
+
+`EventRecord` punya bidang opsional `poster` untuk artwork asli dari tim desain — biasanya
+potret 4:5 sesuai ukuran Instagram. Aset ini **tidak pernah dipotong**:
+
+- **Kartu event** menampilkan poster secara utuh (`object-contain`) di atas salinan dirinya
+  sendiri yang diburamkan, sehingga tinggi semua kartu di grid tetap sejajar.
+- **Halaman detail** menampilkan poster pada ukuran penuh di blok "Poster Kegiatan".
+
+Artinya aset yang dibuat untuk Instagram bisa langsung dipakai di website tanpa perlu
+versi lanskap terpisah. Contohnya ada pada event `pemadam-cilik-oktober-2026`.
+
+> **Perhatian:** poster Pemadam Cilik memuat nomor WhatsApp yang tercetak di dalam gambar.
+> Aturan "tanpa nomor telepon" hanya berlaku pada teks situs; nomor di dalam artwork tetap
+> terlihat pengunjung. Potong bagian bawah poster bila nomor tersebut tidak boleh tampil.
 
 ### Catatan halaman Galeri
 
@@ -264,5 +280,7 @@ agar metadata SEO dan sitemap memakai URL yang benar.
 - **Harga setiap kelas masih placeholder** dan wajib diganti dengan angka sebenarnya.
 - Alamat email pada footer masih placeholder; Instagram adalah satu-satunya kanal kontak
   yang terkonfirmasi.
+- Poster Pemadam Cilik beresolusi 595×739 px (hasil tangkapan layar). Minta berkas asli dari
+  tim desain agar tajam pada layar beresolusi tinggi.
 - Tautan folder Google Drive pada halaman Galeri belum diisi; halaman menampilkan status
   "belum diatur" sampai URL asli dimasukkan.

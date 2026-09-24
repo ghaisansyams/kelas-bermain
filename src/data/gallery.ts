@@ -14,7 +14,9 @@ export const galleryDrive = {
   title: "Folder Dokumentasi Kelas Bermain",
   description:
     "Seluruh foto kegiatan Kelas Bermain kami kumpulkan dalam satu folder Google Drive. Folder ini terbuka untuk umum — orang tua bisa melihat dan mengunduh dokumentasi tanpa perlu masuk akun.",
-  url: process.env.NEXT_PUBLIC_GALLERY_DRIVE_URL ?? "",
+  url:
+    process.env.NEXT_PUBLIC_GALLERY_DRIVE_URL ??
+    "https://drive.google.com/drive/folders/1qtvvERoCf6tqVtHxDtOIxhr6CyQNB8hK?usp=sharing",
   /** Shown as the last-updated hint under the link. */
   updatedAt: "2026-09-20",
   contents: [

@@ -41,14 +41,39 @@ export function EventCard({
       )}
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-canvas-deep to-line-soft">
-        <Image
-          src={event.cover.src}
-          alt={event.cover.alt}
-          fill
-          sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 30vw"
-          priority={priority}
-          className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-        />
+        {event.poster ? (
+          /* An Instagram-portrait poster is letterboxed over a blurred copy of
+             itself, so the designer's artwork is never cropped and cards in the
+             grid still line up. */
+          <>
+            <Image
+              src={event.poster.src}
+              alt=""
+              aria-hidden
+              fill
+              sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 30vw"
+              className="scale-125 object-cover blur-xl saturate-150"
+            />
+            <div aria-hidden className="absolute inset-0 bg-ink/20" />
+            <Image
+              src={event.poster.src}
+              alt={event.poster.alt}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
+              priority={priority}
+              className="object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            />
+          </>
+        ) : (
+          <Image
+            src={event.cover.src}
+            alt={event.cover.alt}
+            fill
+            sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 30vw"
+            priority={priority}
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          />
+        )}
         <div
           aria-hidden
           className="absolute inset-0 bg-gradient-to-t from-ink/45 via-ink/5 to-transparent"

@@ -110,6 +110,13 @@ export const events: EventRecord[] = [
       width: 1600,
       height: 1000,
     },
+    // Poster asli dari desainer, format Instagram 4:5.
+    poster: {
+      src: "/images/poster-pemadam-cilik.jpg",
+      alt: "Poster Pemadam Cilik: Minggu 4 Oktober, 09.00 WIB, Damkar Cinere Depok, usia 3–15 tahun, lengkap dengan daftar aktivitas dan benefit",
+      width: 595,
+      height: 739,
+    },
     startDate: "2026-10-04",
     endDate: "2026-10-04",
     timeStart: "09:00",
