@@ -76,7 +76,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${jakarta.variable} ${fraunces.variable}`}>
+    <html
+      lang="id"
+      // Tells Next to keep suppressing smooth scroll during route changes.
+      data-scroll-behavior="smooth"
+      className={`${jakarta.variable} ${fraunces.variable}`}
+    >
       <body className="flex min-h-dvh flex-col">
         <SiteHeader />
         <main id="konten" className="flex-1">

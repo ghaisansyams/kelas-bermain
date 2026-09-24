@@ -49,7 +49,7 @@ export default async function AttendancePage({
     <Container className="max-w-2xl py-10 sm:py-14">
       <Link
         href={`/event/${event.slug}`}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-brand"
+        className="-my-2 inline-flex min-h-11 items-center gap-1.5 py-2 text-sm font-semibold text-muted transition-colors hover:text-brand"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Kembali ke detail event

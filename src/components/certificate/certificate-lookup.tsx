@@ -89,7 +89,7 @@ export function CertificateLookup({ examples }: { examples: string[] }) {
                   setQuery(example);
                   setError(null);
                 }}
-                className="rounded-pill border border-line bg-surface px-3 py-1.5 font-mono text-xs font-bold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+                className="inline-flex min-h-10 items-center rounded-pill border border-line bg-surface px-3.5 font-mono text-xs font-bold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
               >
                 {example}
               </button>

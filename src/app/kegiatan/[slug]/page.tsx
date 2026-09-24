@@ -91,7 +91,7 @@ export default async function ActivityDetailPage({
         <Container className="flex flex-col justify-end pb-8 pt-10 sm:min-h-[24rem] sm:pb-12 sm:pt-14 lg:min-h-[28rem]">
           <Link
             href="/kegiatan"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/85 transition-colors hover:text-white"
+            className="-my-2 inline-flex min-h-11 items-center gap-1.5 py-2 text-sm font-semibold text-white/85 transition-colors hover:text-white"
           >
             <ArrowLeft className="size-4" aria-hidden />
             Kembali ke daftar kegiatan

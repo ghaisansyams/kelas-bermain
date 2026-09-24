@@ -35,7 +35,7 @@ export default async function CertificatePage({
     <Container className="max-w-4xl py-10 sm:py-14">
       <Link
         href="/sertifikat"
-        className="no-print inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-brand"
+        className="no-print -my-2 inline-flex min-h-11 items-center gap-1.5 py-2 text-sm font-semibold text-muted transition-colors hover:text-brand"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Kembali ke cek sertifikat
