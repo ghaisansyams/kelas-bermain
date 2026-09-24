@@ -1,0 +1,115 @@
+import Link from "next/link";
+import { Mail } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
+import { InstagramIcon, TiktokIcon, YoutubeIcon } from "@/components/brand/social-icons";
+import { Logo } from "@/components/brand/logo";
+import { Container } from "@/components/ui/container";
+import { footerNav, siteConfig, socialLinks } from "@/data/site";
+
+const socialIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  instagram: InstagramIcon,
+  youtube: YoutubeIcon,
+  mail: Mail,
+  music: TiktokIcon,
+};
+
+export function SiteFooter() {
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="mt-24 border-t border-line bg-canvas-deep/60">
+      <Container className="py-14 lg:py-16">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-5 lg:col-span-4">
+            <Logo />
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
+              {siteConfig.description}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {socialLinks.map((social) => {
+                const Icon = socialIcons[social.icon] ?? Mail;
+                const external = social.href.startsWith("http");
+                return (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    aria-label={`${social.label} — ${social.handle}`}
+                    {...(external
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
+                    className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand-ink"
+                  >
+                    <Icon className="size-[1.125rem]" aria-hidden />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+
+          {footerNav.map((group) => (
+            <nav key={group.title} className="md:col-span-3 lg:col-span-2" aria-label={group.title}>
+              <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-ink">
+                {group.title}
+              </h2>
+              <ul className="mt-4 flex flex-col gap-2.5">
+                {group.links.map((link) => (
+                  <li key={link.href + link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted transition-colors hover:text-brand"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
+
+          <div className="md:col-span-12 lg:col-span-4">
+            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-ink">
+              Hubungi Kami
+            </h2>
+            <div className="mt-4 space-y-3 text-sm text-muted">
+              <p>
+                <a
+                  href={`mailto:${siteConfig.email}`}
+                  className="font-semibold text-ink transition-colors hover:text-brand"
+                >
+                  {siteConfig.email}
+                </a>
+              </p>
+              <address className="not-italic leading-relaxed">
+                {siteConfig.address.line1}
+                <br />
+                {siteConfig.address.line2}
+                <br />
+                {siteConfig.address.city}
+              </address>
+              <p className="text-xs">{siteConfig.officeHours}</p>
+              <p className="text-xs leading-relaxed">
+                Pertanyaan paling cepat dijawab lewat direct message Instagram{" "}
+                <a
+                  href="https://instagram.com/kelasbermain"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-brand hover:underline"
+                >
+                  @kelasbermain
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 flex flex-col gap-3 border-t border-line pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            © {year} {siteConfig.name}. Seluruh hak cipta dilindungi.
+          </p>
+          <p>Dibangun untuk komunitas belajar di Indonesia.</p>
+        </div>
+      </Container>
+    </footer>
+  );
+}
