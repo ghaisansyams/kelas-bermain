@@ -13,8 +13,8 @@ export function ActivityPreview({ activities }: { activities: ActivityRecord[] }
       <Container>
         <SectionHeading
           eyebrow="Kegiatan terbaru"
-          title="Yang sedang kami kerjakan"
-          description="Di luar event terjadwal, Kelas Bermain berjalan setiap bulan lewat kunjungan sekolah, aksi relawan, dan pertemuan komunitas."
+          title="Yang sudah kami jalankan"
+          description="Dokumentasi kelas yang sudah berlangsung — dari kebun di Tangerang Selatan sampai hangar pesawat di Jakarta."
           action={
             <Link
               href="/kegiatan"

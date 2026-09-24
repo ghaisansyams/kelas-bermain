@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import {
   ArrowLeft,
   Award,
+  Baby,
   Building2,
   CalendarDays,
   Clock,
@@ -193,6 +194,12 @@ export default async function EventDetailPage({
                 {event.location.note ? (
                   <span className="mt-0.5 block text-xs text-muted">{event.location.note}</span>
                 ) : null}
+              </Fact>
+              <Fact icon={Baby} label="Usia Peserta">
+                {event.ageRange[0]}–{event.ageRange[1]} tahun
+                <span className="block text-xs text-muted">
+                  Kelompok dibagi per rentang umur
+                </span>
               </Fact>
               <Fact icon={Building2} label="Penyelenggara">
                 {event.organizer}

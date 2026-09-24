@@ -24,7 +24,10 @@ export interface RegistrationEventContext {
 }
 
 export interface RegistrationInput {
+  /** The child attending. */
   fullName: string;
+  /** Parent or guardian registering the child. */
+  parentName: string;
   email: string;
   whatsapp: string;
   institution: string;
@@ -65,7 +68,7 @@ export async function registerForEvent(
     return {
       ok: false,
       field: "email",
-      error: `Email ini sudah terdaftar di event tersebut dengan ID ${existing.id}.`,
+      error: `Email ini sudah terdaftar di kelas tersebut dengan ID ${existing.id}.`,
     };
   }
 
@@ -79,6 +82,7 @@ export async function registerForEvent(
     eventTitle: event.title,
     eventDate: event.date,
     fullName: input.fullName.trim(),
+    parentName: input.parentName.trim(),
     email: input.email.trim().toLowerCase(),
     whatsapp: normalizePhone(input.whatsapp),
     institution: input.institution.trim(),

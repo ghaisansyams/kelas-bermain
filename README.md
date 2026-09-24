@@ -1,13 +1,27 @@
 # Kelas Bermain
 
-Situs publik untuk program **Kelas Bermain** — menampilkan event, kegiatan, dan galeri,
+Situs publik untuk **Kelas Bermain** — aktivitas kreatif dan edukatif untuk anak usia
+**3–15 tahun di Jabodetabek**. Menampilkan jadwal kelas, dokumentasi kegiatan, dan galeri,
 lengkap dengan alur pendaftaran, kehadiran, dan sertifikat peserta.
 
 > **Status: versi demo dengan data dummy.**
-> Seluruh konten pada `src/data` adalah data contoh. Pendaftaran, kehadiran, dan penerbitan
+> Judul kelas, tanggal, lokasi, daftar aktivitas, dan benefit mengikuti unggahan
+> [@kelasbermain.id](https://instagram.com/kelasbermain.id). **Harga masih placeholder** —
+> poster Instagram tidak mencantumkan biaya. Pendaftaran, kehadiran, dan penerbitan
 > sertifikat berjalan di peramban (localStorage) dan **belum** terhubung ke basis data
 > produksi mana pun. Arsitekturnya sudah disiapkan agar penggantian ke CMS/database tidak
 > menyentuh satu pun komponen UI — lihat [Mengganti data dummy](#mengganti-data-dummy).
+
+### Catatan penting
+
+- **Seluruh kelas berstatus berbayar** (`registrationType: "PAID"`). Jalur `FREE` tetap
+  didukung model data dan layanan, hanya tidak dipakai oleh data saat ini.
+- **Tidak ada nomor telepon di seluruh situs**, sesuai notulen rapat — meskipun bio dan
+  poster Instagram mencantumkan nomor WhatsApp. Kontak publik hanya email dan Instagram.
+  Untuk menampilkannya, tambahkan entri pada `socialLinks` di `src/data/site.ts`.
+- **Logo digambar ulang** dari profil Instagram sebagai SVG di
+  `src/components/brand/logo.tsx` (dan `src/app/icon.svg`). Ganti dengan berkas asli bila
+  sudah tersedia agar sama persis.
 
 ---
 
@@ -59,7 +73,7 @@ Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 | Rute | Isi |
 | --- | --- |
 | `/` | Landing page: hero, nilai program, event terdekat, cara ikut, statistik, kegiatan, testimoni, media sosial |
-| `/event` | Daftar event + filter status (Semua / Akan Datang / Sedang Berlangsung / Selesai) dan kategori |
+| `/event` | Jadwal kelas + filter status (Semua / Akan Datang / Sedang Berlangsung / Selesai) dan kategori |
 | `/event/[slug]` | Halaman detail event (satu template untuk semua event) |
 | `/event/[slug]/daftar` | Formulir pendaftaran + status sukses; instruksi pembayaran untuk event berbayar |
 | `/event/[slug]/attendance` | Formulir konfirmasi kehadiran peserta |
@@ -71,6 +85,18 @@ Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 | `/sitemap.xml`, `/robots.txt` | Dihasilkan otomatis dari data konten |
 
 Galeri **tidak memerlukan login** — seluruh isinya terbuka untuk umum.
+
+## Model konten
+
+Kategori kelas: **Profesi, Kuliner, Alam, Kreatif, Eksplorasi, Outdoor** — masing-masing
+punya satu warna tetap yang diambil dari empat kotak pada logo (merah, kuning, hijau, ungu).
+
+Dua bidang yang spesifik untuk program anak:
+
+- `ageRange: [min, max]` pada `EventRecord` — ditampilkan di kartu kelas dan halaman detail,
+  karena ini hal pertama yang dicari orang tua.
+- `parentName` pada `Registration` — formulir mendata **anak** (nama, usia, sekolah) dan
+  **orang tua/wali** (nama, email, WhatsApp) secara terpisah.
 
 ### Catatan halaman Galeri
 
@@ -191,8 +217,11 @@ Belum ada dashboard admin di fase ini — sesuai permintaan. Yang sudah disiapka
 - Bagian Instagram memakai data statis di `src/data/instagram.ts`. Tidak ada scraping dan
   tidak ada pemanggilan API Instagram. Komponennya hanya mengonsumsi tipe `SocialPost`,
   sehingga integrasi resmi nantinya cukup mengganti sumber datanya.
-- Seluruh foto adalah **stok berlisensi bebas sebagai placeholder** dan perlu diganti dengan
-  dokumentasi asli Kelas Bermain sebelum situs dipakai sungguhan.
+- Sebagian besar foto adalah **stok berlisensi bebas sebagai placeholder** dan perlu diganti
+  dengan dokumentasi asli Kelas Bermain sebelum situs dipakai sungguhan.
+- Cover **Tentara Cilik** dan **Pemadam Cilik** adalah ilustrasi datar yang dibuat sendiri
+  (tidak ada foto stok yang sesuai dan aman untuk tema ini). Ganti dengan poster asli bila
+  tersedia.
 
 ## Kualitas & pengujian
 
@@ -202,11 +231,12 @@ Pada commit ini:
 - 48 halaman dihasilkan sebagai HTML statis.
 - Diuji di peramban pada lebar 360 / 390 / 768 / 1280 px: tidak ada scroll horizontal,
   tidak ada gambar gagal muat, tidak ada hydration error.
-- Alur yang diuji ujung ke ujung: menu seluler, filter event (termasuk deep link
-  `?filter=`), validasi form, pendaftaran gratis, penolakan email duplikat, pendaftaran
-  berbayar beserta instruksi pembayaran, pencatatan kehadiran, penolakan kontak yang tidak
-  cocok, penerbitan sertifikat bernomor unik, verifikasi sertifikat, tautan Drive pada
-  halaman Galeri, serta lightbox galeri pada halaman detail kegiatan.
+- 28 alur diuji ujung ke ujung: menu seluler, filter event (termasuk deep link `?filter=`),
+  validasi anak + orang tua, penolakan usia di luar 3–15, pendaftaran berbayar beserta
+  instruksi pembayaran dan status menunggu bayar, kelas dengan kuota penuh, pencatatan
+  kehadiran, penolakan kontak yang tidak cocok, penerbitan sertifikat bernomor unik,
+  verifikasi sertifikat, tautan Drive pada halaman Galeri, lightbox pada halaman detail
+  kegiatan, serta pemeriksaan bahwa tidak ada nomor telepon di halaman mana pun.
 - Daftar event dan formulir dirender di server (bukan skeleton), sehingga isinya terbaca
   tanpa menjalankan JavaScript. Halaman yang bergantung pada tanggal diregenerasi tiap jam
   (`revalidate = 3600`) agar status "Akan Datang"/"Selesai" tidak basi.
@@ -231,5 +261,8 @@ agar metadata SEO dan sitemap memakai URL yang benar.
 - Tanggal event bersifat statis. Seiring waktu, event "akan datang" akan berpindah sendiri
   ke "selesai" karena statusnya dihitung dari tanggal sebenarnya.
 - Belum ada panel admin, autentikasi, maupun absensi QR (jalur kodenya sudah disiapkan).
+- **Harga setiap kelas masih placeholder** dan wajib diganti dengan angka sebenarnya.
+- Alamat email pada footer masih placeholder; Instagram adalah satu-satunya kanal kontak
+  yang terkonfirmasi.
 - Tautan folder Google Drive pada halaman Galeri belum diisi; halaman menampilkan status
   "belum diatur" sampai URL asli dimasukkan.

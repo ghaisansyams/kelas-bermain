@@ -7,21 +7,21 @@ import { cn } from "@/lib/utils/cn";
 import { formatDateRange } from "@/lib/utils/date";
 
 export const activityCategoryLabel: Record<ActivityCategory, string> = {
-  Workshop: "Workshop",
-  Community: "Komunitas",
-  "School Visit": "Kunjungan Sekolah",
-  Leadership: "Kepemimpinan",
-  Volunteer: "Relawan",
+  Profesi: "Profesi",
+  Kuliner: "Kuliner",
+  Alam: "Alam",
+  Kreatif: "Kreatif",
+  Eksplorasi: "Eksplorasi",
   Outdoor: "Luar Ruang",
 };
 
 export const activityCategoryTone: Record<ActivityCategory, BadgeTone> = {
-  Workshop: "grape",
-  Community: "pine",
-  "School Visit": "sky",
-  Leadership: "brand",
-  Volunteer: "sun",
-  Outdoor: "leaf",
+  Profesi: "brand",
+  Kuliner: "sun",
+  Alam: "leaf",
+  Kreatif: "grape",
+  Eksplorasi: "sky",
+  Outdoor: "pine",
 };
 
 export function ActivityCard({

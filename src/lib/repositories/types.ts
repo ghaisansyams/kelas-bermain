@@ -10,7 +10,10 @@ export interface Registration {
   eventSlug: string;
   eventTitle: string;
   eventDate: string;
+  /** The child attending. */
   fullName: string;
+  /** Parent or guardian who registered and will be contacted. */
+  parentName: string;
   email: string;
   whatsapp: string;
   institution: string;

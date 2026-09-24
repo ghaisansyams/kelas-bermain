@@ -14,8 +14,8 @@ const CATEGORIES: (GalleryCategory | "Semua")[] = [
   "Semua",
   "Event",
   "Kegiatan",
-  "Workshop",
-  "Community",
+  "Kreatif",
+  "Kuliner",
 ];
 
 /**

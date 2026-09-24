@@ -2,25 +2,28 @@
  * Global site configuration: identity, navigation, contact, and the numbers
  * shown on the landing page. An admin panel would edit this as "Site settings".
  *
- * Note: the organisation deliberately publishes no phone number. Contact runs
- * through email and social media only.
+ * Sourced from the @kelasbermain.id Instagram profile.
+ *
+ * Note: the organisation deliberately publishes no phone number on this site —
+ * a requirement from the meeting notes. Contact runs through email and social
+ * media only, even though the Instagram bio lists a WhatsApp number.
  */
 
 export const siteConfig = {
   name: "Kelas Bermain",
   shortName: "Kelas Bermain",
-  tagline: "Ruang untuk belajar, bertumbuh, dan bermain bersama.",
+  legalName: "Kelas Bermain Anak | Jabodetabek",
+  motto: "Play • Learn • Grow",
+  tagline: "Tempat anak bermain, belajar, dan bertumbuh.",
   description:
-    "Kelas Bermain menghadirkan event, kegiatan, dan pengalaman seru yang dirancang untuk membangun kreativitas, keberanian, kolaborasi, dan koneksi.",
+    "Kelas Bermain menghadirkan aktivitas kreatif dan edukatif untuk anak usia 3–15 tahun di Jabodetabek — dari jadi pemadam cilik sampai membuat cokelat sendiri.",
   /** Overridden per-environment; falls back to the production domain. */
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://kelas-bermain.vercel.app",
   locale: "id-ID",
+  /** Placeholder — replace with the organisation's real inbox. */
   email: "halo@kelasbermain.id",
-  address: {
-    line1: "Rumah Komunitas Kemang",
-    line2: "Jl. Kemang Selatan VIII No. 21",
-    city: "Jakarta Selatan, 12730",
-  },
+  serviceArea: "Jabodetabek",
+  ageRangeLabel: "3–15 tahun",
   officeHours: "Senin – Jumat, 09.00 – 17.00 WIB",
 } as const;
 
@@ -47,12 +50,12 @@ export const footerNav: { title: string; links: NavLink[] }[] = [
     ],
   },
   {
-    title: "Program",
+    title: "Jadwal",
     links: [
-      { href: "/event?filter=upcoming", label: "Event Akan Datang" },
+      { href: "/event?filter=upcoming", label: "Akan Datang" },
       { href: "/event?filter=ongoing", label: "Sedang Berlangsung" },
-      { href: "/event?filter=past", label: "Event Selesai" },
-      { href: "/kegiatan", label: "Program Komunitas" },
+      { href: "/event?filter=past", label: "Sudah Selesai" },
+      { href: "/kegiatan", label: "Dokumentasi Kegiatan" },
     ],
   },
 ];
@@ -67,21 +70,9 @@ export interface SocialLink {
 export const socialLinks: SocialLink[] = [
   {
     label: "Instagram",
-    handle: "@kelasbermain",
-    href: "https://instagram.com/kelasbermain",
+    handle: "@kelasbermain.id",
+    href: "https://instagram.com/kelasbermain.id",
     icon: "instagram",
-  },
-  {
-    label: "TikTok",
-    handle: "@kelasbermain",
-    href: "https://tiktok.com/@kelasbermain",
-    icon: "music",
-  },
-  {
-    label: "YouTube",
-    handle: "Kelas Bermain",
-    href: "https://youtube.com/@kelasbermain",
-    icon: "youtube",
   },
   {
     label: "Email",
@@ -98,46 +89,47 @@ export interface SiteStat {
 }
 
 export const siteStats: SiteStat[] = [
-  { value: "40+", label: "Kegiatan terselenggara", detail: "Sejak 2022" },
-  { value: "12", label: "Kota terjangkau", detail: "Jawa & sekitarnya" },
-  { value: "5.200", label: "Peserta terlibat", detail: "Pelajar, mahasiswa, komunitas" },
-  { value: "68", label: "Relawan aktif", detail: "Tersebar di 5 kota" },
+  { value: "20+", label: "Kegiatan terselenggara", detail: "Sepanjang 2026" },
+  { value: "8", label: "Lokasi mitra", detail: "Tersebar di Jabodetabek" },
+  { value: "1.200+", label: "Anak sudah ikut", detail: "Dari berbagai sekolah" },
+  { value: "3–15", label: "Rentang usia peserta", detail: "Dibagi per kelompok umur" },
 ];
 
 export interface Pillar {
   title: string;
   description: string;
-  icon: "sparkles" | "shield" | "users" | "heart";
-  accent: "brand" | "pine" | "sun" | "grape";
+  icon: "compass" | "sparkles" | "footprints" | "message";
+  accent: "brand" | "pine" | "sun" | "grape" | "leaf" | "sky";
 }
 
+/** The four skills Kelas Bermain builds every activity around. */
 export const pillars: Pillar[] = [
   {
-    title: "Kreativitas",
+    title: "Kemandirian",
     description:
-      "Ruang untuk mencoba ide sendiri, termasuk yang belum tentu berhasil. Gagal di sini tidak dihitung sebagai nilai merah.",
-    icon: "sparkles",
-    accent: "sun",
+      "Anak belajar memulai dan menyelesaikan aktivitasnya sendiri — dari memakai apron sampai merapikan alat setelah selesai.",
+    icon: "compass",
+    accent: "sky",
   },
   {
     title: "Keberanian",
     description:
-      "Latihan kecil yang berulang: angkat tangan, ajukan pendapat, tampil di depan kelompok. Dimulai dari yang paling menakutkan.",
-    icon: "shield",
+      "Mencoba hal baru dan mengeksplorasi lingkungan yang belum pernah didatangi, dengan pendampingan yang membuat anak merasa aman.",
+    icon: "sparkles",
     accent: "brand",
   },
   {
-    title: "Kolaborasi",
+    title: "Motorik",
     description:
-      "Hampir semua kegiatan kami hanya bisa selesai kalau dikerjakan bersama. Itu bukan kebetulan — memang dirancang begitu.",
-    icon: "users",
-    accent: "pine",
+      "Bergerak, memanen, mengaduk, dan merakit. Aktivitas fisik yang melatih koordinasi tangan dan tubuh tanpa terasa seperti latihan.",
+    icon: "footprints",
+    accent: "leaf",
   },
   {
-    title: "Koneksi",
+    title: "Komunikasi",
     description:
-      "Peserta pulang membawa lebih dari materi. Banyak yang lanjut jadi relawan dan bertemu lagi di kegiatan berikutnya.",
-    icon: "heart",
+      "Kegiatan selalu dikerjakan berkelompok, sehingga anak terbiasa berbicara, bergantian, dan bekerja sama dengan teman baru.",
+    icon: "message",
     accent: "grape",
   },
 ];
@@ -149,19 +141,23 @@ export interface ProcessStep {
 
 export const joinSteps: ProcessStep[] = [
   {
-    title: "Pilih event",
-    description: "Telusuri daftar event dan buka detailnya untuk melihat agenda, lokasi, dan biaya.",
+    title: "Pilih kegiatan",
+    description:
+      "Lihat jadwal dan pilih aktivitas yang sesuai usia si kecil. Setiap halaman memuat agenda, lokasi, dan fasilitas.",
   },
   {
-    title: "Isi pendaftaran",
-    description: "Lengkapi formulir singkat. Untuk event gratis, pendaftaran langsung tercatat.",
+    title: "Isi formulir pendaftaran",
+    description:
+      "Lengkapi data anak dan orang tua. Kuota tiap kelas terbatas agar pendampingan tetap maksimal.",
   },
   {
-    title: "Datang & isi kehadiran",
-    description: "Tunjukkan ID pendaftaran saat hari-H, lalu isi kehadiran lewat halaman event.",
+    title: "Selesaikan pembayaran",
+    description:
+      "Transfer sesuai instruksi yang muncul setelah mendaftar, lalu tunggu konfirmasi dari tim kami.",
   },
   {
-    title: "Ambil sertifikat",
-    description: "Setelah kehadiran tercatat, sertifikat dengan nomor unik bisa langsung dilihat.",
+    title: "Datang & ambil sertifikat",
+    description:
+      "Hadir di lokasi, isi kehadiran lewat halaman event, dan e-sertifikat anak bisa langsung dilihat.",
   },
 ];

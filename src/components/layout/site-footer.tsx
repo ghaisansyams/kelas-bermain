@@ -79,23 +79,22 @@ export function SiteFooter() {
                   {siteConfig.email}
                 </a>
               </p>
-              <address className="not-italic leading-relaxed">
-                {siteConfig.address.line1}
+              <p className="leading-relaxed">
+                Area kegiatan:{" "}
+                <span className="font-semibold text-ink">{siteConfig.serviceArea}</span>
                 <br />
-                {siteConfig.address.line2}
-                <br />
-                {siteConfig.address.city}
-              </address>
+                Lokasi berpindah mengikuti jadwal tiap kelas.
+              </p>
               <p className="text-xs">{siteConfig.officeHours}</p>
               <p className="text-xs leading-relaxed">
                 Pertanyaan paling cepat dijawab lewat direct message Instagram{" "}
                 <a
-                  href="https://instagram.com/kelasbermain"
+                  href="https://instagram.com/kelasbermain.id"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-brand hover:underline"
                 >
-                  @kelasbermain
+                  @kelasbermain.id
                 </a>
                 .
               </p>

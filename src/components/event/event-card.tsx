@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Clock, MapPin } from "lucide-react";
+import { ArrowRight, Baby, CalendarDays, Clock, MapPin } from "lucide-react";
 import {
   Badge,
   categoryTone,
@@ -92,6 +92,9 @@ export function EventCard({
           </MetaRow>
           <MetaRow icon={MapPin}>
             {event.location.venue}, {event.location.city}
+          </MetaRow>
+          <MetaRow icon={Baby}>
+            Usia {event.ageRange[0]}–{event.ageRange[1]} tahun
           </MetaRow>
         </div>
 

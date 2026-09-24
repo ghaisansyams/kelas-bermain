@@ -24,21 +24,22 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
             <Reveal>
               <span className="inline-flex items-center gap-2 rounded-pill border border-brand/20 bg-brand-soft px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-brand-ink">
                 <Sparkles className="size-3.5" aria-hidden />
-                Kelas Bermain
+                Play • Learn • Grow
               </span>
             </Reveal>
 
             <Reveal delay={80}>
               <h1 className="mt-5 text-[2.1rem] leading-[1.08] font-extrabold text-ink sm:text-5xl lg:text-[3.4rem]">
-                Ruang untuk belajar, bertumbuh, dan{" "}
+                Tempat anak belajar, bertumbuh, dan{" "}
                 <span className="text-accent text-brand">bermain</span> bersama.
               </h1>
             </Reveal>
 
             <Reveal delay={150}>
               <p className="mt-5 max-w-xl text-[0.9375rem] leading-relaxed text-muted sm:text-lg">
-                Temukan berbagai event, kegiatan, dan pengalaman seru yang dirancang untuk
-                membangun kreativitas, keberanian, kolaborasi, dan koneksi.
+                Aktivitas kreatif dan edukatif untuk anak usia 3–15 tahun di Jabodetabek.
+                Satu hari penuh pengalaman baru — dari jadi pemadam cilik sampai membuat
+                cokelat sendiri.
               </p>
             </Reveal>
 
@@ -64,9 +65,9 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
             <Reveal delay={300}>
               <dl className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
                 {[
-                  { value: "40+", label: "Kegiatan" },
-                  { value: "12", label: "Kota" },
-                  { value: "5.200", label: "Peserta" },
+                  { value: "20+", label: "Kegiatan" },
+                  { value: "3–15", label: "Tahun" },
+                  { value: "1.200+", label: "Anak" },
                 ].map((stat) => (
                   <div key={stat.label}>
                     <dt className="sr-only">{stat.label}</dt>
@@ -86,8 +87,8 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
             <Reveal delay={120} className="relative">
               <div className="relative overflow-hidden rounded-[1.75rem] bg-canvas-deep shadow-lift sm:rounded-[2rem]">
                 <Image
-                  src="/images/hero-komunitas.jpg"
-                  alt="Sekelompok pelajar dan mahasiswa tersenyum bersama setelah mengikuti kegiatan Kelas Bermain"
+                  src="/images/hero-kelas-bermain.jpg"
+                  alt="Anak-anak mengikuti kegiatan kreatif bersama di Kelas Bermain"
                   width={1800}
                   height={1200}
                   priority
@@ -114,7 +115,7 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[0.625rem] font-bold uppercase tracking-[0.14em] text-brand">
-                      Event terdekat
+                      Kelas terdekat
                     </span>
                     <span className="mt-0.5 block truncate text-sm font-bold text-ink">
                       {nextEvent.title}

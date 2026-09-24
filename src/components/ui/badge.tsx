@@ -39,12 +39,12 @@ export function Badge({
 
 /** One hue per category, used consistently across cards, filters and detail pages. */
 export const categoryTone: Record<EventCategory, BadgeTone> = {
-  Workshop: "grape",
-  Leadership: "brand",
-  Creativity: "sun",
-  Community: "pine",
-  Education: "sky",
-  Outdoor: "leaf",
+  Profesi: "brand",
+  Kuliner: "sun",
+  Alam: "leaf",
+  Kreatif: "grape",
+  Eksplorasi: "sky",
+  Outdoor: "pine",
 };
 
 export const lifecycleLabel: Record<EventLifecycle, string> = {

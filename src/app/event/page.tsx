@@ -14,12 +14,12 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "Event",
   description:
-    "Daftar event Kelas Bermain: workshop, kelas kepemimpinan, kegiatan luar ruang, dan festival komunitas. Saring berdasarkan status dan kategori.",
+    "Jadwal kelas Kelas Bermain untuk anak usia 3–15 tahun di Jabodetabek: kelas profesi, kuliner, alam, dan kreatif. Saring berdasarkan status dan kategori.",
   alternates: { canonical: "/event" },
   openGraph: {
     title: `Event · ${siteConfig.name}`,
     description:
-      "Workshop, kelas kepemimpinan, kegiatan luar ruang, dan festival komunitas yang bisa kamu ikuti.",
+      "Kelas profesi, kuliner, alam, dan kreatif untuk anak usia 3–15 tahun di Jabodetabek.",
     url: `${siteConfig.url}/event`,
   },
 };
@@ -32,11 +32,11 @@ export default async function EventPage() {
     <>
       <PageHeader
         eyebrow="Agenda"
-        title="Event Kelas Bermain"
+        title="Jadwal Kelas Bermain"
         description={
           <>
-            Dari workshop setengah hari sampai kemah tiga hari. Saat ini{" "}
-            <strong className="font-bold text-ink">{openCount} event</strong> sedang membuka
+            Kelas satu hari untuk anak usia 3–15 tahun di Jabodetabek. Saat ini{" "}
+            <strong className="font-bold text-ink">{openCount} kelas</strong> sedang membuka
             pendaftaran.
           </>
         }

@@ -13,8 +13,8 @@ import { nextCertificateNumber } from "@/lib/utils/certificate";
  */
 
 const DEFAULT_SIGNATORY = {
-  name: "Putri Anggraini",
-  role: "Program Director, Kelas Bermain",
+  name: "Kak Rangga",
+  role: "Lead Facilitator, Kelas Bermain",
 };
 
 export interface IssueInput {

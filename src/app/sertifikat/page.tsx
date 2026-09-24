@@ -9,7 +9,7 @@ import { siteConfig } from "@/data/site";
 export const metadata: Metadata = {
   title: "Cek Sertifikat",
   description:
-    "Verifikasi keaslian sertifikat Kelas Bermain menggunakan nomor sertifikat atau ID pendaftaran.",
+    "Verifikasi sertifikat peserta Kelas Bermain menggunakan nomor sertifikat atau ID pendaftaran.",
   alternates: { canonical: "/sertifikat" },
   openGraph: {
     title: `Cek Sertifikat · ${siteConfig.name}`,
@@ -33,7 +33,7 @@ const facts = [
   {
     icon: Award,
     title: "Terbit otomatis",
-    body: "Sertifikat diterbitkan setelah kehadiran peserta tercatat pada kegiatan terkait.",
+    body: "Sertifikat diterbitkan setelah kehadiran anak tercatat pada kelas terkait.",
   },
 ];
 
@@ -42,8 +42,8 @@ export default function CertificateLookupPage() {
     <>
       <PageHeader
         eyebrow="Sertifikat"
-        title="Cek sertifikat peserta"
-        description="Masukkan nomor sertifikat atau ID pendaftaran untuk menampilkan dan mengunduh sertifikat kegiatan Kelas Bermain."
+        title="Cek sertifikat anak"
+        description="Masukkan nomor sertifikat atau ID pendaftaran untuk menampilkan dan mengunduh sertifikat kelas yang sudah diikuti."
       />
 
       <Container className="py-10 sm:py-14">

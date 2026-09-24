@@ -1,14 +1,20 @@
-import { Heart, Shield, Sparkles, Users, type LucideIcon } from "lucide-react";
+import {
+  Compass,
+  Footprints,
+  MessagesSquare,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { pillars, type Pillar } from "@/data/site";
 
 const icons: Record<Pillar["icon"], LucideIcon> = {
+  compass: Compass,
   sparkles: Sparkles,
-  shield: Shield,
-  users: Users,
-  heart: Heart,
+  footprints: Footprints,
+  message: MessagesSquare,
 };
 
 const accents: Record<Pillar["accent"], string> = {
@@ -16,6 +22,8 @@ const accents: Record<Pillar["accent"], string> = {
   pine: "bg-pine-soft text-pine",
   sun: "bg-sun-soft text-sun-dark",
   grape: "bg-grape-soft text-grape",
+  leaf: "bg-leaf-soft text-leaf",
+  sky: "bg-sky-soft text-sky",
 };
 
 export function Pillars() {
@@ -23,9 +31,9 @@ export function Pillars() {
     <section className="py-16 sm:py-20">
       <Container>
         <SectionHeading
-          eyebrow="Yang kami bangun"
-          title="Empat hal yang selalu jadi tujuan setiap kegiatan"
-          description="Formatnya boleh berubah — workshop, kemah, festival, atau kunjungan sekolah. Yang dilatih tetap sama."
+          eyebrow="Yang diasah"
+          title="Empat keterampilan yang diasah di setiap kegiatan"
+          description="Temanya berganti setiap pekan — memasak, bertani, mengenal profesi. Tapi empat hal ini selalu jadi tujuannya."
         />
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

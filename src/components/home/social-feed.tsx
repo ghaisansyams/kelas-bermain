@@ -21,16 +21,16 @@ export function SocialFeed({ posts }: { posts: SocialPost[] }) {
         <SectionHeading
           eyebrow="Media sosial"
           title="Ikuti keseruan Kelas Bermain"
-          description="Dokumentasi harian, pengumuman event, dan cerita di balik layar kami bagikan lewat Instagram."
+          description="Pengumuman jadwal, dokumentasi kelas, dan cerita di balik layar kami bagikan lewat Instagram."
           action={
             <a
-              href="https://instagram.com/kelasbermain"
+              href="https://instagram.com/kelasbermain.id"
               target="_blank"
               rel="noopener noreferrer"
               className={buttonStyles({ variant: "secondary" })}
             >
               <InstagramIcon className="size-4" />
-              @kelasbermain
+              @kelasbermain.id
               <ExternalLink className="size-3.5" aria-hidden />
             </a>
           }

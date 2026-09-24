@@ -18,18 +18,18 @@ export function CtaBanner() {
             <div className="relative mx-auto max-w-2xl">
               <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-sun">
                 <Sparkles className="size-3.5" aria-hidden />
-                Gratis & berbayar
+                Kuota terbatas
               </span>
               <h2 className="mt-5 text-[1.75rem] leading-tight font-extrabold text-white sm:text-4xl">
-                Siap ikut kegiatan berikutnya?
+                Siap ikut kelas berikutnya?
               </h2>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-white/70 sm:text-base">
-                Pilih event yang sesuai, isi formulir singkat, dan sampai jumpa di lokasi.
-                Sebagian besar kegiatan kami gratis dan terbuka untuk umum.
+                Pilih kelas yang sesuai usia anak, isi formulir singkat, selesaikan
+                pembayaran, dan sampai jumpa di lokasi.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 <Link href="/event" className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}>
-                  Daftar Event
+                  Daftar Kelas
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
                 <Link

@@ -13,9 +13,9 @@ export function UpcomingEvents({ events }: { events: EventView[] }) {
     <section className="bg-canvas-deep/50 py-16 sm:py-20" id="event-terdekat">
       <Container>
         <SectionHeading
-          eyebrow="Agenda terdekat"
-          title="Event yang bisa kamu ikuti"
-          description="Pilih satu yang paling dekat dengan tempat dan minatmu. Detail agenda, biaya, dan fasilitas ada di setiap halaman event."
+          eyebrow="Jadwal terdekat"
+          title="Kelas yang bisa diikuti si kecil"
+          description="Pilih yang paling sesuai usia dan minat anak. Detail agenda, biaya, dan fasilitas ada di setiap halaman kelas."
           action={
             <Link
               href="/event"
@@ -30,8 +30,8 @@ export function UpcomingEvents({ events }: { events: EventView[] }) {
         {events.length === 0 ? (
           <EmptyState
             className="mt-10"
-            title="Belum ada event terjadwal"
-            description="Agenda berikutnya sedang disusun. Ikuti Instagram kami agar tidak ketinggalan pengumuman."
+            title="Belum ada kelas terjadwal"
+            description="Jadwal berikutnya sedang disusun. Ikuti Instagram kami agar tidak ketinggalan pengumuman."
           />
         ) : (
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

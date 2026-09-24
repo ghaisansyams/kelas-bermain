@@ -8,19 +8,19 @@
  */
 
 export type EventCategory =
-  | "Workshop"
-  | "Leadership"
-  | "Creativity"
-  | "Community"
-  | "Education"
+  | "Profesi"
+  | "Kuliner"
+  | "Alam"
+  | "Kreatif"
+  | "Eksplorasi"
   | "Outdoor";
 
 export const EVENT_CATEGORIES: EventCategory[] = [
-  "Workshop",
-  "Leadership",
-  "Creativity",
-  "Community",
-  "Education",
+  "Profesi",
+  "Kuliner",
+  "Alam",
+  "Kreatif",
+  "Eksplorasi",
   "Outdoor",
 ];
 
@@ -94,6 +94,8 @@ export interface EventRecord {
   timezone: string;
   location: EventLocation;
   organizer: string;
+  /** Inclusive age range in years, e.g. [3, 15]. */
+  ageRange: [number, number];
   capacity: number;
   registered: number;
   registration: EventRegistrationInfo;
@@ -116,13 +118,8 @@ export interface EventView extends EventRecord {
   filledPercent: number;
 }
 
-export type ActivityCategory =
-  | "Workshop"
-  | "Community"
-  | "School Visit"
-  | "Leadership"
-  | "Volunteer"
-  | "Outdoor";
+/** Activities use the same taxonomy as events. */
+export type ActivityCategory = EventCategory;
 
 export interface ActivityHighlight {
   label: string;
@@ -149,7 +146,7 @@ export interface ActivityRecord {
   published: boolean;
 }
 
-export type GalleryCategory = "Event" | "Kegiatan" | "Workshop" | "Community";
+export type GalleryCategory = "Event" | "Kegiatan" | "Kreatif" | "Kuliner";
 
 export interface GalleryItem {
   id: string;

@@ -10,9 +10,9 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
     <section className="bg-canvas-deep/50 py-16 sm:py-20">
       <Container>
         <SectionHeading
-          eyebrow="Kata peserta"
-          title="Cerita dari yang pernah ikut"
-          description="Kami mengumpulkan umpan balik setelah setiap kegiatan. Berikut beberapa di antaranya."
+          eyebrow="Kata orang tua"
+          title="Cerita dari Ayah & Bunda"
+          description="Kami mengumpulkan umpan balik setelah setiap kelas. Berikut beberapa di antaranya."
           align="center"
           className="mx-auto"
         />

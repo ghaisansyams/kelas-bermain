@@ -8,12 +8,12 @@ import { getActivities } from "@/lib/services/content";
 export const metadata: Metadata = {
   title: "Kegiatan",
   description:
-    "Dokumentasi kegiatan Kelas Bermain: workshop, kunjungan sekolah, aksi relawan, pertemuan komunitas, dan kegiatan luar ruang.",
+    "Dokumentasi kegiatan Kelas Bermain: kelas profesi, kuliner, alam, kreatif, dan kegiatan luar ruang untuk anak usia 3–15 tahun.",
   alternates: { canonical: "/kegiatan" },
   openGraph: {
     title: `Kegiatan · ${siteConfig.name}`,
     description:
-      "Workshop, kunjungan sekolah, aksi relawan, dan pertemuan komunitas yang sudah kami jalankan.",
+      "Kelas profesi, kuliner, alam, dan kreatif yang sudah kami jalankan bersama anak-anak.",
     url: `${siteConfig.url}/kegiatan`,
   },
 };
@@ -29,9 +29,9 @@ export default async function KegiatanPage() {
         title="Kegiatan Kelas Bermain"
         description={
           <>
-            Program yang berjalan di luar event terjadwal — total{" "}
+            Kelas yang sudah berlangsung — total{" "}
             <strong className="font-bold text-ink">
-              {participants.toLocaleString("id-ID")} peserta
+              {participants.toLocaleString("id-ID")} anak
             </strong>{" "}
             terlibat dalam {activities.length} kegiatan yang terdokumentasi di bawah ini.
           </>

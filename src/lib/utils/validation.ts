@@ -10,6 +10,7 @@ export function normalizePhone(value: string): string {
 
 export interface RegistrationFormValues {
   fullName: string;
+  parentName: string;
   email: string;
   whatsapp: string;
   institution: string;
@@ -25,7 +26,10 @@ export function validateRegistration(
   const errors: FieldErrors<RegistrationFormValues> = {};
 
   if (values.fullName.trim().length < 3) {
-    errors.fullName = "Nama lengkap minimal 3 karakter.";
+    errors.fullName = "Nama anak minimal 3 karakter.";
+  }
+  if (values.parentName.trim().length < 3) {
+    errors.parentName = "Nama orang tua atau wali minimal 3 karakter.";
   }
   if (!EMAIL.test(values.email.trim())) {
     errors.email = "Masukkan alamat email yang valid.";
@@ -34,16 +38,16 @@ export function validateRegistration(
     errors.whatsapp = "Gunakan format nomor Indonesia, contoh 08123456789.";
   }
   if (values.institution.trim().length < 2) {
-    errors.institution = "Isi asal sekolah, kampus, atau komunitas.";
+    errors.institution = "Isi asal sekolah atau PAUD/TK anak.";
   }
   if (values.city.trim().length < 2) {
-    errors.city = "Isi kota domisili kamu.";
+    errors.city = "Isi kota domisili.";
   }
   const age = Number(values.age);
   if (!values.age.trim()) {
-    errors.age = "Usia wajib diisi.";
-  } else if (!Number.isFinite(age) || age < 10 || age > 80) {
-    errors.age = "Usia harus antara 10 sampai 80 tahun.";
+    errors.age = "Usia anak wajib diisi.";
+  } else if (!Number.isFinite(age) || age < 3 || age > 15) {
+    errors.age = "Kelas ini untuk anak usia 3 sampai 15 tahun.";
   }
   if (values.notes.trim().length > 500) {
     errors.notes = "Maksimal 500 karakter.";
@@ -71,7 +75,7 @@ export function validateAttendance(
     errors.registrationId = "Masukkan ID pendaftaran, contoh KB-REG-2026-H4K2PX.";
   }
   if (values.fullName.trim().length < 3) {
-    errors.fullName = "Nama lengkap minimal 3 karakter.";
+    errors.fullName = "Nama anak minimal 3 karakter.";
   }
   const contact = values.contact.trim();
   if (!EMAIL.test(contact) && !PHONE.test(normalizePhone(contact))) {

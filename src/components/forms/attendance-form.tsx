@@ -125,7 +125,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
           <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
             {result.alreadyRecorded
               ? `Kehadiran ${result.registration.fullName} sudah tercatat sebelumnya untuk ${event.title}.`
-              : `Terima kasih, ${result.registration.fullName}. Kehadiranmu di ${event.title} sudah kami catat.`}
+              : `Terima kasih. Kehadiran ${result.registration.fullName} di ${event.title} sudah kami catat.`}
           </p>
           <p className="mx-auto mt-4 inline-block rounded-xl border border-pine/20 bg-surface px-4 py-2 font-mono text-sm font-bold text-ink">
             {result.registration.id}
@@ -136,7 +136,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
           <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
             <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
               <Award className="size-5 text-brand" aria-hidden />
-              Sertifikat kamu sudah bisa diterbitkan
+              Sertifikat anak sudah bisa diterbitkan
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Sertifikat akan dibuat dengan nomor unik dan dapat dicek kapan saja melalui
@@ -196,7 +196,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
         label="ID Pendaftaran"
         htmlFor="registrationId"
         error={errors.registrationId}
-        hint="Kode yang kamu terima setelah mendaftar, contoh KB-REG-2026-H4K2PX."
+        hint="Kode yang diterima setelah mendaftar, contoh KB-REG-2026-H4K2PX."
         required
       >
         <TextInput
@@ -208,18 +208,18 @@ export function AttendanceForm({ event }: { event: EventView }) {
           className="font-mono uppercase"
           value={values.registrationId}
           error={errors.registrationId}
-          hint="Kode yang kamu terima setelah mendaftar, contoh KB-REG-2026-H4K2PX."
+          hint="Kode yang diterima setelah mendaftar, contoh KB-REG-2026-H4K2PX."
           disabled={submitting}
           onChange={(e) => set("registrationId", e.target.value)}
         />
       </Field>
 
-      <Field label="Nama Lengkap" htmlFor="fullName" error={errors.fullName} required>
+      <Field label="Nama Lengkap Anak" htmlFor="fullName" error={errors.fullName} required>
         <TextInput
           id="fullName"
           name="fullName"
           autoComplete="name"
-          placeholder="Sesuai data pendaftaran"
+          placeholder="Sesuai data pendaftaran anak"
           value={values.fullName}
           error={errors.fullName}
           disabled={submitting}
@@ -231,7 +231,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
         label="Email atau Nomor WhatsApp"
         htmlFor="contact"
         error={errors.contact}
-        hint="Gunakan kontak yang sama seperti saat mendaftar."
+        hint="Gunakan kontak orang tua yang sama seperti saat mendaftar."
         required
       >
         <TextInput
@@ -241,7 +241,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
           placeholder="nama@email.com atau 08123456789"
           value={values.contact}
           error={errors.contact}
-          hint="Gunakan kontak yang sama seperti saat mendaftar."
+          hint="Gunakan kontak orang tua yang sama seperti saat mendaftar."
           disabled={submitting}
           onChange={(e) => set("contact", e.target.value)}
         />
@@ -253,7 +253,7 @@ export function AttendanceForm({ event }: { event: EventView }) {
         checked={values.confirmed}
         error={errors.confirmed}
         onChange={(checked) => set("confirmed", checked)}
-        label={`Saya menyatakan hadir dan mengikuti ${event.title}.`}
+        label={`Saya menyatakan anak saya hadir dan mengikuti ${event.title}.`}
       />
 
       <div className="flex flex-col gap-3 border-t border-line pt-5">

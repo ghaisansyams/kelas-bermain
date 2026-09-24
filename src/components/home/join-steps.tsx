@@ -13,7 +13,7 @@ export function JoinSteps() {
             <SectionHeading
               eyebrow="Cara ikut"
               title="Empat langkah, selesai dalam lima menit"
-              description="Pendaftaran dibuat sesederhana mungkin. Tidak perlu membuat akun, tidak perlu mengunduh aplikasi."
+              description="Pendaftaran dibuat sesederhana mungkin untuk Ayah dan Bunda. Tidak perlu membuat akun, tidak perlu mengunduh aplikasi."
             />
 
             <ol className="mt-9 space-y-6">
@@ -44,8 +44,8 @@ export function JoinSteps() {
               <div className="space-y-4">
                 <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
                   <Image
-                    src="/images/galeri-15.jpg"
-                    alt="Peserta berdiskusi dalam kelompok kecil di meja kerja"
+                    src="/images/galeri-01.jpg"
+                    alt="Tiga anak kecil berpelukan sambil tertawa"
                     width={1200}
                     height={800}
                     sizes="(max-width: 1024px) 45vw, 28vw"
@@ -54,8 +54,8 @@ export function JoinSteps() {
                 </div>
                 <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
                   <Image
-                    src="/images/galeri-02.jpg"
-                    alt="Relawan berangkulan menghadap matahari terbenam"
+                    src="/images/galeri-04.jpg"
+                    alt="Anak-anak mewarnai batu di meja prakarya"
                     width={1200}
                     height={675}
                     sizes="(max-width: 1024px) 45vw, 28vw"
@@ -66,8 +66,8 @@ export function JoinSteps() {
               <div className="space-y-4 pt-8">
                 <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
                   <Image
-                    src="/images/galeri-04.jpg"
-                    alt="Pembicara membawakan sesi di depan peserta"
+                    src="/images/galeri-14.jpg"
+                    alt="Kue kecil yang sudah dihias peserta"
                     width={1200}
                     height={857}
                     sizes="(max-width: 1024px) 45vw, 28vw"
@@ -77,7 +77,7 @@ export function JoinSteps() {
                 <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
                   <Image
                     src="/images/galeri-13.jpg"
-                    alt="Peserta mengangkat tangan di kegiatan luar ruang"
+                    alt="Aneka sayuran segar hasil panen peserta"
                     width={1200}
                     height={802}
                     sizes="(max-width: 1024px) 45vw, 28vw"

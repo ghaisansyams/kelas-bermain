@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: `Galeri · ${siteConfig.name}`,
     description:
-      "Dokumentasi foto kegiatan dan event Kelas Bermain, terbuka untuk umum lewat Google Drive.",
+      "Dokumentasi foto kegiatan Kelas Bermain, terbuka untuk umum lewat Google Drive.",
     url: `${siteConfig.url}/galeri`,
     images: [{ url: "/images/galeri-banner.jpg", width: 2000, height: 1100 }],
   },
@@ -69,7 +69,7 @@ export default async function GaleriPage() {
             Semua foto ada di Google Drive
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">
-            Agar mudah diunduh dan selalu terbarui, dokumentasi lengkap Kelas Bermain kami
+            Agar Ayah dan Bunda mudah mengunduhnya, dokumentasi lengkap setiap kelas kami
             simpan di satu folder Google Drive yang terbuka untuk umum.
           </p>
         </div>
@@ -81,10 +81,10 @@ export default async function GaleriPage() {
         <div className="mt-10 flex flex-col gap-3 rounded-card border border-line bg-canvas-deep/40 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
           <div className="min-w-0">
             <p className="text-base font-extrabold text-ink">
-              Mencari dokumentasi satu kegiatan tertentu?
+              Mencari dokumentasi satu kelas tertentu?
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              Setiap halaman kegiatan memuat cerita, linimasa, dan foto dari kegiatan
+              Setiap halaman kegiatan memuat cerita, linimasa, dan foto dari kelas
               tersebut.
             </p>
           </div>

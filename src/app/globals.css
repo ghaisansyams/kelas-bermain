@@ -15,27 +15,30 @@
   --color-line: #e9e1d5;
   --color-line-soft: #f2ece2;
 
-  --color-brand: #e4572e;
-  --color-brand-dark: #c34320;
-  --color-brand-ink: #7d2a12;
-  --color-brand-soft: #fdeee8;
+  /* Accents follow the four tiles of the Kelas Bermain mark: red, yellow,
+     green, purple. Each solid value clears 4.5:1 against white so button and
+     badge labels stay readable. */
+  --color-brand: #d93a2b;
+  --color-brand-dark: #b62e20;
+  --color-brand-ink: #8c2318;
+  --color-brand-soft: #fdecea;
 
   --color-pine: #0f6b5c;
   --color-pine-dark: #0b5347;
   --color-pine-soft: #e3f1ed;
 
-  --color-sun: #f0ab27;
-  --color-sun-dark: #c98a12;
+  --color-sun: #efa613;
+  --color-sun-dark: #a9700a;
   --color-sun-soft: #fdf3dd;
 
-  --color-grape: #6b5ca5;
-  --color-grape-soft: #eeebf8;
+  --color-grape: #6b31db;
+  --color-grape-soft: #efe9fd;
 
   --color-sky: #2f6fb5;
   --color-sky-soft: #e7f0fa;
 
-  --color-leaf: #4f8a3d;
-  --color-leaf-soft: #edf4e8;
+  --color-leaf: #1e8e3e;
+  --color-leaf-soft: #e7f5ec;
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;

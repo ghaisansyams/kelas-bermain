@@ -28,6 +28,7 @@ import {
 
 const EMPTY: RegistrationFormValues = {
   fullName: "",
+  parentName: "",
   email: "",
   whatsapp: "",
   institution: "",
@@ -85,6 +86,7 @@ export function RegistrationForm({ event }: { event: EventView }) {
       },
       {
         fullName: values.fullName,
+        parentName: values.parentName,
         email: values.email,
         whatsapp: values.whatsapp,
         institution: values.institution,
@@ -129,16 +131,58 @@ export function RegistrationForm({ event }: { event: EventView }) {
       ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Nama Lengkap" htmlFor="fullName" error={errors.fullName} required className="sm:col-span-2">
+        <Field
+          label="Nama Lengkap Anak"
+          htmlFor="fullName"
+          error={errors.fullName}
+          hint="Nama ini yang akan tercetak pada sertifikat."
+          required
+        >
           <TextInput
             id="fullName"
             name="fullName"
-            autoComplete="name"
+            autoComplete="off"
             placeholder="Contoh: Ahmad Fajar"
             value={values.fullName}
             error={errors.fullName}
+            hint="Nama ini yang akan tercetak pada sertifikat."
             disabled={submitting}
             onChange={(e) => set("fullName", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Usia Anak" htmlFor="age" error={errors.age} required>
+          <TextInput
+            id="age"
+            name="age"
+            type="number"
+            inputMode="numeric"
+            min={3}
+            max={15}
+            placeholder="7"
+            value={values.age}
+            error={errors.age}
+            disabled={submitting}
+            onChange={(e) => set("age", e.target.value)}
+          />
+        </Field>
+
+        <Field
+          label="Nama Orang Tua / Wali"
+          htmlFor="parentName"
+          error={errors.parentName}
+          required
+          className="sm:col-span-2"
+        >
+          <TextInput
+            id="parentName"
+            name="parentName"
+            autoComplete="name"
+            placeholder="Nama pendamping yang akan dihubungi"
+            value={values.parentName}
+            error={errors.parentName}
+            disabled={submitting}
+            onChange={(e) => set("parentName", e.target.value)}
           />
         </Field>
 
@@ -161,7 +205,7 @@ export function RegistrationForm({ event }: { event: EventView }) {
           label="Nomor WhatsApp"
           htmlFor="whatsapp"
           error={errors.whatsapp}
-          hint="Dipakai untuk mengirim konfirmasi kehadiran."
+          hint="Dipakai panitia untuk konfirmasi dan info lokasi."
           required
         >
           <TextInput
@@ -173,18 +217,18 @@ export function RegistrationForm({ event }: { event: EventView }) {
             placeholder="08123456789"
             value={values.whatsapp}
             error={errors.whatsapp}
-            hint="Dipakai untuk mengirim konfirmasi kehadiran."
+            hint="Dipakai panitia untuk konfirmasi dan info lokasi."
             disabled={submitting}
             onChange={(e) => set("whatsapp", e.target.value)}
           />
         </Field>
 
-        <Field label="Asal Sekolah / Institusi" htmlFor="institution" error={errors.institution} required>
+        <Field label="Asal Sekolah Anak" htmlFor="institution" error={errors.institution} required>
           <TextInput
             id="institution"
             name="institution"
             autoComplete="organization"
-            placeholder="SMA Negeri 1 Jakarta"
+            placeholder="SDN Menteng 03"
             value={values.institution}
             error={errors.institution}
             disabled={submitting}
@@ -205,27 +249,11 @@ export function RegistrationForm({ event }: { event: EventView }) {
           />
         </Field>
 
-        <Field label="Usia" htmlFor="age" error={errors.age} required>
-          <TextInput
-            id="age"
-            name="age"
-            type="number"
-            inputMode="numeric"
-            min={10}
-            max={80}
-            placeholder="17"
-            value={values.age}
-            error={errors.age}
-            disabled={submitting}
-            onChange={(e) => set("age", e.target.value)}
-          />
-        </Field>
-
         <Field
           label="Informasi tambahan"
           htmlFor="notes"
           error={errors.notes}
-          hint="Alergi makanan, kebutuhan aksesibilitas, atau pertanyaan untuk panitia."
+          hint="Alergi makanan, kebutuhan khusus, atau pertanyaan untuk panitia."
           className="sm:col-span-2"
         >
           <TextArea
@@ -236,7 +264,7 @@ export function RegistrationForm({ event }: { event: EventView }) {
             placeholder="Opsional"
             value={values.notes}
             error={errors.notes}
-            hint="Alergi makanan, kebutuhan aksesibilitas, atau pertanyaan untuk panitia."
+            hint="Alergi makanan, kebutuhan khusus, atau pertanyaan untuk panitia."
             disabled={submitting}
             onChange={(e) => set("notes", e.target.value)}
           />
@@ -251,8 +279,9 @@ export function RegistrationForm({ event }: { event: EventView }) {
         onChange={(checked) => set("consent", checked)}
         label={
           <>
-            Saya menyatakan data di atas benar dan bersedia dihubungi panitia Kelas Bermain
-            terkait {event.title}. Data hanya digunakan untuk keperluan kegiatan ini.
+            Saya orang tua/wali yang mendaftarkan anak di atas, menyatakan datanya benar,
+            dan bersedia dihubungi panitia Kelas Bermain terkait {event.title}. Data hanya
+            digunakan untuk keperluan kegiatan ini.
           </>
         }
       />
@@ -269,8 +298,7 @@ export function RegistrationForm({ event }: { event: EventView }) {
             </>
           ) : (
             <>
-              Event ini <strong className="font-bold text-ink">gratis</strong>. Tidak ada
-              pembayaran apa pun.
+              Kelas ini <strong className="font-bold text-ink">tanpa biaya</strong>.
             </>
           )}
         </p>
@@ -306,8 +334,8 @@ function RegistrationSuccess({
         </span>
         <h2 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">Registrasi Berhasil!</h2>
         <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
-          Terima kasih sudah mendaftar. Detail kegiatan akan dikirimkan ke kontak yang kamu
-          berikan.
+          Terima kasih sudah mendaftarkan si kecil. Detail kegiatan akan dikirimkan ke
+          kontak yang Ayah/Bunda berikan.
         </p>
 
         <div className="mx-auto mt-6 max-w-sm rounded-2xl border border-pine/20 bg-surface p-4">
@@ -319,7 +347,7 @@ function RegistrationSuccess({
           </p>
           <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
             <Copy className="mt-px size-3 shrink-0" aria-hidden />
-            Simpan ID ini. Kamu memerlukannya untuk mengisi kehadiran dan mengambil sertifikat.
+            Simpan ID ini. Diperlukan untuk mengisi kehadiran dan mengambil sertifikat anak.
           </p>
         </div>
       </div>
@@ -377,12 +405,12 @@ function RegistrationSuccess({
           </li>
           <li className="flex gap-3">
             <CalendarCheck className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
-            Isi kehadiran lewat halaman event menggunakan ID pendaftaranmu.
+            Isi kehadiran lewat halaman event menggunakan ID pendaftaran di atas.
           </li>
           {event.certificate.available ? (
             <li className="flex gap-3">
               <CalendarCheck className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
-              Setelah kehadiran tercatat, sertifikat bisa langsung dilihat dan diunduh.
+              Setelah kehadiran tercatat, sertifikat anak bisa langsung dilihat dan diunduh.
             </li>
           ) : null}
         </ul>
@@ -405,7 +433,7 @@ function RegistrationSuccess({
       </div>
 
       <p className="rounded-xl bg-canvas-deep/60 p-4 text-xs leading-relaxed text-muted">
-        Catatan versi demo: pendaftaran ini disimpan sementara di peramban kamu dan belum
+        Catatan versi demo: pendaftaran ini disimpan sementara di peramban Anda dan belum
         terhubung ke basis data produksi.
       </p>
     </div>
