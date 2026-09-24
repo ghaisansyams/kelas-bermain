@@ -1,27 +1,30 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { Metadata } from "next";
-import { Camera, Images } from "lucide-react";
-import { GalleryGrid } from "@/components/gallery/gallery-grid";
+import { ArrowRight, Camera } from "lucide-react";
+import { DriveLinkCard } from "@/components/gallery/drive-link-card";
+import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Eyebrow } from "@/components/ui/section-heading";
 import { siteConfig } from "@/data/site";
-import { getGalleryFeatured, getGalleryItems } from "@/lib/services/content";
+import { getGalleryDrive, getGalleryFeatured } from "@/lib/services/content";
 
 export const metadata: Metadata = {
   title: "Galeri",
   description:
-    "Dokumentasi foto kegiatan dan event Kelas Bermain. Terbuka untuk umum — tanpa perlu masuk akun.",
+    "Dokumentasi foto kegiatan dan event Kelas Bermain, tersimpan dalam satu folder Google Drive yang terbuka untuk umum — tanpa perlu masuk akun.",
   alternates: { canonical: "/galeri" },
   openGraph: {
     title: `Galeri · ${siteConfig.name}`,
-    description: "Dokumentasi foto kegiatan dan event Kelas Bermain, terbuka untuk umum.",
+    description:
+      "Dokumentasi foto kegiatan dan event Kelas Bermain, terbuka untuk umum lewat Google Drive.",
     url: `${siteConfig.url}/galeri`,
     images: [{ url: "/images/galeri-banner.jpg", width: 2000, height: 1100 }],
   },
 };
 
 export default async function GaleriPage() {
-  const [items, featured] = await Promise.all([getGalleryItems(), getGalleryFeatured()]);
+  const [featured, drive] = await Promise.all([getGalleryFeatured(), getGalleryDrive()]);
 
   return (
     <>
@@ -58,25 +61,44 @@ export default async function GaleriPage() {
         </Container>
       </section>
 
+      {/* Below the banner: the Drive link, not a photo grid. */}
       <Container className="py-10 sm:py-14">
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Eyebrow>Dokumentasi</Eyebrow>
-            <h2 className="mt-3 text-[1.5rem] font-extrabold text-ink sm:text-3xl">
-              Semua foto kegiatan
-            </h2>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-              Galeri ini terbuka untuk umum. Klik foto mana pun untuk melihat versi besar
-              beserta keterangannya.
-            </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-pill border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink-soft sm:self-auto">
-            <Images className="size-4 text-brand" aria-hidden />
-            {items.length} foto
-          </span>
+        <div className="max-w-3xl">
+          <Eyebrow>Dokumentasi</Eyebrow>
+          <h2 className="mt-3 text-[1.5rem] font-extrabold text-ink sm:text-3xl">
+            Semua foto ada di Google Drive
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">
+            Agar mudah diunduh dan selalu terbarui, dokumentasi lengkap Kelas Bermain kami
+            simpan di satu folder Google Drive yang terbuka untuk umum.
+          </p>
         </div>
 
-        <GalleryGrid items={items} />
+        <div className="mt-8 max-w-4xl">
+          <DriveLinkCard drive={drive} />
+        </div>
+
+        <div className="mt-10 flex flex-col gap-3 rounded-card border border-line bg-canvas-deep/40 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+          <div className="min-w-0">
+            <p className="text-base font-extrabold text-ink">
+              Mencari dokumentasi satu kegiatan tertentu?
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">
+              Setiap halaman kegiatan memuat cerita, linimasa, dan foto dari kegiatan
+              tersebut.
+            </p>
+          </div>
+          <Link
+            href="/kegiatan"
+            className={buttonStyles({
+              variant: "secondary",
+              className: "w-full shrink-0 sm:w-auto",
+            })}
+          >
+            Lihat Kegiatan
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
       </Container>
     </>
   );

@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -8,7 +7,6 @@ import {
   AttendanceForm,
 } from "@/components/forms/attendance-form";
 import { Container } from "@/components/ui/container";
-import { Skeleton } from "@/components/ui/skeleton";
 import { demoRegistrations } from "@/data/demo-records";
 import { getEventBySlug, getEventSlugs } from "@/lib/services/content";
 import { formatDateRange } from "@/lib/utils/date";
@@ -70,9 +68,7 @@ export default async function AttendancePage({
       </header>
 
       <div className="mt-8 rounded-card border border-line bg-surface p-5 shadow-soft sm:p-7">
-        <Suspense fallback={<AttendanceFormSkeleton />}>
-          <AttendanceForm event={event} />
-        </Suspense>
+        <AttendanceForm event={event} />
       </div>
 
       {demo ? (
@@ -83,20 +79,5 @@ export default async function AttendancePage({
         />
       ) : null}
     </Container>
-  );
-}
-
-function AttendanceFormSkeleton() {
-  return (
-    <div className="space-y-5">
-      {[0, 1, 2].map((index) => (
-        <div key={index} className="space-y-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-12 w-full rounded-xl" />
-        </div>
-      ))}
-      <Skeleton className="h-16 w-full rounded-xl" />
-      <Skeleton className="h-13 w-44 rounded-pill" />
-    </div>
   );
 }

@@ -35,6 +35,9 @@ import {
 import { formatDateRange, formatWeekday } from "@/lib/utils/date";
 import { formatTimeRange } from "@/lib/utils/format";
 
+/** Event status is derived from the current date; regenerate hourly. */
+export const revalidate = 3600;
+
 export async function generateStaticParams() {
   const slugs = await getEventSlugs();
   return slugs.map((slug) => ({ slug }));

@@ -8,21 +8,13 @@ export default function Loading() {
         <Skeleton className="h-[18rem] w-full rounded-[1.5rem] sm:h-[24rem] lg:h-[30rem]" />
       </Container>
       <Container className="py-10 sm:py-14">
-        <div className="flex gap-2">
-          {[0, 1, 2, 3, 4].map((index) => (
-            <Skeleton key={index} className="h-10 w-24 rounded-pill" />
-          ))}
+        <div className="max-w-3xl space-y-3">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-9 w-80 max-w-full" />
+          <Skeleton className="h-5 w-full max-w-xl" />
         </div>
-        <div className="mt-8 columns-2 gap-3 sm:columns-3 lg:columns-4">
-          {/* Varied heights mirror the masonry layout underneath. */}
-          {[14, 11, 16, 12, 15, 10, 13, 17, 11, 14, 12, 16].map((height, index) => (
-            <Skeleton
-              key={index}
-              className="mb-3 w-full rounded-2xl"
-              style={{ height: `${height}rem` }}
-            />
-          ))}
-        </div>
+        <Skeleton className="mt-8 h-72 w-full max-w-4xl rounded-card" />
+        <Skeleton className="mt-10 h-28 w-full rounded-card" />
       </Container>
     </>
   );

@@ -1,11 +1,15 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { EventExplorer } from "@/components/event/event-explorer";
 import { PageHeader } from "@/components/layout/page-header";
 import { Container } from "@/components/ui/container";
-import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { siteConfig } from "@/data/site";
 import { getEvents } from "@/lib/services/content";
+
+/**
+ * Event status is derived from the current date, so regenerate hourly to keep
+ * "Akan Datang" / "Selesai" honest without needing a redeploy.
+ */
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Event",
@@ -39,9 +43,7 @@ export default async function EventPage() {
       />
 
       <Container className="py-10 sm:py-14">
-        <Suspense fallback={<CardGridSkeleton count={6} />}>
-          <EventExplorer events={events} />
-        </Suspense>
+        <EventExplorer events={events} />
       </Container>
     </>
   );

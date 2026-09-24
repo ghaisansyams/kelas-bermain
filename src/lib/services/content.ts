@@ -1,6 +1,6 @@
 import { activities } from "@/data/activities";
 import { events } from "@/data/events";
-import { galleryFeatured, galleryItems } from "@/data/gallery";
+import { galleryDrive, galleryFeatured, galleryItems } from "@/data/gallery";
 import { instagramPosts } from "@/data/instagram";
 import { speakers } from "@/data/speakers";
 import { testimonials } from "@/data/testimonials";
@@ -153,6 +153,11 @@ export async function getGalleryItems(): Promise<GalleryItem[]> {
 
 export async function getGalleryFeatured(): Promise<typeof galleryFeatured> {
   return galleryFeatured;
+}
+
+/** The Drive folder the gallery page links to, in place of a photo grid. */
+export async function getGalleryDrive(): Promise<typeof galleryDrive> {
+  return galleryDrive;
 }
 
 export async function getGalleryByIds(ids: readonly string[]): Promise<GalleryItem[]> {

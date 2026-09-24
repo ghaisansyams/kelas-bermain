@@ -16,6 +16,9 @@ import {
   getUpcomingEvents,
 } from "@/lib/services/content";
 
+/** Event status is derived from the current date; regenerate hourly. */
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: `${siteConfig.name} — ${siteConfig.tagline}`,
   description: siteConfig.description,

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Award,
@@ -35,14 +35,19 @@ type Status = "idle" | "submitting" | "success";
 
 export function AttendanceForm({ event }: { event: EventView }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  // A QR check-in would land here with the id already in the URL.
-  const prefilled = searchParams.get("rid") ?? "";
+  // A QR check-in lands here with the id already in the URL. Read it after
+  // mount rather than with `useSearchParams`, which would make this form
+  // prerender as a skeleton and flash on every visit.
+  const [prefilled, setPrefilled] = useState(false);
 
-  const [values, setValues] = useState<AttendanceFormValues>({
-    ...EMPTY,
-    registrationId: prefilled,
-  });
+  const [values, setValues] = useState<AttendanceFormValues>(EMPTY);
+
+  useEffect(() => {
+    const rid = new URLSearchParams(window.location.search).get("rid");
+    if (!rid) return;
+    setPrefilled(true);
+    setValues((current) => ({ ...current, registrationId: rid }));
+  }, []);
   const [errors, setErrors] = useState<FieldErrors<AttendanceFormValues>>({});
   const [status, setStatus] = useState<Status>("idle");
   const [formError, setFormError] = useState<string | null>(null);

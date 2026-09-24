@@ -47,6 +47,10 @@ Hanya satu, dan bersifat opsional:
 | Nama | Fungsi | Default |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Basis URL absolut untuk metadata SEO, Open Graph, sitemap, dan canonical | `https://kelas-bermain.vercel.app` |
+| `NEXT_PUBLIC_GALLERY_DRIVE_URL` | URL folder Google Drive yang ditautkan di halaman Galeri | kosong |
+
+Keduanya opsional. Selama `NEXT_PUBLIC_GALLERY_DRIVE_URL` kosong, halaman Galeri menampilkan
+status "tautan belum diisi" alih-alih tautan mati.
 
 Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 
@@ -61,12 +65,22 @@ Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 | `/event/[slug]/attendance` | Formulir konfirmasi kehadiran peserta |
 | `/kegiatan` | Daftar kegiatan + filter kategori |
 | `/kegiatan/[slug]` | Detail kegiatan: linimasa, sorotan, galeri, kegiatan terkait |
-| `/galeri` | Galeri publik: banner utama, filter kategori, grid masonry, lightbox |
+| `/galeri` | Galeri publik: banner utama + tautan ke folder Google Drive (bukan grid foto) |
 | `/sertifikat` | Verifikasi sertifikat berdasarkan nomor sertifikat atau ID pendaftaran |
 | `/sertifikat/[id]` | Tampilan sertifikat + cetak/unduh |
 | `/sitemap.xml`, `/robots.txt` | Dihasilkan otomatis dari data konten |
 
 Galeri **tidak memerlukan login** — seluruh isinya terbuka untuk umum.
+
+### Catatan halaman Galeri
+
+Sesuai notulen rapat dengan direktur, area **di bawah banner berisi tautan, bukan grid
+foto**: dokumentasi lengkap disimpan di satu folder Google Drive dan halaman Galeri hanya
+menautkannya. Isi tautan lewat `NEXT_PUBLIC_GALLERY_DRIVE_URL` atau pada
+`src/data/gallery.ts` (`galleryDrive.url`).
+
+Grid foto beserta lightbox-nya **tetap dipakai di halaman detail kegiatan**
+(`/kegiatan/[slug]`), yang menampilkan foto milik kegiatan tersebut.
 
 ## Struktur proyek
 
@@ -191,7 +205,11 @@ Pada commit ini:
 - Alur yang diuji ujung ke ujung: menu seluler, filter event (termasuk deep link
   `?filter=`), validasi form, pendaftaran gratis, penolakan email duplikat, pendaftaran
   berbayar beserta instruksi pembayaran, pencatatan kehadiran, penolakan kontak yang tidak
-  cocok, penerbitan sertifikat bernomor unik, verifikasi sertifikat, serta lightbox galeri.
+  cocok, penerbitan sertifikat bernomor unik, verifikasi sertifikat, tautan Drive pada
+  halaman Galeri, serta lightbox galeri pada halaman detail kegiatan.
+- Daftar event dan formulir dirender di server (bukan skeleton), sehingga isinya terbaca
+  tanpa menjalankan JavaScript. Halaman yang bergantung pada tanggal diregenerasi tiap jam
+  (`revalidate = 3600`) agar status "Akan Datang"/"Selesai" tidak basi.
 
 ## Deploy
 
@@ -213,3 +231,5 @@ agar metadata SEO dan sitemap memakai URL yang benar.
 - Tanggal event bersifat statis. Seiring waktu, event "akan datang" akan berpindah sendiri
   ke "selesai" karena statusnya dihitung dari tanggal sebenarnya.
 - Belum ada panel admin, autentikasi, maupun absensi QR (jalur kodenya sudah disiapkan).
+- Tautan folder Google Drive pada halaman Galeri belum diisi; halaman menampilkan status
+  "belum diatur" sampai URL asli dimasukkan.

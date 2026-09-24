@@ -225,6 +225,30 @@ export const galleryItems: GalleryItem[] = [
   },
 ];
 
+/**
+ * Google Drive folder that holds the full documentation.
+ *
+ * Per the director's note, the gallery page shows this link under the banner
+ * instead of a photo grid — the photos themselves live in Drive.
+ *
+ * Set the real folder URL either here, or without touching code by adding
+ * `NEXT_PUBLIC_GALLERY_DRIVE_URL` to the environment. While it is empty the
+ * page renders a clearly-marked "belum diatur" state rather than a dead link.
+ */
+export const galleryDrive = {
+  title: "Folder Dokumentasi Kelas Bermain",
+  description:
+    "Seluruh foto kegiatan dan event Kelas Bermain kami kumpulkan dalam satu folder Google Drive. Folder ini terbuka untuk umum — tidak perlu masuk akun untuk melihat maupun mengunduh.",
+  url: process.env.NEXT_PUBLIC_GALLERY_DRIVE_URL ?? "",
+  /** Shown as the last-updated hint under the link. */
+  updatedAt: "2026-09-20",
+  contents: [
+    "Dokumentasi event dan kegiatan, dikelompokkan per folder tahun",
+    "Foto resolusi penuh siap diunduh",
+    "Diperbarui setiap selesai kegiatan",
+  ],
+} as const;
+
 /** Image shown as the large banner at the top of the gallery page. */
 export const galleryFeatured = {
   src: "/images/galeri-banner.jpg",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { CalendarX2, SlidersHorizontal } from "lucide-react";
 import { EventCard } from "@/components/event/event-card";
 import { Button } from "@/components/ui/button";
@@ -22,26 +22,35 @@ function isLifecycleFilter(value: string | null): value is LifecycleFilter {
   return value === "all" || value === "upcoming" || value === "ongoing" || value === "past";
 }
 
+function filterFromLocation(): LifecycleFilter {
+  const value = new URLSearchParams(window.location.search).get("filter");
+  return isLifecycleFilter(value) ? value : "all";
+}
+
 /**
  * Client-side filtering over a server-rendered list.
  *
  * The events arrive with their lifecycle already resolved on the server, so no
  * date maths happens here and server and client markup always agree.
+ *
+ * The `?filter=` deep link is read from `window.location` after mount rather
+ * than with `useSearchParams`, which would force this component's Suspense
+ * boundary to prerender as a skeleton — leaving the event list out of the
+ * static HTML entirely, and so out of reach of anything that does not run JS.
  */
 export function EventExplorer({ events }: { events: EventView[] }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const paramFilter = searchParams.get("filter");
 
-  const [lifecycle, setLifecycle] = useState<LifecycleFilter>(
-    isLifecycleFilter(paramFilter) ? paramFilter : "all",
-  );
+  const [lifecycle, setLifecycle] = useState<LifecycleFilter>("all");
   const [category, setCategory] = useState<EventCategory | "all">("all");
 
-  // Keep state in step with back/forward navigation and deep links.
+  // Apply the deep link once mounted, and follow back/forward afterwards.
   useEffect(() => {
-    setLifecycle(isLifecycleFilter(paramFilter) ? paramFilter : "all");
-  }, [paramFilter]);
+    setLifecycle(filterFromLocation());
+    const onPopState = () => setLifecycle(filterFromLocation());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const updateLifecycle = useCallback(
     (value: LifecycleFilter) => {
