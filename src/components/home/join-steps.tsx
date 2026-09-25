@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { JoinStepsCollage } from "@/components/home/join-steps-collage";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -39,54 +39,7 @@ export function JoinSteps() {
             </ol>
           </div>
 
-          <Reveal delay={120} className="lg:col-span-7">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
-                <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
-                  <Image
-                    src="/images/galeri-01.jpg"
-                    alt="Tiga anak kecil berpelukan sambil tertawa"
-                    width={1200}
-                    height={800}
-                    sizes="(max-width: 1024px) 45vw, 28vw"
-                    className="aspect-[4/5] w-full object-cover"
-                  />
-                </div>
-                <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
-                  <Image
-                    src="/images/galeri-04.jpg"
-                    alt="Anak-anak mewarnai batu di meja prakarya"
-                    width={1200}
-                    height={675}
-                    sizes="(max-width: 1024px) 45vw, 28vw"
-                    className="aspect-square w-full object-cover"
-                  />
-                </div>
-              </div>
-              <div className="space-y-4 pt-8">
-                <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
-                  <Image
-                    src="/images/galeri-14.jpg"
-                    alt="Kue kecil yang sudah dihias peserta"
-                    width={1200}
-                    height={857}
-                    sizes="(max-width: 1024px) 45vw, 28vw"
-                    className="aspect-square w-full object-cover"
-                  />
-                </div>
-                <div className="overflow-hidden rounded-[1.5rem] bg-canvas-deep shadow-soft">
-                  <Image
-                    src="/images/galeri-13.jpg"
-                    alt="Aneka sayuran segar hasil panen peserta"
-                    width={1200}
-                    height={802}
-                    sizes="(max-width: 1024px) 45vw, 28vw"
-                    className="aspect-[4/5] w-full object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-          </Reveal>
+          <JoinStepsCollage className="lg:col-span-7" />
         </div>
       </Container>
     </section>

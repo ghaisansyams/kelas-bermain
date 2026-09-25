@@ -96,6 +96,29 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Collage drift                                                       */
+/* Declared outside @theme: Tailwind only emits @theme keyframes that an */
+/* --animate-* variable references, and these are driven by a class.     */
+/* ------------------------------------------------------------------ */
+@keyframes float-up {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, calc(var(--float-distance) * -1), 0);
+  }
+}
+
+@keyframes float-down {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, var(--float-distance), 0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Base                                                                */
 /* ------------------------------------------------------------------ */
 @layer base {
@@ -180,6 +203,51 @@
     transform: none;
   }
 
+  /* --- "Cara ikut" collage -------------------------------------------
+     Three separate layers so each owns exactly one transform and they never
+     fight: reveal (this), pointer parallax, then the float itself. */
+  .collage-tile {
+    opacity: 0;
+    transition:
+      opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .collage-tile[data-from="below"] {
+    transform: translate3d(0, 18px, 0);
+  }
+  .collage-tile[data-from="above"] {
+    transform: translate3d(0, -18px, 0);
+  }
+  .collage-tile[data-shown="true"] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .parallax-layer {
+    transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .float-tile {
+    /* Shorter travel on phones, per the brief. */
+    --float-distance: 8px;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+    will-change: transform;
+  }
+  @media (min-width: 640px) {
+    .float-tile {
+      --float-distance: 12px;
+    }
+  }
+  .float-up {
+    animation-name: float-up;
+  }
+  .float-down {
+    animation-name: float-down;
+  }
+
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -219,6 +287,18 @@
   .reveal {
     opacity: 1;
     transform: none;
+  }
+
+  /* Without this the collage would settle on the end keyframe and sit
+     permanently offset rather than at rest. */
+  .float-tile {
+    animation: none !important;
+  }
+  .collage-tile,
+  .parallax-layer {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 }
 
