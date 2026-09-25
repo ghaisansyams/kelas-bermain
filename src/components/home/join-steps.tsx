@@ -11,6 +11,7 @@ export function JoinSteps() {
         <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">
             <SectionHeading
+              stagger
               eyebrow="Cara ikut"
               title="Empat langkah, selesai dalam lima menit"
               description="Pendaftaran dibuat sesederhana mungkin untuk Ayah dan Bunda. Tidak perlu membuat akun, tidak perlu mengunduh aplikasi."
@@ -18,7 +19,7 @@ export function JoinSteps() {
 
             <ol className="mt-9 space-y-6">
               {joinSteps.map((step, index) => (
-                <Reveal key={step.title} delay={index * 70} as="li" className="flex gap-4">
+                <Reveal key={step.title} delay={210 + index * 70} as="li" className="flex gap-4">
                   <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-extrabold text-white">
                     {index + 1}
                     {index < joinSteps.length - 1 ? (

@@ -96,29 +96,6 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Collage drift                                                       */
-/* Declared outside @theme: Tailwind only emits @theme keyframes that an */
-/* --animate-* variable references, and these are driven by a class.     */
-/* ------------------------------------------------------------------ */
-@keyframes float-up {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(0, calc(var(--float-distance) * -1), 0);
-  }
-}
-
-@keyframes float-down {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(0, var(--float-distance), 0);
-  }
-}
-
-/* ------------------------------------------------------------------ */
 /* Base                                                                */
 /* ------------------------------------------------------------------ */
 @layer base {
@@ -204,48 +181,33 @@
   }
 
   /* --- "Cara ikut" collage -------------------------------------------
-     Three separate layers so each owns exactly one transform and they never
-     fight: reveal (this), pointer parallax, then the float itself. */
+     Two layers, one job each. The outer one reveals on entry (a CSS
+     transition, fired once). The inner one is driven every frame by the
+     component's rAF loop, which composes scroll parallax, an idle sway, and
+     pointer offset into a single transform — so the layers never fight and
+     nothing writes to layout. */
   .collage-tile {
     opacity: 0;
     transition:
-      opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 560ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
     transition-delay: var(--reveal-delay, 0ms);
   }
   .collage-tile[data-from="below"] {
-    transform: translate3d(0, 18px, 0);
+    transform: translate3d(0, 20px, 0) scale(0.96);
   }
   .collage-tile[data-from="above"] {
-    transform: translate3d(0, -18px, 0);
+    transform: translate3d(0, -20px, 0) scale(0.96);
   }
   .collage-tile[data-shown="true"] {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
-  .parallax-layer {
-    transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .float-tile {
-    /* Shorter travel on phones, per the brief. */
-    --float-distance: 8px;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-    animation-direction: alternate;
+  /* No transition here on purpose: the rAF loop already interpolates, and a
+     transition on top would fight it and smear the motion. */
+  .collage-motion {
     will-change: transform;
-  }
-  @media (min-width: 640px) {
-    .float-tile {
-      --float-distance: 12px;
-    }
-  }
-  .float-up {
-    animation-name: float-up;
-  }
-  .float-down {
-    animation-name: float-down;
   }
 
   .no-scrollbar {
@@ -289,13 +251,10 @@
     transform: none;
   }
 
-  /* Without this the collage would settle on the end keyframe and sit
-     permanently offset rather than at rest. */
-  .float-tile {
-    animation: none !important;
-  }
+  /* The rAF loop never starts under reduced motion; these make sure nothing
+     is left mid-reveal or holding a stale transform. */
   .collage-tile,
-  .parallax-layer {
+  .collage-motion {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
