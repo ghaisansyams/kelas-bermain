@@ -7,8 +7,20 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // Personal flows have nothing to index.
-        disallow: ["/sertifikat/", "/event/*/daftar", "/event/*/attendance"],
+        disallow: [
+          // The ERP is staff-only. Pages also carry noindex, but keep crawlers
+          // off the path entirely.
+          "/admin",
+          // Personal flows: forms, checkouts, and someone's certificate.
+          "/register/",
+          "/payment/",
+          "/attendance/",
+          "/certificate/",
+          // Pre-restructure URLs that now redirect into the paths above.
+          "/event/*/daftar",
+          "/event/*/attendance",
+          "/sertifikat/",
+        ],
       },
     ],
     sitemap: `${siteConfig.url}/sitemap.xml`,
