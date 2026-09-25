@@ -83,6 +83,79 @@ export function Panel({
 /* Stats                                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Semantic tones. Colour carries meaning here rather than decoration:
+ * money is settled value, action is something waiting on a human, critical is
+ * a failure, info is context, neutral is reference data. The older literal
+ * names stay valid so the other admin screens are untouched.
+ */
+export type StatTone =
+  | "money"
+  | "action"
+  | "critical"
+  | "info"
+  | "neutral"
+  | "brand"
+  | "pine"
+  | "sun"
+  | "sky"
+  | "grape";
+
+const TONE_STYLES: Record<StatTone, string> = {
+  money: "bg-pine-soft text-pine",
+  action: "bg-sun-soft text-sun-dark",
+  critical: "bg-brand-soft text-brand",
+  info: "bg-sky-soft text-sky",
+  neutral: "bg-canvas-deep text-muted",
+  brand: "bg-brand-soft text-brand",
+  pine: "bg-pine-soft text-pine",
+  sun: "bg-sun-soft text-sun-dark",
+  sky: "bg-sky-soft text-sky",
+  grape: "bg-grape-soft text-grape",
+};
+
+export interface StatTrend {
+  percent: number;
+  direction: "up" | "down" | "flat";
+  comparable: boolean;
+}
+
+function TrendPill({
+  trend,
+  /** Down is good for some metrics — outstanding payments, for instance. */
+  invert = false,
+}: {
+  trend: StatTrend;
+  invert?: boolean;
+}) {
+  if (!trend.comparable) {
+    return (
+      <span className="text-[0.6875rem] font-medium text-muted">
+        Belum ada pembanding
+      </span>
+    );
+  }
+  if (trend.direction === "flat") {
+    return <span className="text-[0.6875rem] font-medium text-muted">Tidak berubah</span>;
+  }
+  const up = trend.direction === "up";
+  const good = invert ? !up : up;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-0.5 text-[0.6875rem] font-bold tabular-nums",
+        good ? "text-pine-dark" : "text-brand-ink",
+      )}
+    >
+      <span aria-hidden>{up ? "▲" : "▼"}</span>
+      {trend.percent}%
+      <span className="sr-only">
+        {up ? "naik" : "turun"} dibanding periode sebelumnya
+      </span>
+    </span>
+  );
+}
+
 export function StatCard({
   label,
   value,
@@ -90,48 +163,79 @@ export function StatCard({
   icon,
   tone = "neutral",
   href,
+  size = "sm",
+  trend,
+  invertTrend,
+  cta,
 }: {
   label: string;
   value: string;
-  detail?: string;
+  detail?: ReactNode;
   icon?: ReactNode;
-  tone?: "neutral" | "brand" | "pine" | "sun" | "sky" | "grape";
+  tone?: StatTone;
   href?: string;
+  /** "lg" is the headline row; "sm" is the reference row beneath it. */
+  size?: "sm" | "lg";
+  trend?: StatTrend;
+  invertTrend?: boolean;
+  /** Shown on cards that exist to be clicked. */
+  cta?: string;
 }) {
-  const tones = {
-    neutral: "bg-canvas-deep text-ink-soft",
-    brand: "bg-brand-soft text-brand",
-    pine: "bg-pine-soft text-pine",
-    sun: "bg-sun-soft text-sun-dark",
-    sky: "bg-sky-soft text-sky",
-    grape: "bg-grape-soft text-grape",
-  } as const;
+  const large = size === "lg";
 
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold text-muted">{label}</p>
+        <p
+          className={cn(
+            "font-semibold text-muted",
+            large ? "text-[0.8125rem]" : "text-xs",
+          )}
+        >
+          {label}
+        </p>
         {icon ? (
           <span
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-lg",
-              tones[tone],
+              "flex shrink-0 items-center justify-center rounded-lg",
+              large ? "size-9" : "size-8",
+              TONE_STYLES[tone],
             )}
           >
             {icon}
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-2xl font-extrabold tabular-nums leading-none text-ink">
+
+      <p
+        className={cn(
+          "mt-2 font-extrabold tabular-nums leading-none text-ink",
+          large ? "text-[1.75rem]" : "text-2xl",
+        )}
+      >
         {value}
       </p>
-      {detail ? <p className="mt-1.5 text-xs text-muted">{detail}</p> : null}
+
+      {detail || trend ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {trend ? <TrendPill trend={trend} invert={invertTrend} /> : null}
+          {detail ? <span className="text-xs text-muted">{detail}</span> : null}
+        </div>
+      ) : null}
+
+      {cta && href ? (
+        <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-brand">
+          {cta}
+          <span aria-hidden>→</span>
+        </span>
+      ) : null}
     </>
   );
 
   const className = cn(
-    "rounded-xl border border-line bg-surface p-4 transition-shadow",
-    href && "hover:shadow-soft",
+    "block rounded-xl border bg-surface transition-shadow",
+    large ? "border-line p-5" : "border-line p-4",
+    href && "hover:border-brand/30 hover:shadow-soft",
   );
 
   return href ? (

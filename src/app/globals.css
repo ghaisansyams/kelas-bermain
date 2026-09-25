@@ -114,8 +114,11 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    /* Nothing should ever scroll sideways on a phone. */
-    overflow-x: hidden;
+    /* Nothing should ever scroll sideways on a phone.
+       `clip` rather than `hidden`: `hidden` turns <body> into a scroll
+       container, which silently breaks `position: sticky` inside it on
+       Chrome and Safari — that is what left the admin sidebar short. */
+    overflow-x: clip;
   }
 
   h1,

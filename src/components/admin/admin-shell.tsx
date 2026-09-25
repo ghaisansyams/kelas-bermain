@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Gauge,
   Image as ImageIcon,
-  LogOut,
   Menu,
   Settings,
   Sparkles,
@@ -24,8 +23,9 @@ import {
 } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { GlobalSearch } from "@/components/admin/global-search";
+import { UserMenu } from "@/components/admin/user-menu";
 import { adminNav, NAV_GROUPS } from "@/lib/auth/nav";
-import { can, ROLE_LABEL, type Role } from "@/lib/auth/roles";
+import { can, type Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils/cn";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -138,7 +138,7 @@ export function AdminShell({
   return (
     <div className="flex min-h-dvh bg-canvas-deep/40">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-line bg-surface lg:block">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 self-start overflow-hidden border-r border-line bg-surface lg:block">
         {sidebar}
       </aside>
 
@@ -172,28 +172,7 @@ export function AdminShell({
             <GlobalSearch />
 
             <div className="ml-auto flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-xs font-bold leading-none text-ink">{user.name}</p>
-                <p className="mt-1 text-[0.6875rem] font-semibold text-brand">
-                  {ROLE_LABEL[user.role]}
-                </p>
-              </div>
-              <span
-                aria-hidden
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-extrabold text-brand-ink"
-              >
-                {user.name.slice(0, 1)}
-              </span>
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  aria-label="Keluar"
-                  title="Keluar"
-                  className="inline-flex size-10 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:border-brand/40 hover:text-brand"
-                >
-                  <LogOut className="size-4" aria-hidden />
-                </button>
-              </form>
+              <UserMenu user={user} logoutAction={logoutAction} />
             </div>
           </div>
         </header>

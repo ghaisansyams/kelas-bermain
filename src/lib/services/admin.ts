@@ -223,96 +223,290 @@ export interface SeriesPoint {
   value: number;
 }
 
+export type RangeKey = "7d" | "30d" | "6m" | "custom";
+
+export interface DashboardRange {
+  key: RangeKey;
+  /** Inclusive ISO dates (yyyy-mm-dd). */
+  from: string;
+  to: string;
+}
+
+export type Granularity = "day" | "week" | "month";
+
+export interface Trend {
+  /** Percent change against the previous window of equal length. */
+  percent: number;
+  direction: "up" | "down" | "flat";
+  /** False when the previous window had nothing to compare against. */
+  comparable: boolean;
+}
+
+/** Attendance split for one event, used by the dashboard breakdown. */
+export interface AttendanceEventPoint {
+  label: string;
+  present: number;
+  absent: number;
+  pending: number;
+  total: number;
+}
+
 export interface DashboardData {
+  range: DashboardRange;
+  granularity: Granularity;
   stats: {
-    customers: number;
-    children: number;
-    upcomingEvents: number;
-    activeRegistrations: number;
-    pendingPayments: number;
-    paidRegistrations: number;
-    attendanceToday: number;
-    certificatesIssued: number;
     revenue: number;
+    revenueTrend: Trend;
+    registrations: number;
+    registrationsTrend: Trend;
+    /** Outstanding payments are never scoped to the range — an overdue one
+        from two months ago still needs chasing. */
+    pendingCount: number;
+    pendingAmount: number;
+    attendance: { present: number; absent: number; pending: number; rate: number };
+    customersTotal: number;
+    customersAdded: number;
+    childrenTotal: number;
+    childrenAdded: number;
+    upcomingEvents: number;
+    certificatesTotal: number;
+    certificatesIssued: number;
+    activeRegistrations: number;
   };
-  registrationsByMonth: SeriesPoint[];
-  revenueByMonth: SeriesPoint[];
+  registrationSeries: SeriesPoint[];
+  revenueSeries: SeriesPoint[];
   registrationsByEvent: SeriesPoint[];
-  attendanceRate: { present: number; absent: number; pending: number };
+  attendanceByEvent: AttendanceEventPoint[];
   recentRegistrations: RegistrationRow[];
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const DAY_MS = 86_400_000;
 
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+const isoDay = (date: Date): string => {
+  const copy = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return copy.toISOString().slice(0, 10);
+};
+
+export function resolveRange(
+  key: RangeKey,
+  now: Date = new Date(),
+  custom?: { from: string; to: string },
+): DashboardRange {
+  const to = isoDay(now);
+  if (key === "custom" && custom?.from && custom?.to) {
+    return custom.from <= custom.to
+      ? { key, from: custom.from, to: custom.to }
+      : { key, from: custom.to, to: custom.from };
+  }
+  if (key === "7d") return { key, from: isoDay(new Date(now.getTime() - 6 * DAY_MS)), to };
+  if (key === "30d") return { key, from: isoDay(new Date(now.getTime() - 29 * DAY_MS)), to };
+  const sixMonthsBack = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  return { key: "6m", from: isoDay(sixMonthsBack), to };
 }
 
-/** Last `count` months ending with the current one, oldest first. */
-function recentMonths(count: number, now: Date): string[] {
-  return Array.from({ length: count }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (count - 1 - i), 1);
-    return `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
-  });
+function spanDays(range: DashboardRange): number {
+  return Math.max(
+    1,
+    Math.round((Date.parse(range.to) - Date.parse(range.from)) / DAY_MS) + 1,
+  );
 }
 
-export async function getDashboard(now: Date = new Date()): Promise<DashboardData> {
+export function granularityFor(range: DashboardRange): Granularity {
+  const days = spanDays(range);
+  if (days <= 14) return "day";
+  if (days <= 92) return "week";
+  return "month";
+}
+
+/** The window of equal length immediately before `range`. */
+function previousWindow(range: DashboardRange): { from: string; to: string } {
+  const days = spanDays(range);
+  const to = new Date(Date.parse(range.from) - DAY_MS);
+  const from = new Date(to.getTime() - (days - 1) * DAY_MS);
+  return { from: isoDay(from), to: isoDay(to) };
+}
+
+const within = (iso: string | undefined, from: string, to: string): boolean => {
+  if (!iso) return false;
+  const day = iso.slice(0, 10);
+  return day >= from && day <= to;
+};
+
+function trendOf(current: number, previous: number): Trend {
+  if (previous === 0) {
+    return {
+      percent: 0,
+      direction: current > 0 ? "up" : "flat",
+      comparable: false,
+    };
+  }
+  const percent = ((current - previous) / previous) * 100;
+  return {
+    percent: Math.round(Math.abs(percent)),
+    direction: percent > 0.5 ? "up" : percent < -0.5 ? "down" : "flat",
+    comparable: true,
+  };
+}
+
+/** Bucket boundaries for the series, oldest first. */
+function buckets(
+  range: DashboardRange,
+  granularity: Granularity,
+): { label: string; from: string; to: string }[] {
+  const out: { label: string; from: string; to: string }[] = [];
+  const start = new Date(`${range.from}T00:00:00`);
+  const end = new Date(`${range.to}T00:00:00`);
+
+  if (granularity === "month") {
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cursor <= end) {
+      const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      out.push({
+        label: `${MONTHS[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(2)}`,
+        from: isoDay(cursor),
+        to: isoDay(last > end ? end : last),
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return out;
+  }
+
+  const step = granularity === "week" ? 7 : 1;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const last = new Date(cursor.getTime() + (step - 1) * DAY_MS);
+    const capped = last > end ? end : last;
+    out.push({
+      label:
+        granularity === "day"
+          ? `${cursor.getDate()} ${MONTHS[cursor.getMonth()]}`
+          : `${cursor.getDate()} ${MONTHS[cursor.getMonth()]}`,
+      from: isoDay(cursor),
+      to: isoDay(capped),
+    });
+    cursor.setTime(cursor.getTime() + step * DAY_MS);
+  }
+  return out;
+}
+
+export async function getDashboard(
+  rangeKey: RangeKey = "6m",
+  now: Date = new Date(),
+  custom?: { from: string; to: string },
+): Promise<DashboardData> {
+  const range = resolveRange(rangeKey, now, custom);
+  const granularity = granularityFor(range);
+  const previous = previousWindow(range);
+
   const allRegistrations = registrationsRepo.all();
   const allPayments = paymentsRepo.all();
-  const allAttendance = attendanceRepo.all();
-  const today = now.toISOString().slice(0, 10);
+  const allCertificates = certificatesRepo.all();
 
-  const months = recentMonths(6, now);
-  const registrationsByMonth = months.map((label) => ({
-    label,
-    value: allRegistrations.filter((r) => monthKey(r.registrationDate) === label).length,
+  const inRange = allRegistrations.filter((r) =>
+    within(r.registrationDate, range.from, range.to),
+  );
+  const inPrevious = allRegistrations.filter((r) =>
+    within(r.registrationDate, previous.from, previous.to),
+  );
+
+  const paidIn = (from: string, to: string) =>
+    allPayments
+      .filter((p) => p.status === "PAID" && within(p.paidAt ?? p.createdAt, from, to))
+      .reduce((sum, p) => sum + p.amount, 0);
+
+  const revenue = paidIn(range.from, range.to);
+  const pending = allPayments.filter((p) => p.status === "PENDING");
+
+  const present = inRange.filter((r) => r.attendanceStatus === "PRESENT").length;
+  const absent = inRange.filter((r) => r.attendanceStatus === "ABSENT").length;
+  const notYet = inRange.filter((r) => r.attendanceStatus === "NOT_ATTENDED").length;
+  const settled = present + absent + notYet;
+
+  const series = buckets(range, granularity);
+  const registrationSeries = series.map((bucket) => ({
+    label: bucket.label,
+    value: allRegistrations.filter((r) =>
+      within(r.registrationDate, bucket.from, bucket.to),
+    ).length,
   }));
-  const revenueByMonth = months.map((label) => ({
-    label,
-    value: allPayments
-      .filter((p) => p.status === "PAID" && monthKey(p.paidAt ?? p.createdAt) === label)
-      .reduce((sum, p) => sum + p.amount, 0),
+  const revenueSeries = series.map((bucket) => ({
+    label: bucket.label,
+    value: paidIn(bucket.from, bucket.to),
   }));
 
   const registrationsByEvent = events
     .map((event) => ({
       label: event.title,
-      value: allRegistrations.filter((r) => r.eventId === event.id).length,
+      value: inRange.filter((r) => r.eventId === event.id).length,
     }))
     .filter((point) => point.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
+  // Attendance split per event. The dashboard's attendance card reports one
+  // blended rate; this says which event is dragging it, which is the next
+  // question an admin asks.
+  const attendanceByEvent: AttendanceEventPoint[] = events
+    .map((event) => {
+      const regs = inRange.filter((r) => r.eventId === event.id);
+      return {
+        label: event.title,
+        present: regs.filter((r) => r.attendanceStatus === "PRESENT").length,
+        absent: regs.filter((r) => r.attendanceStatus === "ABSENT").length,
+        pending: regs.filter((r) => r.attendanceStatus === "NOT_ATTENDED").length,
+        total: regs.length,
+      };
+    })
+    .filter((row) => row.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+
   const rows = await getRegistrationRows();
+  const scopedRows = rows.filter((row) =>
+    within(row.registration.registrationDate, range.from, range.to),
+  );
 
   return {
+    range,
+    granularity,
     stats: {
-      customers: customersRepo.all().length,
-      children: childrenRepo.all().length,
+      revenue,
+      revenueTrend: trendOf(revenue, paidIn(previous.from, previous.to)),
+      registrations: inRange.length,
+      registrationsTrend: trendOf(inRange.length, inPrevious.length),
+      pendingCount: pending.length,
+      pendingAmount: pending.reduce((sum, p) => sum + p.amount, 0),
+      attendance: {
+        present,
+        absent,
+        pending: notYet,
+        rate: settled > 0 ? Math.round((present / settled) * 100) : 0,
+      },
+      customersTotal: customersRepo.all().length,
+      customersAdded: customersRepo
+        .all()
+        .filter((c) => within(c.createdAt, range.from, range.to)).length,
+      childrenTotal: childrenRepo.all().length,
+      childrenAdded: childrenRepo
+        .all()
+        .filter((c) => within(c.createdAt, range.from, range.to)).length,
       upcomingEvents: events.filter(
         (e) => e.published && resolveLifecycle(e.startDate, e.endDate, now) === "upcoming",
+      ).length,
+      certificatesTotal: allCertificates.length,
+      certificatesIssued: allCertificates.filter((c) =>
+        within(c.issuedAt, range.from, range.to),
       ).length,
       activeRegistrations: allRegistrations.filter(
         (r) => r.status === "REGISTERED" || r.status === "CONFIRMED",
       ).length,
-      pendingPayments: allPayments.filter((p) => p.status === "PENDING").length,
-      paidRegistrations: allRegistrations.filter((r) => r.paymentStatus === "PAID").length,
-      attendanceToday: allAttendance.filter((a) => a.checkedInAt?.startsWith(today)).length,
-      certificatesIssued: certificatesRepo.all().length,
-      revenue: allPayments
-        .filter((p) => p.status === "PAID")
-        .reduce((sum, p) => sum + p.amount, 0),
     },
-    registrationsByMonth,
-    revenueByMonth,
+    registrationSeries,
+    revenueSeries,
     registrationsByEvent,
-    attendanceRate: {
-      present: allRegistrations.filter((r) => r.attendanceStatus === "PRESENT").length,
-      absent: allRegistrations.filter((r) => r.attendanceStatus === "ABSENT").length,
-      pending: allRegistrations.filter((r) => r.attendanceStatus === "NOT_ATTENDED").length,
-    },
-    recentRegistrations: rows.slice(0, 6),
+    attendanceByEvent,
+    recentRegistrations: (scopedRows.length > 0 ? scopedRows : rows).slice(0, 6),
   };
 }
 

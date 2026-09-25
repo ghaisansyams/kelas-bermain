@@ -26,9 +26,15 @@ export function PaymentsView() {
   const [eventId, setEventId] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
 
+  // Deep links from the dashboard and global search land pre-filtered.
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q");
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
     if (q) setQuery(q);
+    const s = params.get("status");
+    if (s && (STATUSES as string[]).includes(s.toUpperCase())) setStatus(s.toUpperCase());
+    const m = params.get("method");
+    if (m && ["WEBSITE", "THIRD_PARTY"].includes(m.toUpperCase())) setMethod(m.toUpperCase());
   }, []);
 
   const rows = useMemo(() => data ?? [], [data]);
