@@ -63,6 +63,10 @@ export function createStore<T>(key: string, seed: () => T[]): CollectionStore<T>
 }
 
 export const STORAGE_KEYS = {
-  registrations: "kb.registrations.v1",
-  certificates: "kb.certificates.v1",
+  customers: "kb.customers.v2",
+  children: "kb.children.v2",
+  registrations: "kb.registrations.v2",
+  payments: "kb.payments.v2",
+  attendance: "kb.attendance.v2",
+  certificates: "kb.certificates.v2",
 } as const;

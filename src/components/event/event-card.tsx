@@ -136,7 +136,7 @@ function EventCardCta({ event, href }: { event: EventView; href: string }) {
     return (
       <>
         <Link
-          href={`${href}/daftar`}
+          href={`/register/${event.slug}`}
           className={cn(buttonStyles({ size: "sm" }), "relative z-10 flex-1")}
         >
           Daftar Sekarang

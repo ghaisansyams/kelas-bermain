@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
-import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
 import { siteConfig } from "@/data/site";
 import "./globals.css";
 
@@ -82,13 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       data-scroll-behavior="smooth"
       className={`${jakarta.variable} ${fraunces.variable}`}
     >
-      <body className="flex min-h-dvh flex-col">
-        <SiteHeader />
-        <main id="konten" className="flex-1">
-          {children}
-        </main>
-        <SiteFooter />
-      </body>
+      <body className="flex min-h-dvh flex-col">{children}</body>
     </html>
   );
 }

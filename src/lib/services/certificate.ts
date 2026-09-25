@@ -1,14 +1,19 @@
-import { certificatesRepository } from "@/lib/repositories/certificates";
-import { registrationsRepository } from "@/lib/repositories/registrations";
+import {
+  certificatesRepo,
+  childrenRepo,
+  lookups,
+  registrationsRepo,
+} from "@/lib/repositories";
 import type { CertificateRecord } from "@/lib/repositories/types";
+import { events } from "@/data/events";
 import { nextCertificateNumber } from "@/lib/utils/certificate";
 
 /**
- * Mock certificate service.
+ * Certificate service.
  *
- * A certificate is issued once — attendance has to be recorded first, and the
- * number is reused on every later request. Numbering is delegated to
- * `lib/utils/certificate.ts`; move that to a database sequence when the real
+ * A certificate is issued once, only after attendance is recorded, and the same
+ * number is returned on every later request. Numbering lives in
+ * `lib/utils/certificate.ts` — move that to a database sequence when the real
  * backend lands so numbers stay unique under concurrent writes.
  */
 
@@ -17,13 +22,7 @@ const DEFAULT_SIGNATORY = {
   role: "Lead Facilitator, Kelas Bermain",
 };
 
-export interface IssueInput {
-  registrationId: string;
-  template?: CertificateRecord["template"];
-  organizer?: string;
-}
-
-export type CertificateResult =
+export type IssueResult =
   | { ok: true; certificate: CertificateRecord; alreadyIssued: boolean }
   | { ok: false; error: string };
 
@@ -33,65 +32,73 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function issueCertificate(input: IssueInput): Promise<CertificateResult> {
+export async function issueCertificate(registrationId: string): Promise<IssueResult> {
   await delay(MOCK_LATENCY_MS);
 
-  const registration = registrationsRepository.findById(input.registrationId);
-  if (!registration) {
-    return { ok: false, error: "Data pendaftaran tidak ditemukan." };
-  }
-  if (!registration.attendedAt) {
+  const registration =
+    registrationsRepo.find(registrationId) ?? lookups.registrationByNumber(registrationId);
+  if (!registration) return { ok: false, error: "Data pendaftaran tidak ditemukan." };
+
+  const existing = lookups.certificateByRegistration(registration.id);
+  if (existing) return { ok: true, certificate: existing, alreadyIssued: true };
+
+  if (registration.attendanceStatus !== "PRESENT") {
     return {
       ok: false,
       error: "Sertifikat baru bisa diterbitkan setelah kehadiran tercatat.",
     };
   }
 
-  const existing = certificatesRepository.findByRegistrationId(registration.id);
-  if (existing) return { ok: true, certificate: existing, alreadyIssued: true };
+  const event = events.find((e) => e.id === registration.eventId);
+  if (!event) return { ok: false, error: "Data kelas tidak ditemukan." };
+  if (!event.certificate.available) {
+    return { ok: false, error: "Kelas ini tidak menerbitkan sertifikat." };
+  }
 
+  const child = childrenRepo.find(registration.childId);
   const certificate: CertificateRecord = {
-    number: nextCertificateNumber(certificatesRepository.numbers()),
+    number: nextCertificateNumber(certificatesRepo.all().map((c) => c.number)),
     registrationId: registration.id,
-    participantName: registration.fullName,
-    eventTitle: registration.eventTitle,
-    eventDate: registration.eventDate,
-    organizer: input.organizer ?? "Kelas Bermain",
-    template: input.template ?? "classic",
+    childId: registration.childId,
+    eventId: registration.eventId,
+    participantName: child?.fullName ?? "Peserta Kelas Bermain",
+    eventTitle: event.title,
+    eventDate: event.startDate,
+    organizer: event.organizer,
+    template: event.certificate.template,
     issuedAt: new Date().toISOString(),
     status: "issued",
     signatory: DEFAULT_SIGNATORY,
   };
 
-  certificatesRepository.create(certificate);
-  registrationsRepository.update(registration.id, {
-    certificateNumber: certificate.number,
-  });
-
+  certificatesRepo.create(certificate);
+  registrationsRepo.update(registration.id, { certificateStatus: "ISSUED" });
   return { ok: true, certificate, alreadyIssued: false };
 }
 
 export async function getCertificate(value: string): Promise<CertificateRecord | null> {
-  await delay(300);
+  await delay(250);
   return (
-    certificatesRepository.findByNumber(value) ??
-    certificatesRepository.findByRegistrationId(value)
+    certificatesRepo.find(value) ??
+    certificatesRepo.all().find((c) => c.registrationId === value) ??
+    null
   );
 }
 
-/** Public verification: accepts a certificate number or a registration ID. */
+/** Public verification: accepts a certificate number or a registration number. */
 export async function verifyCertificate(query: string): Promise<
-  | { ok: true; certificate: CertificateRecord }
-  | { ok: false; error: string }
+  { ok: true; certificate: CertificateRecord } | { ok: false; error: string }
 > {
   await delay(500);
   const trimmed = query.trim();
   if (trimmed.length < 6) {
-    return { ok: false, error: "Masukkan nomor sertifikat atau ID pendaftaran." };
+    return { ok: false, error: "Masukkan nomor sertifikat atau nomor pendaftaran." };
   }
+
+  const byNumber = certificatesRepo.find(trimmed);
+  const registration = lookups.registrationByNumber(trimmed);
   const certificate =
-    certificatesRepository.findByNumber(trimmed) ??
-    certificatesRepository.findByRegistrationId(trimmed);
+    byNumber ?? (registration ? lookups.certificateByRegistration(registration.id) : null);
 
   if (!certificate) {
     return {
@@ -106,6 +113,5 @@ export async function verifyCertificate(query: string): Promise<
 }
 
 export async function listCertificates(): Promise<CertificateRecord[]> {
-  await delay(120);
-  return certificatesRepository.all();
+  return certificatesRepo.all();
 }

@@ -50,14 +50,14 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
                 <Link
-                  href="/kegiatan"
+                  href="/event?filter=upcoming"
                   className={buttonStyles({
                     variant: "secondary",
                     size: "lg",
                     className: "w-full sm:w-auto",
                   })}
                 >
-                  Jelajahi Kegiatan
+                  Daftar Kelas
                 </Link>
               </div>
             </Reveal>

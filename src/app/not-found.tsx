@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { Compass, Home } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { SiteHeader } from "@/components/layout/site-header";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { mainNav } from "@/data/site";
 
 export default function NotFound() {
   return (
-    <Container className="flex min-h-[70vh] max-w-2xl flex-col items-center justify-center py-16 text-center">
+    <>
+      <SiteHeader />
+      <Container
+        as="main"
+        className="flex min-h-[70vh] max-w-2xl flex-1 flex-col items-center justify-center py-16 text-center"
+      >
       <LogoMark className="size-14 motion-safe:animate-float-slow" />
 
       <p className="mt-8 text-6xl font-extrabold tracking-tight text-brand sm:text-7xl">404</p>
@@ -59,6 +66,8 @@ export default function NotFound() {
           </li>
         </ul>
       </nav>
-    </Container>
+      </Container>
+      <SiteFooter />
+    </>
   );
 }

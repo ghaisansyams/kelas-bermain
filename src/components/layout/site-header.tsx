@@ -109,7 +109,7 @@ export function SiteHeader() {
             className={buttonStyles({ size: "sm", className: "hidden md:inline-flex" })}
           >
             <Ticket className="size-4" aria-hidden />
-            Daftar Event
+            Daftar Kelas
           </Link>
 
           <button
@@ -165,7 +165,7 @@ export function SiteHeader() {
           </nav>
           <Link href="/event" className={buttonStyles({ size: "lg", className: "mt-2 w-full" })}>
             <Ticket className="size-4" aria-hidden />
-            Daftar Event
+            Daftar Kelas
           </Link>
         </Container>
       </div>

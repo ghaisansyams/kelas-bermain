@@ -23,7 +23,7 @@ export function CertificateLookup({ examples }: { examples: string[] }) {
       setError(result.error);
       return;
     }
-    router.push(`/sertifikat/${result.certificate.number}`);
+    router.push(`/certificate/${result.certificate.number}`);
   }
 
   return (

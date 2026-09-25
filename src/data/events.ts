@@ -48,6 +48,7 @@ export const events: EventRecord[] = [
     registered: 36,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 285_000,
       currency: "IDR",
       deadline: "2026-09-25",
@@ -133,6 +134,7 @@ export const events: EventRecord[] = [
     registered: 35,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 265_000,
       currency: "IDR",
       deadline: "2026-10-01",
@@ -206,6 +208,7 @@ export const events: EventRecord[] = [
     registered: 23,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 245_000,
       currency: "IDR",
       deadline: "2026-10-08",
@@ -280,6 +283,8 @@ export const events: EventRecord[] = [
     registered: 9,
     registration: {
       type: "PAID",
+      method: "THIRD_PARTY",
+      thirdPartyUrl: "https://kelasbermain-partner.example.com/checkout/pottery-class-oktober-2026",
       price: 225_000,
       currency: "IDR",
       deadline: "2026-10-21",
@@ -348,6 +353,7 @@ export const events: EventRecord[] = [
     registered: 14,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 235_000,
       currency: "IDR",
       deadline: "2026-11-04",
@@ -418,6 +424,8 @@ export const events: EventRecord[] = [
     registered: 18,
     registration: {
       type: "PAID",
+      method: "THIRD_PARTY",
+      thirdPartyUrl: "https://kelasbermain-partner.example.com/checkout/little-farmer-november-2026",
       price: 275_000,
       currency: "IDR",
       deadline: "2026-11-18",
@@ -489,6 +497,7 @@ export const events: EventRecord[] = [
     registered: 60,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 950_000,
       currency: "IDR",
       deadline: "2026-09-15",
@@ -556,6 +565,7 @@ export const events: EventRecord[] = [
     registered: 40,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 295_000,
       currency: "IDR",
       deadline: "2026-09-09",
@@ -619,6 +629,7 @@ export const events: EventRecord[] = [
     registered: 30,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 199_000,
       currency: "IDR",
       deadline: "2026-09-01",
@@ -672,6 +683,7 @@ export const events: EventRecord[] = [
     registered: 74,
     registration: {
       type: "PAID",
+      method: "WEBSITE",
       price: 75_000,
       currency: "IDR",
       deadline: "2026-08-14",
@@ -687,6 +699,72 @@ export const events: EventRecord[] = [
     facilities: ["Snack", "Medali partisipasi", "Dokumentasi kegiatan"],
     requirements: ["Usia 3–15 tahun", "Memakai pakaian olahraga", "Membawa botol minum"],
     certificate: { available: true, template: "playful", requiresAttendance: true },
+    featured: false,
+    published: true,
+  },
+  {
+    id: "evt-011",
+    slug: "open-house-oktober-2026",
+    title: "Open House Kelas Bermain",
+    tagline: "Coba satu sesi singkat, gratis, sebelum ikut kelas berbayar.",
+    summary:
+      "Sesi perkenalan gratis selama 90 menit: anak mencoba dua pos aktivitas, orang tua berbincang dengan kakak pembina.",
+    description: [
+      "Open House adalah satu-satunya agenda Kelas Bermain yang tidak dipungut biaya. Tujuannya sederhana: memberi kesempatan anak dan orang tua merasakan format kelas kami sebelum memutuskan ikut kelas berbayar.",
+      "Anak mencoba dua pos aktivitas singkat — satu pos kuliner dan satu pos kreatif. Sementara itu orang tua bisa berbincang langsung dengan kakak pembina soal kelompok usia, alur kelas, dan hal-hal teknis lain.",
+      "Karena gratis dan ruangnya terbatas, satu keluarga dibatasi mendaftarkan maksimal dua anak.",
+    ],
+    category: "Eksplorasi",
+    cover: {
+      src: "/images/galeri-01.jpg",
+      alt: "Tiga anak kecil berpelukan sambil tertawa di sesi perkenalan",
+      width: 1200,
+      height: 800,
+    },
+    startDate: "2026-10-18",
+    endDate: "2026-10-18",
+    timeStart: "09:00",
+    timeEnd: "10:30",
+    timezone: "WIB",
+    location: {
+      venue: "Rumah Kelas Bermain",
+      city: "Depok",
+      address: "Beji, Kota Depok, Jawa Barat",
+      note: "Tempat parkir terbatas, disarankan datang lebih awal",
+    },
+    organizer: "Kelas Bermain",
+    ageRange: [3, 12],
+    capacity: 50,
+    registered: 17,
+    registration: {
+      type: "FREE",
+      method: "NONE",
+      deadline: "2026-10-15",
+      notes: [
+        "Sesi ini gratis dan tidak ada pembayaran apa pun.",
+        "Maksimal dua anak per keluarga agar semua kebagian tempat.",
+      ],
+    },
+    agenda: [
+      { time: "08.45", title: "Registrasi ulang" },
+      { time: "09.00", title: "Perkenalan & pemanasan bersama" },
+      { time: "09.20", title: "Pos 1 — aktivitas kuliner singkat" },
+      { time: "09.50", title: "Pos 2 — aktivitas kreatif singkat" },
+      { time: "10.15", title: "Sesi tanya jawab orang tua & penutupan" },
+    ],
+    speakerIds: ["fs-dinda", "fs-alya"],
+    facilities: [
+      "Dua pos aktivitas percobaan",
+      "Snack ringan",
+      "Sesi tanya jawab dengan kakak pembina",
+      "Dokumentasi kegiatan",
+    ],
+    requirements: [
+      "Usia 3–12 tahun",
+      "Didampingi satu orang tua atau wali",
+      "Maksimal dua anak per keluarga",
+    ],
+    certificate: { available: false, template: "playful", requiresAttendance: true },
     featured: false,
     published: true,
   },

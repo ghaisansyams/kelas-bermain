@@ -130,6 +130,12 @@
     text-wrap: pretty;
   }
 
+  /* File paths and env-var names are unbreakable tokens; without this they
+     push their container wider than the viewport on a phone. */
+  code {
+    overflow-wrap: anywhere;
+  }
+
   ::selection {
     background-color: var(--color-brand);
     color: #fff;

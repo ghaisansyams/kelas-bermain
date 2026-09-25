@@ -121,7 +121,7 @@ export function RegistrationPanel({ event }: { event: EventView }) {
         <div className="space-y-2.5 pt-1">
           {isOpen ? (
             <Link
-              href={`/event/${event.slug}/daftar`}
+              href={`/register/${event.slug}`}
               className={buttonStyles({ size: "lg", className: "w-full" })}
             >
               Daftar Sekarang
@@ -142,7 +142,7 @@ export function RegistrationPanel({ event }: { event: EventView }) {
 
           {showAttendance ? (
             <Link
-              href={`/event/${event.slug}/attendance`}
+              href={`/attendance/${event.slug}`}
               className={buttonStyles({ variant: "secondary", className: "w-full" })}
             >
               <CalendarCheck className="size-4" aria-hidden />
@@ -192,7 +192,7 @@ export function MobileRegistrationBar({ event }: { event: EventView }) {
         </div>
         {isOpen ? (
           <Link
-            href={`/event/${event.slug}/daftar`}
+            href={`/register/${event.slug}`}
             className={buttonStyles({ className: "shrink-0" })}
           >
             Daftar Sekarang

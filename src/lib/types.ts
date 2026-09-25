@@ -1,3 +1,5 @@
+import type { PaymentMethod } from "@/lib/repositories/types";
+
 /**
  * Domain model for Kelas Bermain.
  *
@@ -26,6 +28,8 @@ export const EVENT_CATEGORIES: EventCategory[] = [
 
 /** How a participant pays to join. */
 export type RegistrationType = "FREE" | "PAID";
+
+
 
 /** Where an event sits on the calendar. Derived from its dates, never stored. */
 export type EventLifecycle = "upcoming" | "ongoing" | "past";
@@ -56,9 +60,17 @@ export interface AgendaItem {
 
 export interface EventRegistrationInfo {
   type: RegistrationType;
+  /**
+   * How the money is collected. A PAID event is either settled on this site
+   * (WEBSITE, mock gateway for now) or handed off to an external platform
+   * (THIRD_PARTY). FREE events use NONE.
+   */
+  method: PaymentMethod;
   /** Rupiah, integer. Only meaningful when `type` is PAID. */
   price?: number;
   currency?: "IDR";
+  /** Where THIRD_PARTY registrations continue. */
+  thirdPartyUrl?: string;
   /** ISO date; sign-ups close at the end of this day. */
   deadline: string;
   /** Explicit override. When absent, availability is derived from capacity. */

@@ -111,6 +111,33 @@ export function TextArea({
   );
 }
 
+export function Select({
+  id,
+  error,
+  hint,
+  className,
+  children,
+  ...props
+}: ControlProps & React.ComponentProps<"select">) {
+  return (
+    <select
+      id={id}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+      className={cn(
+        controlBase,
+        "h-12 appearance-none bg-[length:1.1rem] bg-[right_0.9rem_center] bg-no-repeat pr-10",
+        "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23756c64%22 stroke-width=%222%22 stroke-linecap=%22round%22><path d=%22m6 9 6 6 6-6%22/></svg>')]",
+        error ? "border-brand/60 ring-2 ring-brand/15" : "border-line",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </select>
+  );
+}
+
 export function Checkbox({
   id,
   label,

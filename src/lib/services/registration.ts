@@ -1,122 +1,184 @@
-import { registrationsRepository } from "@/lib/repositories/registrations";
-import type { PaymentStatus, Registration } from "@/lib/repositories/types";
-import type { RegistrationType } from "@/lib/types";
-import { generateRegistrationId } from "@/lib/utils/certificate";
-import { normalizePhone } from "@/lib/utils/validation";
-import { paymentProvider, type PaymentInstruction } from "./payment";
+import { lookups, registrationsRepo } from "@/lib/repositories";
+import type {
+  PaymentMethod,
+  Registration,
+  RegistrationSource,
+} from "@/lib/repositories/types";
+import type { EventView } from "@/lib/types";
+import { nextId, nextRegistrationNumber } from "@/lib/utils/numbering";
+import {
+  upsertChild,
+  upsertCustomer,
+  type ChildInput,
+  type CustomerInput,
+} from "./customer";
+import { createPayment, type PaymentInstruction } from "./payment";
 
 /**
- * Mock registration service.
+ * Registration service — the one place a sign-up is created.
  *
- * Runs entirely in the browser against `localStorage` — nothing is sent
- * anywhere and no production database is involved. The exported functions are
- * the seam: point them at a `POST /api/registrations` route or a Supabase
- * client and every screen keeps working unchanged.
+ * A single submission can enrol several children of the same family. It
+ * produces: one customer (reused when the email is already known), one child
+ * row per child, one registration per child, and one payment per registration
+ * when the event is not free.
+ *
+ * Everything runs against the repository layer, which is localStorage-backed
+ * for now. Point these functions at an API route or Supabase client and the
+ * screens keep working unchanged.
  */
 
-/** The bits of an event the service needs, without coupling it to content. */
-export interface RegistrationEventContext {
-  slug: string;
-  title: string;
-  date: string;
-  registrationType: RegistrationType;
-  price?: number;
-}
-
-export interface RegistrationInput {
-  /** The child attending. */
-  fullName: string;
-  /** Parent or guardian registering the child. */
-  parentName: string;
-  email: string;
-  whatsapp: string;
-  institution: string;
-  city: string;
-  age: number;
+export interface RegistrationRequest {
+  event: EventView;
+  parent: CustomerInput;
+  children: ChildInput[];
+  source: RegistrationSource;
+  /** Raw `?source=` value carried by the scanned QR. */
+  qrSource?: string;
   notes?: string;
 }
 
-export interface RegistrationSuccess {
-  ok: true;
-  registration: Registration;
+export interface RegistrationBatch {
+  customerId: string;
+  customerNumber: string;
+  registrations: Registration[];
+  /** Absent for free events. */
   payment?: PaymentInstruction;
+  totalAmount: number;
+  paymentMethod: PaymentMethod;
 }
 
-export interface RegistrationFailure {
-  ok: false;
-  error: string;
-  field?: keyof RegistrationInput;
-}
+export type RegistrationResult =
+  | { ok: true; batch: RegistrationBatch }
+  | { ok: false; error: string; field?: string };
 
-export type RegistrationResult = RegistrationSuccess | RegistrationFailure;
-
-/** Artificial latency so loading states are exercised, not decorative. */
 const MOCK_LATENCY_MS = 700;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function registerForEvent(
-  event: RegistrationEventContext,
-  input: RegistrationInput,
+export async function createRegistration(
+  request: RegistrationRequest,
 ): Promise<RegistrationResult> {
-  await delay(MOCK_LATENCY_MS);
+  const { event, parent, children, source } = request;
 
-  const existing = registrationsRepository.findByEmailAndEvent(input.email, event.slug);
-  if (existing) {
+  if (children.length === 0) {
+    return { ok: false, error: "Tambahkan minimal satu data anak." };
+  }
+  if (event.availability !== "open") {
     return {
       ok: false,
-      field: "email",
-      error: `Email ini sudah terdaftar di kelas tersebut dengan ID ${existing.id}.`,
+      error:
+        event.availability === "full"
+          ? "Kuota kelas ini sudah penuh."
+          : "Pendaftaran kelas ini sudah ditutup.",
+    };
+  }
+  if (children.length > event.seatsLeft) {
+    return {
+      ok: false,
+      error: `Sisa kuota tinggal ${event.seatsLeft} anak, sedangkan kamu mendaftarkan ${children.length}.`,
     };
   }
 
-  const isPaid = event.registrationType === "PAID";
-  const amount = isPaid ? (event.price ?? 0) : 0;
-  const paymentStatus: PaymentStatus = isPaid ? "pending" : "not_required";
+  await delay(MOCK_LATENCY_MS);
 
-  const registration: Registration = {
-    id: generateRegistrationId(new Date(event.date).getFullYear()),
-    eventSlug: event.slug,
-    eventTitle: event.title,
-    eventDate: event.date,
-    fullName: input.fullName.trim(),
-    parentName: input.parentName.trim(),
-    email: input.email.trim().toLowerCase(),
-    whatsapp: normalizePhone(input.whatsapp),
-    institution: input.institution.trim(),
-    city: input.city.trim(),
-    age: input.age,
-    notes: input.notes?.trim() || undefined,
-    registrationType: event.registrationType,
-    amount,
-    paymentStatus,
-    status: isPaid ? "waiting_payment" : "confirmed",
-    createdAt: new Date().toISOString(),
-  };
+  const { customer } = upsertCustomer({ ...parent, source });
 
-  registrationsRepository.create(registration);
+  // One child may only hold one active registration per event.
+  const existingForEvent = registrationsRepo.where(
+    (r) => r.eventId === event.id && r.customerId === customer.id && r.status !== "CANCELLED",
+  );
+  const childRows = children.map((child) => upsertChild(customer.id, child));
+  const duplicate = childRows.find((child) =>
+    existingForEvent.some((r) => r.childId === child.id),
+  );
+  if (duplicate) {
+    return {
+      ok: false,
+      error: `${duplicate.fullName} sudah terdaftar di kelas ini.`,
+      field: "children",
+    };
+  }
 
-  if (!isPaid) return { ok: true, registration };
+  const isFree = event.registration.type === "FREE";
+  const method: PaymentMethod = isFree ? "NONE" : event.registration.method;
+  const unitPrice = isFree ? 0 : (event.registration.price ?? 0);
 
-  const payment = await paymentProvider.createCharge({
-    registrationId: registration.id,
-    eventTitle: event.title,
-    amount,
+  const created: Registration[] = childRows.map((child) => {
+    const all = registrationsRepo.all();
+    const registration: Registration = {
+      id: nextId("reg", all.map((r) => r.id)),
+      registrationNumber: nextRegistrationNumber(all.map((r) => r.registrationNumber)),
+      customerId: customer.id,
+      childId: child.id,
+      eventId: event.id,
+      registrationDate: new Date().toISOString(),
+      status: isFree ? "CONFIRMED" : "REGISTERED",
+      paymentStatus: isFree ? "NOT_REQUIRED" : "PENDING",
+      attendanceStatus: "NOT_ATTENDED",
+      certificateStatus: "NOT_ELIGIBLE",
+      paymentMethod: method,
+      amount: unitPrice,
+      source,
+      qrSource: request.qrSource,
+      notes: request.notes,
+    };
+    registrationsRepo.create(registration);
+    return registration;
   });
-  return { ok: true, registration, payment };
+
+  const totalAmount = unitPrice * created.length;
+  let payment: PaymentInstruction | undefined;
+
+  if (!isFree) {
+    // The batch is charged against the first registration; the rest reference it.
+    const lead = created[0];
+    const result = await createPayment(
+      {
+        registrationId: lead.id,
+        registrationNumber: lead.registrationNumber,
+        customerId: customer.id,
+        eventId: event.id,
+        eventTitle: event.title,
+        amount: totalAmount,
+        thirdPartyUrl: event.registration.thirdPartyUrl,
+      },
+      method,
+    );
+    payment = result?.instruction;
+  }
+
+  return {
+    ok: true,
+    batch: {
+      customerId: customer.id,
+      customerNumber: customer.customerNumber,
+      registrations: created,
+      payment,
+      totalAmount,
+      paymentMethod: method,
+    },
+  };
 }
 
-export async function findRegistration(id: string): Promise<Registration | null> {
-  await delay(250);
-  return registrationsRepository.findById(id);
+export async function getRegistration(id: string): Promise<Registration | null> {
+  return registrationsRepo.find(id) ?? lookups.registrationByNumber(id);
 }
 
-/** Admin-facing read, ready for a participants table / CSV export. */
-export async function listRegistrations(eventSlug?: string): Promise<Registration[]> {
-  await delay(120);
-  return eventSlug
-    ? registrationsRepository.findByEvent(eventSlug)
-    : registrationsRepository.all();
+export async function listRegistrations(eventId?: string): Promise<Registration[]> {
+  return eventId
+    ? registrationsRepo.where((r) => r.eventId === eventId)
+    : registrationsRepo.all();
+}
+
+export async function updateRegistration(
+  id: string,
+  patch: Partial<Registration>,
+): Promise<Registration | null> {
+  return registrationsRepo.update(id, patch);
+}
+
+export async function cancelRegistration(id: string): Promise<Registration | null> {
+  return registrationsRepo.update(id, { status: "CANCELLED", paymentStatus: "CANCELLED" });
 }

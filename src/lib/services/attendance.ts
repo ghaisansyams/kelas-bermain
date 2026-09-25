@@ -1,39 +1,41 @@
-import { registrationsRepository } from "@/lib/repositories/registrations";
-import type { Registration } from "@/lib/repositories/types";
-import { normalizePhone } from "@/lib/utils/validation";
+import { attendanceRepo, lookups, registrationsRepo } from "@/lib/repositories";
+import type { AttendanceRecord, AttendanceStatus } from "@/lib/repositories/types";
+import { childrenRepo, customersRepo } from "@/lib/repositories";
+import { nextId } from "@/lib/utils/numbering";
 
 /**
- * Mock attendance service.
+ * Attendance service.
  *
- * Participants confirm attendance with the registration ID they received when
- * signing up. `source` already distinguishes a typed submission from a scanned
- * one, so QR check-in can be added later by calling this with `source: "qr"`
- * and the id decoded from the code — no new flow required.
+ * Check-in is verified against the registration number plus a contact the
+ * family gave at sign-up. `method` already distinguishes a typed submission
+ * from a scanned one, so QR check-in only needs to call this with
+ * `method: "qr"` and the id decoded from the code — no new flow required.
  */
 
-export interface AttendanceInput {
-  registrationId: string;
-  fullName: string;
-  /** Email or WhatsApp number used at registration. */
+export interface CheckInInput {
+  registrationNumber: string;
+  /** Email or WhatsApp used at registration. */
   contact: string;
-  eventSlug: string;
-  source?: "form" | "qr";
+  eventId?: string;
+  method?: AttendanceRecord["method"];
 }
 
-export interface AttendanceSuccess {
+export interface CheckInSuccess {
   ok: true;
-  registration: Registration;
-  /** True when the participant had already checked in earlier. */
+  registrationNumber: string;
+  childName: string;
+  eventId: string;
   alreadyRecorded: boolean;
+  certificateAvailable: boolean;
 }
 
-export interface AttendanceFailure {
+export interface CheckInFailure {
   ok: false;
   error: string;
-  field?: "registrationId" | "fullName" | "contact";
+  field?: "registrationNumber" | "contact";
 }
 
-export type AttendanceResult = AttendanceSuccess | AttendanceFailure;
+export type CheckInResult = CheckInSuccess | CheckInFailure;
 
 const MOCK_LATENCY_MS = 600;
 
@@ -41,33 +43,41 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function contactMatches(registration: Registration, contact: string): boolean {
-  const value = contact.trim().toLowerCase();
-  if (registration.email.toLowerCase() === value) return true;
-  return normalizePhone(registration.whatsapp) === normalizePhone(contact);
+function normalizePhone(value: string): string {
+  return value.replace(/[\s\-().]/g, "");
 }
 
-export async function submitAttendance(
-  input: AttendanceInput,
-): Promise<AttendanceResult> {
+export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
   await delay(MOCK_LATENCY_MS);
 
-  const registration = registrationsRepository.findById(input.registrationId);
+  const registration = lookups.registrationByNumber(input.registrationNumber);
   if (!registration) {
     return {
       ok: false,
-      field: "registrationId",
-      error: "ID pendaftaran tidak ditemukan. Periksa kembali kode yang kamu terima.",
+      field: "registrationNumber",
+      error: "Nomor pendaftaran tidak ditemukan. Periksa kembali kode yang kamu terima.",
     };
   }
-  if (registration.eventSlug !== input.eventSlug) {
+  if (input.eventId && registration.eventId !== input.eventId) {
     return {
       ok: false,
-      field: "registrationId",
-      error: `ID ini terdaftar untuk event lain (${registration.eventTitle}).`,
+      field: "registrationNumber",
+      error: "Nomor ini terdaftar untuk kelas lain.",
     };
   }
-  if (!contactMatches(registration, input.contact)) {
+  if (registration.status === "CANCELLED") {
+    return { ok: false, error: "Pendaftaran ini sudah dibatalkan." };
+  }
+
+  const customer = customersRepo.find(registration.customerId);
+  const child = childrenRepo.find(registration.childId);
+  const value = input.contact.trim().toLowerCase();
+  const contactMatches =
+    customer !== null &&
+    (customer.email.toLowerCase() === value ||
+      normalizePhone(customer.whatsapp) === normalizePhone(input.contact));
+
+  if (!contactMatches) {
     return {
       ok: false,
       field: "contact",
@@ -75,21 +85,92 @@ export async function submitAttendance(
     };
   }
 
-  if (registration.attendedAt) {
-    return { ok: true, registration, alreadyRecorded: true };
+  const existing = lookups.attendanceByRegistration(registration.id);
+  const now = new Date().toISOString();
+
+  if (existing && existing.status === "PRESENT") {
+    return {
+      ok: true,
+      registrationNumber: registration.registrationNumber,
+      childName: child?.fullName ?? "Peserta",
+      eventId: registration.eventId,
+      alreadyRecorded: true,
+      certificateAvailable: registration.certificateStatus !== "NOT_ELIGIBLE",
+    };
   }
 
-  const updated = registrationsRepository.update(registration.id, {
-    attendedAt: new Date().toISOString(),
+  if (existing) {
+    attendanceRepo.update(existing.id, {
+      status: "PRESENT",
+      checkedInAt: now,
+      method: input.method ?? "form",
+    });
+  } else {
+    const record: AttendanceRecord = {
+      id: nextId("att", attendanceRepo.all().map((a) => a.id)),
+      registrationId: registration.id,
+      eventId: registration.eventId,
+      childId: registration.childId,
+      status: "PRESENT",
+      checkedInAt: now,
+      method: input.method ?? "form",
+    };
+    attendanceRepo.create(record);
+  }
+
+  registrationsRepo.update(registration.id, {
+    attendanceStatus: "PRESENT",
+    certificateStatus: "AVAILABLE",
+    status: "COMPLETED",
   });
 
-  return { ok: true, registration: updated ?? registration, alreadyRecorded: false };
+  return {
+    ok: true,
+    registrationNumber: registration.registrationNumber,
+    childName: child?.fullName ?? "Peserta",
+    eventId: registration.eventId,
+    alreadyRecorded: false,
+    certificateAvailable: true,
+  };
 }
 
-/** Admin-facing read for an attendance list. */
-export async function listAttendance(eventSlug: string): Promise<Registration[]> {
-  await delay(120);
-  return registrationsRepository
-    .findByEvent(eventSlug)
-    .filter((registration) => Boolean(registration.attendedAt));
+/** Admin-side toggle from the attendance table. */
+export async function setAttendance(
+  registrationId: string,
+  status: AttendanceStatus,
+  recordedBy = "Admin",
+): Promise<AttendanceRecord | null> {
+  const registration = registrationsRepo.find(registrationId);
+  if (!registration) return null;
+
+  const existing = lookups.attendanceByRegistration(registrationId);
+  const now = new Date().toISOString();
+  const patch = {
+    status,
+    checkedInAt: status === "PRESENT" ? now : undefined,
+    method: "manual" as const,
+    recordedBy,
+  };
+
+  const record = existing
+    ? attendanceRepo.update(existing.id, patch)
+    : attendanceRepo.create({
+        id: nextId("att", attendanceRepo.all().map((a) => a.id)),
+        registrationId,
+        eventId: registration.eventId,
+        childId: registration.childId,
+        ...patch,
+      });
+
+  registrationsRepo.update(registrationId, {
+    attendanceStatus: status,
+    certificateStatus: status === "PRESENT" ? "AVAILABLE" : "NOT_ELIGIBLE",
+  });
+  return record;
+}
+
+export async function listAttendance(eventId?: string): Promise<AttendanceRecord[]> {
+  return eventId
+    ? attendanceRepo.where((a) => a.eventId === eventId)
+    : attendanceRepo.all();
 }

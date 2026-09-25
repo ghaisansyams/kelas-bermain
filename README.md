@@ -1,29 +1,29 @@
-# Kelas Bermain
+# Kelas Bermain — Platform Digital
 
-Situs publik untuk **Kelas Bermain** — aktivitas kreatif dan edukatif untuk anak usia
-**3–15 tahun di Jabodetabek**. Menampilkan jadwal kelas, dokumentasi kegiatan, dan galeri,
-lengkap dengan alur pendaftaran, kehadiran, dan sertifikat peserta.
+Dua aplikasi dalam satu basis kode, berbagi satu model data:
+
+1. **Situs publik** untuk orang tua — jadwal kelas, pendaftaran lewat QR, pembayaran, check-in, dan verifikasi sertifikat.
+2. **ERP internal** (`/admin`) untuk staf — customer, anak, event, pendaftaran, pembayaran, kehadiran, sertifikat, konten, dan laporan.
+
+Kelas Bermain adalah aktivitas kreatif dan edukatif untuk anak **3–15 tahun di Jabodetabek**.
 
 > **Status: versi demo dengan data dummy.**
-> Judul kelas, tanggal, lokasi, daftar aktivitas, dan benefit mengikuti unggahan
-> [@kelasbermain.id](https://instagram.com/kelasbermain.id). **Harga masih placeholder** —
-> poster Instagram tidak mencantumkan biaya. Pendaftaran, kehadiran, dan penerbitan
-> sertifikat berjalan di peramban (localStorage) dan **belum** terhubung ke basis data
-> produksi mana pun. Arsitekturnya sudah disiapkan agar penggantian ke CMS/database tidak
-> menyentuh satu pun komponen UI — lihat [Mengganti data dummy](#mengganti-data-dummy).
+> Judul kelas, tanggal, lokasi, aktivitas, dan benefit mengikuti unggahan
+> [@kelasbermain.id](https://instagram.com/kelasbermain.id). **Harga masih placeholder.**
+> Pendaftaran, pembayaran, kehadiran, dan sertifikat berjalan di peramban
+> (localStorage) — belum ada basis data produksi. Seluruh akses data lewat
+> lapisan service, jadi penggantian ke Supabase/PostgreSQL tidak menyentuh satu
+> pun komponen UI.
 
 ### Catatan penting
 
-- **Seluruh kelas berstatus berbayar** (`registrationType: "PAID"`). Jalur `FREE` tetap
-  didukung model data dan layanan, hanya tidak dipakai oleh data saat ini.
-- **Tidak ada nomor telepon di seluruh situs**, sesuai notulen rapat — meskipun bio dan
-  poster Instagram mencantumkan nomor WhatsApp. Kontak publik hanya email dan Instagram.
-  Untuk menampilkannya, tambahkan entri pada `socialLinks` di `src/data/site.ts`.
-- **Logo digambar ulang** dari profil Instagram sebagai SVG di
-  `src/components/brand/logo.tsx` (dan `src/app/icon.svg`). Ganti dengan berkas asli bila
-  sudah tersedia agar sama persis.
-
----
+- **Autentikasi ERP masih simulasi.** Akun fixture, kata sandi ditampilkan di
+  layar masuk. Ganti `src/lib/auth/*` sebelum dipakai untuk data asli.
+- **Payment gateway masih simulasi.** Tidak ada uang berpindah.
+- **Tidak ada nomor telepon di teks situs publik**, sesuai notulen. Nomor WhatsApp
+  tetap terlihat karena tercetak di dalam poster Pemadam Cilik.
+- Hampir semua kelas berbayar. Satu event gratis (**Open House**) sengaja ada agar
+  alur `FREE` benar-benar teruji, bukan hanya didukung model data.
 
 ## Tech stack
 
@@ -39,7 +39,8 @@ lengkap dengan alur pendaftaran, kehadiran, dan sertifikat peserta.
 | Deploy | Vercel (region `sin1`) |
 
 Dependensi runtime sengaja dijaga minimal: `next`, `react`, `react-dom`, `lucide-react`,
-`clsx`, `tailwind-merge`. Tidak ada pustaka form, state manager, atau animasi tambahan.
+`clsx`, `tailwind-merge`, `qrcode-generator`. Tidak ada pustaka form, state manager,
+chart, atau animasi tambahan — chart dashboard digambar sendiri sebagai SVG/HTML.
 
 ## Menjalankan proyek
 
@@ -62,6 +63,7 @@ Hanya satu, dan bersifat opsional:
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Basis URL absolut untuk metadata SEO, Open Graph, sitemap, dan canonical | `https://kelas-bermain.vercel.app` |
 | `NEXT_PUBLIC_GALLERY_DRIVE_URL` | URL folder Google Drive yang ditautkan di halaman Galeri | folder produksi di `src/data/gallery.ts` |
+| `ADMIN_SESSION_SECRET` | Kunci tanda tangan cookie sesi ERP | nilai pengembangan yang terdokumentasi — **wajib diisi di produksi** |
 
 Keduanya opsional. `NEXT_PUBLIC_GALLERY_DRIVE_URL` hanya perlu diisi bila folder Drive
 berpindah tanpa ingin mengubah kode.
@@ -70,59 +72,76 @@ Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 
 ## Rute
 
+### Situs publik
+
 | Rute | Isi |
 | --- | --- |
-| `/` | Landing page: hero, nilai program, event terdekat, cara ikut, statistik, kegiatan, testimoni, media sosial |
-| `/event` | Jadwal kelas + filter status (Semua / Akan Datang / Sedang Berlangsung / Selesai) dan kategori |
-| `/event/[slug]` | Halaman detail event (satu template untuk semua event) |
-| `/event/[slug]/daftar` | Formulir pendaftaran + status sukses; instruksi pembayaran untuk event berbayar |
-| `/event/[slug]/attendance` | Formulir konfirmasi kehadiran peserta |
-| `/kegiatan` | Daftar kegiatan + filter kategori |
-| `/kegiatan/[slug]` | Detail kegiatan: linimasa, sorotan, galeri, kegiatan terkait |
-| `/galeri` | Galeri publik: banner utama + tautan ke folder Google Drive (bukan grid foto) |
-| `/sertifikat` | Verifikasi sertifikat berdasarkan nomor sertifikat atau ID pendaftaran |
-| `/sertifikat/[id]` | Tampilan sertifikat + cetak/unduh |
-| `/sitemap.xml`, `/robots.txt` | Dihasilkan otomatis dari data konten |
+| `/` | Landing: hero, nilai, jadwal terdekat, cara ikut, statistik, kegiatan, galeri, testimoni, media sosial |
+| `/event` | Jadwal kelas + filter status dan kategori |
+| `/event/[slug]` | Detail kelas (satu template untuk semua kelas) |
+| `/register/[eventSlug]` | **Halaman pendaratan QR** — pendaftaran 4 langkah |
+| `/payment/[registrationId]` | Checkout & pembayaran (gerbang simulasi) |
+| `/attendance/[eventSlug]` | Check-in kehadiran peserta |
+| `/certificate/[certificateId]` | Verifikasi sertifikat publik |
+| `/kegiatan`, `/kegiatan/[slug]` | Dokumentasi kegiatan |
+| `/galeri` | Banner + tautan folder Google Drive |
+| `/sertifikat` | Pencarian sertifikat berdasarkan nomor |
 
-Galeri **tidak memerlukan login** — seluruh isinya terbuka untuk umum.
+URL lama (`/event/[slug]/daftar`, `/event/[slug]/attendance`, `/sertifikat/[id]`) tetap
+hidup lewat redirect permanen — materi cetak lama tidak rusak.
 
-## Model konten
+### ERP internal
 
-Kategori kelas: **Profesi, Kuliner, Alam, Kreatif, Eksplorasi, Outdoor** — masing-masing
-punya satu warna tetap yang diambil dari empat kotak pada logo (merah, kuning, hijau, ungu).
+| Rute | Isi |
+| --- | --- |
+| `/admin/login` | Masuk (akun demo ditampilkan di layar) |
+| `/admin/dashboard` | 8 kartu statistik + 4 chart + pendaftaran terbaru |
+| `/admin/customers`, `/admin/customers/[id]` | Orang tua + profil, anak, pendaftaran, pembayaran |
+| `/admin/children`, `/admin/children/[id]` | Anak + profil, kelas, sertifikat |
+| `/admin/events`, `/admin/events/[id]` | Event + ikhtisar, pendaftaran, pembayaran, sertifikat |
+| `/admin/events/[id]/qr` | **Generator QR** — unduh PNG/SVG, cetak, salin tautan, penanda sumber |
+| `/admin/registrations` | Pendaftaran + 5 filter + ekspor CSV |
+| `/admin/payments` | Pembayaran + ubah status manual (untuk konfirmasi pihak ketiga) |
+| `/admin/attendance` | Tandai kehadiran manual + tautan QR check-in |
+| `/admin/certificates` | Sertifikat terbit |
+| `/admin/activities`, `/admin/gallery` | Konten |
+| `/admin/reports` | 6 laporan, tersaring, ekspor CSV |
+| `/admin/settings` | Identitas, peran, status integrasi, skema basis data |
 
-Dua bidang yang spesifik untuk program anak:
+`/admin` dialihkan ke `/admin/dashboard`. Seluruh `/admin/*` dijaga middleware.
 
-- `ageRange: [min, max]` pada `EventRecord` — ditampilkan di kartu kelas dan halaman detail,
-  karena ini hal pertama yang dicari orang tua.
-- `parentName` pada `Registration` — formulir mendata **anak** (nama, usia, sekolah) dan
-  **orang tua/wali** (nama, email, WhatsApp) secara terpisah.
+## Alur
 
-### Poster desainer (format Instagram)
+### QR → pendaftaran
 
-`EventRecord` punya bidang opsional `poster` untuk artwork asli dari tim desain — biasanya
-potret 4:5 sesuai ukuran Instagram. Aset ini **tidak pernah dipotong**:
+```
+QR di poster / banner / lokasi
+  → /register/<slug>?source=poster
+  → Langkah 1 Orang Tua  → Langkah 2 Anak (bisa lebih dari satu)
+  → Langkah 3 Konfirmasi → Langkah 4 Selesai
+  → Nomor pendaftaran per anak + nomor customer
+```
 
-- **Kartu event** menampilkan poster secara utuh (`object-contain`) di atas salinan dirinya
-  sendiri yang diburamkan, sehingga tinggi semua kartu di grid tetap sejajar.
-- **Halaman detail** menampilkan poster pada ukuran penuh di blok "Poster Kegiatan".
+`?source=` tersimpan pada setiap pendaftaran, sehingga media mana yang menghasilkan
+peserta bisa dilihat di kolom Sumber.
 
-Artinya aset yang dibuat untuk Instagram bisa langsung dipakai di website tanpa perlu
-versi lanskap terpisah. Contohnya ada pada event `pemadam-cilik-oktober-2026`.
+### Tiga skenario pembayaran
 
-> **Perhatian:** poster Pemadam Cilik memuat nomor WhatsApp yang tercetak di dalam gambar.
-> Aturan "tanpa nomor telepon" hanya berlaku pada teks situs; nomor di dalam artwork tetap
-> terlihat pengunjung. Potong bagian bawah poster bila nomor tersebut tidak boleh tampil.
+| Tipe | Metode | Yang terjadi |
+| --- | --- | --- |
+| `FREE` | `NONE` | Langsung `CONFIRMED`, tanpa pembayaran |
+| `PAID` | `WEBSITE` | Checkout di situs ini lewat gerbang simulasi → `PAID` |
+| `PAID` | `THIRD_PARTY` | Pendaftaran tercatat `PENDING`, peserta diarahkan ke platform mitra; admin mengonfirmasi manual |
 
-### Catatan halaman Galeri
+### Kehadiran → sertifikat
 
-Sesuai notulen rapat dengan direktur, area **di bawah banner berisi tautan, bukan grid
-foto**: dokumentasi lengkap disimpan di satu folder Google Drive dan halaman Galeri hanya
-menautkannya. Isi tautan lewat `NEXT_PUBLIC_GALLERY_DRIVE_URL` atau pada
-`src/data/gallery.ts` (`galleryDrive.url`).
-
-Grid foto beserta lightbox-nya **tetap dipakai di halaman detail kegiatan**
-(`/kegiatan/[slug]`), yang menampilkan foto milik kegiatan tersebut.
+```
+/attendance/<slug>  (atau QR check-in dengan ?reg= terisi otomatis)
+  → verifikasi nomor pendaftaran + kontak orang tua
+  → attendanceStatus = PRESENT, certificateStatus = AVAILABLE
+  → "Lihat Sertifikat" → nomor KB-<tahun>-<urutan> diterbitkan
+  → /certificate/<nomor> bisa diverifikasi publik
+```
 
 ## Struktur proyek
 
@@ -165,54 +184,71 @@ Yang dihindari:
 Halaman mengambil data lewat `lib/services/content.ts`, lalu meneruskannya ke komponen
 sebagai prop. Inilah yang membuat penggantian sumber data menjadi pekerjaan satu berkas.
 
-## Mengganti data dummy
+## Arsitektur data
 
-### 1. Konten (event, kegiatan, galeri, pembicara, testimoni)
-
-Semua fungsi baca ada di `src/lib/services/content.ts` dan **sudah `async`**, meskipun saat
-ini hanya membaca array statis:
-
-```ts
-export async function getEvents(now = new Date()): Promise<EventView[]>
-export async function getEventBySlug(slug: string): Promise<EventView | null>
-export async function getActivities(): Promise<ActivityRecord[]>
-export async function getGalleryItems(): Promise<GalleryItem[]>
+```
+src/data/            seed — customers, children, registrations, payments,
+                     attendance, certificates, events, activities, gallery
+      ↓
+src/lib/repositories/  satu adapter per koleksi (localStorage + seed)
+      ↓
+src/lib/services/      content · customer · registration · payment ·
+                       attendance · certificate · qr · admin
+      ↓
+komponen UI            hanya menerima props
 ```
 
-Untuk pindah ke CMS/database, ganti isi fungsi-fungsi tersebut dengan query — selama nilai
-kembaliannya tetap mengikuti tipe di `src/lib/types.ts`, tidak ada komponen yang perlu
-disentuh.
+Relasi antar-entitas:
 
-Dua hal yang perlu dipertahankan:
+```
+Customer (orang tua)
+  ├── Child            customers.id -> children.customer_id
+  └── Registration     customers.id -> registrations.customer_id
+        ├── Event      events.id    -> registrations.event_id
+        ├── Payment    registrations.id -> payments.registration_id
+        ├── Attendance registrations.id -> attendance.registration_id
+        └── Certificate registrations.id -> certificates.registration_id
+```
 
-- **Status event dihitung di server**, lewat `resolveLifecycle()` di `lib/utils/date.ts`.
-  Nilainya diturunkan sebagai prop, sehingga markup server dan klien selalu sama dan tidak
-  terjadi hydration mismatch.
-- **Bentuk data di `src/data` sengaja dibuat menyerupai kolom tabel**, supaya pemetaan ke
-  skema basis data nantinya berjalan lurus.
+Data orang tua **tidak diduplikasi** per anak; pendaftaran ulang dengan email yang
+sama memakai kembali baris customer yang ada.
 
-### 2. Pendaftaran, kehadiran, dan sertifikat
+### Mengganti data dummy dengan basis data
 
-| Berkas | Perannya sekarang | Penggantinya nanti |
+Cukup satu berkas: **`src/lib/repositories/index.ts`**. Implementasikan ulang
+`Repository<T>` terhadap klien Supabase/PostgreSQL. Selama bentuk kembaliannya
+tetap mengikuti `src/lib/repositories/types.ts`, tidak ada service maupun komponen
+yang perlu diubah.
+
+Yang juga perlu dipindah ke basis data saat itu:
+
+| Sekarang | Nanti |
+| --- | --- |
+| `lib/utils/numbering.ts` | sequence / identity column, agar nomor tetap unik saat penulisan bersamaan |
+| `lib/services/payment.ts` (`mockGateway`) | implementasi `PaymentGateway` untuk Midtrans/Xendit/Stripe |
+| `lib/auth/*` | penyedia autentikasi sungguhan (Supabase Auth, Auth.js, Clerk) |
+| Unggah galeri | penyimpanan objek (Supabase Storage / S3) |
+
+### Penomoran
+
+| Entitas | Format | Contoh |
 | --- | --- | --- |
-| `lib/services/registration.ts` | Menyimpan pendaftaran ke localStorage | `POST /api/registrations` atau Supabase client |
-| `lib/services/attendance.ts` | Mencatat kehadiran, menerima `source: "form" \| "qr"` | Endpoint absensi + pemindaian QR |
-| `lib/services/certificate.ts` | Menerbitkan & memverifikasi sertifikat | Endpoint sertifikat |
-| `lib/services/payment.ts` | `MockPaymentProvider` → instruksi transfer manual | Implementasi `PaymentProvider` untuk Midtrans/Xendit/Stripe |
-| `lib/repositories/*.ts` | Adapter localStorage | Adapter database |
+| Customer | `KB-CUS-<5 digit>` | `KB-CUS-00001` |
+| Anak | `KB-CHD-<5 digit>` | `KB-CHD-00001` |
+| Pendaftaran | `KB-REG-<tahun>-<5 digit>` | `KB-REG-2026-00001` |
+| Pembayaran | `KB-PAY-<tahun>-<5 digit>` | `KB-PAY-2026-00001` |
+| Sertifikat | `KB-<tahun>-<5 digit>` | `KB-2026-00125` |
 
-Antarmukanya sudah ditetapkan, jadi penggantian cukup menukar implementasi. Contoh:
-`payment.ts` mengekspor `interface PaymentProvider`; cukup buat implementasi baru lalu ubah
-satu baris `export const paymentProvider`.
+### Peran ERP
 
-### 3. Penomoran sertifikat
+| Peran | Akses |
+| --- | --- |
+| `SUPER_ADMIN` | seluruh menu termasuk Pengaturan |
+| `ADMIN` | semua kecuali Pengaturan |
+| `STAFF` | Dashboard, Orang Tua, Anak, Pendaftaran, Kehadiran, Laporan |
 
-Format: `KB-<tahun>-<urutan 5 digit>` — contoh `KB-2026-00125`.
-
-Logikanya terisolasi di `lib/utils/certificate.ts` (`formatCertificateNumber`,
-`parseCertificateNumber`, `nextCertificateNumber`). Saat ini urutan dihitung dari sertifikat
-yang sudah ada. **Di produksi, ganti `nextCertificateNumber` dengan sequence/identity column
-database** agar nomor tetap unik saat ada penulisan bersamaan.
+Menu sidebar difilter per peran, dan halaman yang tidak diizinkan menolak akses —
+bukan sekadar disembunyikan.
 
 ## Siap untuk panel admin
 
@@ -244,18 +280,19 @@ Belum ada dashboard admin di fase ini — sesuai permintaan. Yang sudah disiapka
 Pada commit ini:
 
 - `npm run lint`, `npm run typecheck`, dan `npm run build` bersih tanpa peringatan.
-- 48 halaman dihasilkan sebagai HTML statis.
-- Diuji di peramban pada lebar 360 / 390 / 768 / 1280 px: tidak ada scroll horizontal,
-  tidak ada gambar gagal muat, tidak ada hydration error.
-- 28 alur diuji ujung ke ujung: menu seluler, filter event (termasuk deep link `?filter=`),
-  validasi anak + orang tua, penolakan usia di luar 3–15, pendaftaran berbayar beserta
-  instruksi pembayaran dan status menunggu bayar, kelas dengan kuota penuh, pencatatan
-  kehadiran, penolakan kontak yang tidak cocok, penerbitan sertifikat bernomor unik,
-  verifikasi sertifikat, tautan Drive pada halaman Galeri, lightbox pada halaman detail
-  kegiatan, serta pemeriksaan bahwa tidak ada nomor telepon di halaman mana pun.
-- Daftar event dan formulir dirender di server (bukan skeleton), sehingga isinya terbaca
-  tanpa menjalankan JavaScript. Halaman yang bergantung pada tanggal diregenerasi tiap jam
-  (`revalidate = 3600`) agar status "Akan Datang"/"Selesai" tidak basi.
+- 73 halaman dihasilkan saat build.
+- **41 alur diuji ujung ke ujung di peramban**, mencakup: pendaratan QR beserta
+  penanda sumber, pendaftaran multi-anak, total harga, tiga skenario pembayaran
+  (gratis / website / pihak ketiga), simulasi pembayaran gagal lalu berhasil,
+  penolakan usia di luar rentang kelas, penolakan kontak yang tidak cocok saat
+  check-in, penerbitan sertifikat setelah kehadiran, verifikasi sertifikat publik,
+  penjagaan rute ERP, pembatasan peran STAFF, dashboard, pencarian global,
+  generator QR, seluruh halaman ERP, dan perubahan status pembayaran manual.
+- Salah satu tes membuktikan **situs publik dan ERP memang berbagi data**:
+  pendaftaran yang dibuat lewat situs publik langsung muncul di tabel ERP.
+- Sapuan responsif dan aksesibilitas pada **360 / 390 / 768 / 1280 px** (publik) dan
+  **390 / 768 / 1366 px** (ERP): tidak ada scroll horizontal, gambar rusak, teks
+  alternatif hilang, kontrol tanpa label, maupun hydration error.
 
 ## Deploy
 
@@ -271,16 +308,19 @@ agar metadata SEO dan sitemap memakai URL yang benar.
 
 ## Batasan versi ini
 
-- Data pendaftaran/kehadiran/sertifikat tersimpan di peramban pengguna, jadi tidak lintas
-  perangkat dan hilang bila data situs dibersihkan.
-- Tidak ada payment gateway sungguhan; instruksi transfer bersifat contoh.
-- Tanggal event bersifat statis. Seiring waktu, event "akan datang" akan berpindah sendiri
-  ke "selesai" karena statusnya dihitung dari tanggal sebenarnya.
-- Belum ada panel admin, autentikasi, maupun absensi QR (jalur kodenya sudah disiapkan).
+- **Data tersimpan di peramban.** Pendaftaran, pembayaran, kehadiran, dan sertifikat
+  memakai localStorage, jadi tidak lintas perangkat dan hilang bila data situs
+  dibersihkan. Data seed selalu tersedia sebagai dasar.
+- **Autentikasi ERP simulasi.** Cookie sesi ditandatangani HMAC sehingga tidak bisa
+  dipalsukan dengan mengedit nilainya, tetapi akunnya fixture tanpa kata sandi
+  terenkripsi. Bukan autentikasi produksi.
+- **Payment gateway simulasi.** Tombol "Bayar Sekarang" hanya mengubah status.
 - **Harga setiap kelas masih placeholder** dan wajib diganti dengan angka sebenarnya.
-- Alamat email pada footer masih placeholder; Instagram adalah satu-satunya kanal kontak
-  yang terkonfirmasi.
-- Poster Pemadam Cilik beresolusi 595×739 px (hasil tangkapan layar). Minta berkas asli dari
-  tim desain agar tajam pada layar beresolusi tinggi.
-- Tautan folder Google Drive pada halaman Galeri belum diisi; halaman menampilkan status
-  "belum diatur" sampai URL asli dimasukkan.
+- Kegiatan dan galeri di ERP masih **baca saja**; form CRUD menunggu backend dan
+  penyimpanan objek.
+- Statistik pemindaian QR belum ada — yang tercatat baru sumber pendaftaran.
+- Tanggal event bersifat statis; halaman yang bergantung tanggal diregenerasi tiap
+  jam (`revalidate = 3600`).
+- Sebagian besar foto adalah stok placeholder. Cover Tentara Cilik dan Pemadam Cilik
+  adalah ilustrasi datar buatan sendiri; poster Pemadam Cilik memakai artwork asli.
+- Alamat email pada footer masih placeholder.
