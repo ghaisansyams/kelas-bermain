@@ -56,14 +56,6 @@ export default function NotFound() {
               </Link>
             </li>
           ))}
-          <li>
-            <Link
-              href="/sertifikat"
-              className="text-sm font-semibold text-muted transition-colors hover:text-brand"
-            >
-              Cek Sertifikat
-            </Link>
-          </li>
         </ul>
       </nav>
       </Container>
