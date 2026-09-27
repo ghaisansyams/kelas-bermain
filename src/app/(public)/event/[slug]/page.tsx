@@ -27,6 +27,7 @@ import { Badge, categoryTone, LifecycleBadge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { siteConfig } from "@/data/site";
+import { certificatesEnabled } from "@/lib/features";
 import {
   getEventBySlug,
   getEventSlugs,
@@ -157,7 +158,7 @@ export default async function EventDetailPage({
               {event.category}
             </Badge>
             <LifecycleBadge lifecycle={event.lifecycle} className="bg-surface/95" />
-            {event.certificate.available ? (
+            {certificatesEnabled && event.certificate.available ? (
               <Badge tone="solid" className="bg-surface/95 text-ink ring-line">
                 <Award className="size-3.5" aria-hidden />
                 Bersertifikat
@@ -262,7 +263,7 @@ export default async function EventDetailPage({
                 <CheckList items={event.requirements} variant="box" />
               </SectionBlock>
 
-              {event.certificate.available ? (
+              {certificatesEnabled && event.certificate.available ? (
                 <SectionBlock id="sertifikat" title="Sertifikat">
                   <div className="rounded-card border border-line bg-canvas-deep/50 p-5">
                     <p className="text-sm leading-relaxed text-ink-soft">

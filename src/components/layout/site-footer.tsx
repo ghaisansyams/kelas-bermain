@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
-import { InstagramIcon, TiktokIcon, YoutubeIcon } from "@/components/brand/social-icons";
+import {
+  FacebookIcon,
+  InstagramIcon,
+  ThreadsIcon,
+  TiktokIcon,
+  WhatsappIcon,
+} from "@/components/brand/social-icons";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/ui/container";
 import { footerNav, siteConfig, socialLinks } from "@/data/site";
 
 const socialIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   instagram: InstagramIcon,
-  youtube: YoutubeIcon,
+  whatsapp: WhatsappIcon,
   mail: Mail,
-  music: TiktokIcon,
+  threads: ThreadsIcon,
+  tiktok: TiktokIcon,
+  facebook: FacebookIcon,
 };
 
 export function SiteFooter() {
@@ -28,16 +36,31 @@ export function SiteFooter() {
             <div className="mt-6 flex flex-wrap gap-2">
               {socialLinks.map((social) => {
                 const Icon = socialIcons[social.icon] ?? Mail;
+                const tile =
+                  "inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft";
+                const label = `${social.label} — ${social.handle}`;
+
+                // Facebook has a page name but no URL yet, so it stays a
+                // plain tile rather than a link that goes nowhere.
+                if (!social.href) {
+                  return (
+                    <span key={social.label} className={tile} title={label}>
+                      <Icon className="size-[1.125rem]" aria-hidden />
+                      <span className="sr-only">{label}</span>
+                    </span>
+                  );
+                }
+
                 const external = social.href.startsWith("http");
                 return (
                   <a
                     key={social.label}
                     href={social.href}
-                    aria-label={`${social.label} — ${social.handle}`}
+                    aria-label={label}
                     {...(external
                       ? { target: "_blank", rel: "noopener noreferrer" }
                       : {})}
-                    className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand-ink"
+                    className={`${tile} transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand-ink`}
                   >
                     <Icon className="size-[1.125rem]" aria-hidden />
                   </a>

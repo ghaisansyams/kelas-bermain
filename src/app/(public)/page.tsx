@@ -6,7 +6,6 @@ import { Hero } from "@/components/home/hero";
 import { JoinSteps } from "@/components/home/join-steps";
 import { Pillars } from "@/components/home/pillars";
 import { SocialFeed } from "@/components/home/social-feed";
-import { Stats } from "@/components/home/stats";
 import { Testimonials } from "@/components/home/testimonials";
 import { UpcomingEvents } from "@/components/home/upcoming-events";
 import { siteConfig } from "@/data/site";
@@ -60,7 +59,6 @@ export default async function HomePage() {
       <Pillars />
       <UpcomingEvents events={events.slice(0, 6)} />
       <JoinSteps />
-      <Stats />
       <ActivityPreview activities={activities.slice(0, 3)} />
       <GalleryPreview items={gallery.slice(0, 6)} />
       <Testimonials items={testimonials} />

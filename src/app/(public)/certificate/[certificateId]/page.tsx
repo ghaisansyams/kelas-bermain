@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { CertificateViewer } from "@/components/certificate/certificate-viewer";
 import { Container } from "@/components/ui/container";
 import { certificates } from "@/data/certificates";
 import { siteConfig } from "@/data/site";
+import { certificatesEnabled } from "@/lib/features";
 
 export function generateStaticParams() {
-  // Seeded certificates are prerendered; anything issued later renders on demand.
+  // Nothing to prerender while certificates are switched off (R-06 / K-07).
+  if (!certificatesEnabled) return [];
   return certificates.map((certificate) => ({ certificateId: certificate.number }));
 }
 
@@ -35,6 +38,8 @@ export default async function CertificatePage({
 }: {
   params: Promise<{ certificateId: string }>;
 }) {
+  if (!certificatesEnabled) notFound();
+
   const { certificateId } = await params;
 
   return (

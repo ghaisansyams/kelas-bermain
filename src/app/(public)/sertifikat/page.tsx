@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Award, Hash, ShieldCheck } from "lucide-react";
 import { CertificateLookup } from "@/components/certificate/certificate-lookup";
@@ -5,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Container } from "@/components/ui/container";
 import { certificates } from "@/data/certificates";
 import { siteConfig } from "@/data/site";
+import { certificatesEnabled } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "Cek Sertifikat",
@@ -38,6 +40,10 @@ const facts = [
 ];
 
 export default function CertificateLookupPage() {
+  // Kelas Bermain issues no e-certificates (R-06 / K-07). The page stays in
+  // the tree behind the flag so it can be switched back on later.
+  if (!certificatesEnabled) notFound();
+
   return (
     <>
       <PageHeader

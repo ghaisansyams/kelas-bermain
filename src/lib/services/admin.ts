@@ -1,3 +1,4 @@
+import { certificatesEnabled } from "@/lib/features";
 import { activities } from "@/data/activities";
 import { events } from "@/data/events";
 import { galleryItems } from "@/data/gallery";
@@ -271,6 +272,9 @@ export interface DashboardData {
     upcomingEvents: number;
     certificatesTotal: number;
     certificatesIssued: number;
+    /** Registrations in range divided by the events that actually drew any. */
+    avgPerEvent: number;
+    eventsWithRegistrations: number;
     activeRegistrations: number;
   };
   registrationSeries: SeriesPoint[];
@@ -498,6 +502,11 @@ export async function getDashboard(
       certificatesIssued: allCertificates.filter((c) =>
         within(c.issuedAt, range.from, range.to),
       ).length,
+      avgPerEvent:
+        registrationsByEvent.length > 0
+          ? Math.round((inRange.length / registrationsByEvent.length) * 10) / 10
+          : 0,
+      eventsWithRegistrations: registrationsByEvent.length,
       activeRegistrations: allRegistrations.filter(
         (r) => r.status === "REGISTERED" || r.status === "CONFIRMED",
       ).length,
@@ -600,7 +609,9 @@ export async function globalSearch(query: string, limit = 12): Promise<SearchHit
       });
     }
   }
-  for (const c of certificatesRepo.all()) {
+  // Certificate pages 404 while the feature is off (R-06 / K-07), so they
+  // must not appear as search results either.
+  for (const c of certificatesEnabled ? certificatesRepo.all() : []) {
     if (has(c.number, c.participantName)) {
       hits.push({
         kind: "certificate",

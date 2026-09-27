@@ -12,6 +12,8 @@ import type { CertificateRecord } from "@/lib/repositories/types";
 import { ageOf } from "@/lib/services/customer";
 import { getRegistrationRows, type RegistrationRow } from "@/lib/services/admin";
 import { formatDate, formatDateShort } from "@/lib/utils/date";
+import { certificatesEnabled } from "@/lib/features";
+import { cn } from "@/lib/utils/cn";
 
 export function ChildDetailView({ childId }: { childId: string }) {
   const { data, loading } = useCollection(async () => {
@@ -82,11 +84,13 @@ export function ChildDetailView({ childId }: { childId: string }) {
         }
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
+      <div className={cn("mb-4 grid gap-3", certificatesEnabled ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
         <StatCard label="Usia" value={`${ageOf(child.dateOfBirth)} th`} tone="sun" />
         <StatCard label="Kelas Diikuti" value={String(registrations.length)} tone="pine" />
         <StatCard label="Kehadiran" value={String(attended)} tone="sky" />
-        <StatCard label="Sertifikat" value={String(certs.length)} tone="grape" />
+        {certificatesEnabled ? (
+          <StatCard label="Sertifikat" value={String(certs.length)} tone="grape" />
+        ) : null}
       </div>
 
       <DetailTabs
@@ -148,16 +152,20 @@ export function ChildDetailView({ childId }: { childId: string }) {
               </Panel>
             ),
           },
-          {
-            key: "certificates",
-            label: "Sertifikat",
-            count: certs.length,
-            content: (
-              <Panel>
-                <DataTable rows={certs} columns={certColumns} getKey={(c) => c.number} caption="Sertifikat anak" />
-              </Panel>
-            ),
-          },
+          ...(certificatesEnabled
+            ? [
+                {
+                  key: "certificates",
+                  label: "Sertifikat",
+                  count: certs.length,
+                  content: (
+                    <Panel>
+                      <DataTable rows={certs} columns={certColumns} getKey={(c) => c.number} caption="Sertifikat anak" />
+                    </Panel>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </>

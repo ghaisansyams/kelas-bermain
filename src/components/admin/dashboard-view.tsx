@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Award,
   Baby,
   CalendarDays,
   CheckCheck,
@@ -175,13 +174,15 @@ export function DashboardView() {
           icon={<CalendarDays className="size-4" aria-hidden />}
           href="/admin/events"
         />
+        {/* Replaced "Sertifikat Terbit" — Kelas Bermain issues none (R-06).
+            The affiliate card the PRD calls for lands with F13. */}
         <StatCard
           tone="neutral"
-          label="Sertifikat Terbit"
-          value={String(stats.certificatesTotal)}
-          detail={`+${stats.certificatesIssued} pada periode ini`}
-          icon={<Award className="size-4" aria-hidden />}
-          href="/admin/certificates"
+          label="Rata-rata Peserta"
+          value={stats.avgPerEvent.toLocaleString("id-ID")}
+          detail={`per event · ${stats.eventsWithRegistrations} event terisi`}
+          icon={<Users className="size-4" aria-hidden />}
+          href="/admin/registrations"
         />
       </div>
 

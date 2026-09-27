@@ -1,3 +1,4 @@
+import { certificatesEnabled } from "@/lib/features";
 import type { Permission } from "./roles";
 
 export interface AdminNavItem {
@@ -8,8 +9,8 @@ export interface AdminNavItem {
   group: "Ikhtisar" | "Data Pelanggan" | "Operasional" | "Konten" | "Sistem";
 }
 
-/** Single source of the ERP navigation; filtered per role at render time. */
-export const adminNav: AdminNavItem[] = [
+/** Feature-gated entries are dropped before role filtering. */
+const allNavItems: AdminNavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", permission: "dashboard", icon: "gauge", group: "Ikhtisar" },
   { href: "/admin/customers", label: "Orang Tua", permission: "customers", icon: "users", group: "Data Pelanggan" },
   { href: "/admin/children", label: "Anak", permission: "children", icon: "baby", group: "Data Pelanggan" },
@@ -23,6 +24,14 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/reports", label: "Laporan", permission: "reports", icon: "chart", group: "Sistem" },
   { href: "/admin/settings", label: "Pengaturan", permission: "settings", icon: "settings", group: "Sistem" },
 ];
+
+/**
+ * Single source of the ERP navigation; filtered per role at render time.
+ * Sertifikat is hidden while `FEATURE_CERTIFICATES` is off (R-06 / K-07).
+ */
+export const adminNav: AdminNavItem[] = allNavItems.filter(
+  (item) => certificatesEnabled || item.permission !== "certificates",
+);
 
 export const NAV_GROUPS: AdminNavItem["group"][] = [
   "Ikhtisar",

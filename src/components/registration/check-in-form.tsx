@@ -20,6 +20,7 @@ import {
   type CheckInFormValues,
   type FieldErrors,
 } from "@/lib/utils/validation";
+import { certificatesEnabled } from "@/lib/features";
 
 const EMPTY: CheckInFormValues = {
   registrationNumber: "",
@@ -131,7 +132,7 @@ export function CheckInForm({
           </p>
         </div>
 
-        {result.certificateAvailable ? (
+        {certificatesEnabled && result.certificateAvailable ? (
           <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
             <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
               <Award className="size-5 text-brand" aria-hidden />

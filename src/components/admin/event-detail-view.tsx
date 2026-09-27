@@ -15,6 +15,8 @@ import { getPaymentRows, getRegistrationRows, type PaymentRow, type Registration
 import { registrationPath } from "@/lib/services/qr";
 import { formatDate, formatDateRange, formatDateShort } from "@/lib/utils/date";
 import { formatRupiah, formatTimeRange } from "@/lib/utils/format";
+import { certificatesEnabled } from "@/lib/features";
+import { cn } from "@/lib/utils/cn";
 
 export function EventDetailView({ eventId }: { eventId: string }) {
   const { data, loading } = useCollection(async () => {
@@ -107,11 +109,13 @@ export function EventDetailView({ eventId }: { eventId: string }) {
         }
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className={cn("mb-4 grid gap-3 sm:grid-cols-2", certificatesEnabled ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
         <StatCard label="Pendaftaran" value={String(registrations.length)} detail={`Kuota ${event.capacity}`} tone="brand" />
         <StatCard label="Lunas" value={String(paid.length)} tone="pine" />
         <StatCard label="Hadir" value={String(attended)} tone="sky" />
-        <StatCard label="Sertifikat" value={String(certs.length)} tone="grape" />
+        {certificatesEnabled ? (
+          <StatCard label="Sertifikat" value={String(certs.length)} tone="grape" />
+        ) : null}
         <StatCard label="Pendapatan" value={formatRupiah(revenue)} tone="sun" />
       </div>
 

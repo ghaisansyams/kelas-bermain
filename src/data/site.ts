@@ -4,9 +4,11 @@
  *
  * Sourced from the @kelasbermain.id Instagram profile.
  *
- * Note: the organisation deliberately publishes no phone number on this site —
- * a requirement from the meeting notes. Contact runs through email and social
- * media only, even though the Instagram bio lists a WhatsApp number.
+ * Contact policy (PRD v2.0, KONF-01): the director's meeting notes asked for
+ * NO phone number on the public site, but the team later asked for the
+ * WhatsApp number in the contact box — the affiliate programme runs on it.
+ * Until that is settled, the number ships behind `NEXT_PUBLIC_SHOW_WHATSAPP`
+ * so either decision is a config change, not a code change.
  */
 
 export const siteConfig = {
@@ -20,8 +22,10 @@ export const siteConfig = {
   /** Overridden per-environment; falls back to the production domain. */
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://kelas-bermain.vercel.app",
   locale: "id-ID",
-  /** Placeholder — replace with the organisation's real inbox. */
-  email: "halo@kelasbermain.id",
+  email: "kelasbermain.id@gmail.com",
+  /** Shown only when NEXT_PUBLIC_SHOW_WHATSAPP is on — see KONF-01. */
+  whatsapp: "081774918611",
+  whatsappE164: "6281774918611",
   serviceArea: "Jabodetabek",
   ageRangeLabel: "3–15 tahun",
   officeHours: "Senin – Jumat, 09.00 – 17.00 WIB",
@@ -46,7 +50,6 @@ export const footerNav: { title: string; links: NavLink[] }[] = [
       { href: "/event", label: "Semua Event" },
       { href: "/kegiatan", label: "Kegiatan" },
       { href: "/galeri", label: "Galeri" },
-      { href: "/sertifikat", label: "Cek Sertifikat" },
     ],
   },
   {
@@ -63,11 +66,14 @@ export const footerNav: { title: string; links: NavLink[] }[] = [
 export interface SocialLink {
   label: string;
   handle: string;
+  /** Empty when the channel has no usable URL yet. */
   href: string;
-  icon: "instagram" | "youtube" | "mail" | "music";
+  icon: "instagram" | "whatsapp" | "mail" | "threads" | "tiktok" | "facebook";
+  /** Gated behind NEXT_PUBLIC_SHOW_WHATSAPP — see KONF-01. */
+  gated?: boolean;
 }
 
-export const socialLinks: SocialLink[] = [
+const allSocialLinks: SocialLink[] = [
   {
     label: "Instagram",
     handle: "@kelasbermain.id",
@@ -75,25 +81,54 @@ export const socialLinks: SocialLink[] = [
     icon: "instagram",
   },
   {
+    label: "WhatsApp",
+    handle: siteConfig.whatsapp,
+    href: `https://wa.me/${siteConfig.whatsappE164}`,
+    icon: "whatsapp",
+    gated: true,
+  },
+  {
     label: "Email",
-    handle: "halo@kelasbermain.id",
-    href: "mailto:halo@kelasbermain.id",
+    handle: siteConfig.email,
+    href: `mailto:${siteConfig.email}`,
     icon: "mail",
+  },
+  {
+    label: "Threads",
+    handle: "@kelasbermain.id",
+    href: "https://www.threads.net/@kelasbermain.id",
+    icon: "threads",
+  },
+  {
+    label: "TikTok",
+    handle: "@kelasbermain.id",
+    href: "https://www.tiktok.com/@kelasbermain.id",
+    icon: "tiktok",
+  },
+  {
+    // The team gave the page name but not its URL, and guessing one risks
+    // linking to somebody else's page. Rendered as plain text until asked.
+    label: "Facebook",
+    handle: "Kelas Bermain",
+    href: "",
+    icon: "facebook",
   },
 ];
 
-export interface SiteStat {
-  value: string;
-  label: string;
-  detail: string;
-}
+/** True only when the deployment has opted in to showing the phone number. */
+export const showWhatsapp = process.env.NEXT_PUBLIC_SHOW_WHATSAPP === "true";
 
-export const siteStats: SiteStat[] = [
-  { value: "20+", label: "Kegiatan terselenggara", detail: "Sepanjang 2026" },
-  { value: "8", label: "Lokasi mitra", detail: "Tersebar di Jabodetabek" },
-  { value: "1.200+", label: "Anak sudah ikut", detail: "Dari berbagai sekolah" },
-  { value: "3–15", label: "Rentang usia peserta", detail: "Dibagi per kelompok umur" },
-];
+export const socialLinks: SocialLink[] = allSocialLinks.filter(
+  (link) => !link.gated || showWhatsapp,
+);
+
+/*
+ * The landing-page statistics block was removed in PRD v2.0 (R-05 / K-08).
+ * The numbers that shipped here — "20+ kegiatan", "8 lokasi mitra",
+ * "1.200+ anak" — were demo placeholders far above the real figures
+ * (5 kegiatan since 2026), and the team asked for these not to be
+ * published at all. Do not reintroduce without written approval.
+ */
 
 export interface Pillar {
   title: string;
@@ -156,8 +191,8 @@ export const joinSteps: ProcessStep[] = [
       "Transfer sesuai instruksi yang muncul setelah mendaftar, lalu tunggu konfirmasi dari tim kami.",
   },
   {
-    title: "Datang & ambil sertifikat",
+    title: "Datang & ikut kelasnya",
     description:
-      "Hadir di lokasi, isi kehadiran lewat halaman event, dan e-sertifikat anak bisa langsung dilihat.",
+      "Hadir di lokasi, isi kehadiran lewat halaman event, lalu anak tinggal menikmati kegiatannya.",
   },
 ];

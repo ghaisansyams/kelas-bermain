@@ -7,6 +7,7 @@ import { Reveal } from "@/components/ui/reveal";
 import type { EventView } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 import { formatDateRange } from "@/lib/utils/date";
+import { siteConfig } from "@/data/site";
 
 export function Hero({ nextEvent }: { nextEvent?: EventView }) {
   return (
@@ -63,11 +64,14 @@ export function Hero({ nextEvent }: { nextEvent?: EventView }) {
             </Reveal>
 
             <Reveal delay={300}>
-              <dl className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
+              {/* Only publishable facts here. The activity and participant
+                  counts that used to sit alongside these were demo numbers,
+                  and the team asked for such figures not to be published at
+                  all (PRD v2.0, R-05 / K-08). */}
+              <dl className="mt-10 grid max-w-md grid-cols-2 gap-4 border-t border-line pt-6">
                 {[
-                  { value: "20+", label: "Kegiatan" },
-                  { value: "3–15", label: "Tahun" },
-                  { value: "1.200+", label: "Anak" },
+                  { value: siteConfig.ageRangeLabel, label: "Usia peserta" },
+                  { value: siteConfig.serviceArea, label: "Area kegiatan" },
                 ].map((stat) => (
                   <div key={stat.label}>
                     <dt className="sr-only">{stat.label}</dt>

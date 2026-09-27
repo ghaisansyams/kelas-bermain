@@ -14,6 +14,7 @@ import type { EventView } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
+import { certificatesEnabled } from "@/lib/features";
 
 /**
  * The registration box on the event detail template. Its contents are driven
@@ -107,15 +108,17 @@ export function RegistrationPanel({ event }: { event: EventView }) {
               {isPaid ? "Transfer manual" : "Tidak diperlukan"}
             </dd>
           </div>
-          <div className="flex items-start justify-between gap-3">
-            <dt className="flex items-center gap-1.5 text-muted">
-              <Award className="size-4 shrink-0 text-brand/70" aria-hidden />
-              Sertifikat
-            </dt>
-            <dd className="text-right font-semibold text-ink">
-              {event.certificate.available ? "Tersedia" : "Tidak tersedia"}
-            </dd>
-          </div>
+          {certificatesEnabled ? (
+            <div className="flex items-start justify-between gap-3">
+              <dt className="flex items-center gap-1.5 text-muted">
+                <Award className="size-4 shrink-0 text-brand/70" aria-hidden />
+                Sertifikat
+              </dt>
+              <dd className="text-right font-semibold text-ink">
+                {event.certificate.available ? "Tersedia" : "Tidak tersedia"}
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
         <div className="space-y-2.5 pt-1">
