@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Info, Landmark } from "lucide-react";
+import { Check, Copy, Landmark, MessageCircle } from "lucide-react";
 import { paymentAccounts } from "@/data/payment-accounts";
-import { siteConfig, showWhatsapp } from "@/data/site";
+import { siteConfig } from "@/data/site";
 import { buttonStyles } from "@/components/ui/button";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -112,22 +112,22 @@ export function BankTransferPanel({
           bisa segera bergabung bersama kami di Kelas Bermain! 🥰✨
         </p>
 
-        {showWhatsapp ? (
-          <a
-            href={`https://wa.me/${siteConfig.whatsappE164}?text=${encodeURIComponent(proofMessage)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonStyles({ className: "mt-4 w-full sm:w-auto" })}
-          >
-            Kirim Bukti Transfer
-          </a>
-        ) : (
-          <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
-            <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-            Kirimkan bukti transfer ke kontak resmi Kelas Bermain, cantumkan nomor
-            pendaftaran <span className="font-mono font-bold">{registrationNumber}</span>.
-          </p>
-        )}
+        {/*
+          Always shown here regardless of NEXT_PUBLIC_SHOW_WHATSAPP: that flag
+          gates the number as a general public-contact channel (site-wide,
+          still pending the director's call — PRD KONF-01), but this is a
+          transactional step inside an active registration, not a marketing
+          surface. There is no other channel to send a transfer proof to.
+        */}
+        <a
+          href={`https://wa.me/${siteConfig.whatsappE164}?text=${encodeURIComponent(proofMessage)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonStyles({ className: "mt-4 w-full sm:w-auto" })}
+        >
+          <MessageCircle className="size-4" aria-hidden />
+          Konfirmasi via WhatsApp
+        </a>
       </div>
     </div>
   );
