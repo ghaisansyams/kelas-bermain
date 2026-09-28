@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowRight,
   CalendarPlus,
   CircleCheckBig,
   CreditCard,
@@ -10,9 +9,11 @@ import {
   Info,
   Printer,
 } from "lucide-react";
+import { BankTransferPanel } from "@/components/registration/bank-transfer";
 import { buttonStyles } from "@/components/ui/button";
 import type { RegistrationBatch } from "@/lib/services/registration";
 import type { EventView } from "@/lib/types";
+import { certificatesEnabled } from "@/lib/features";
 import { formatDate, formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -27,10 +28,12 @@ export function RegistrationReceipt({
   event,
   batch,
   parentName,
+  childName,
 }: {
   event: EventView;
   batch: RegistrationBatch;
   parentName: string;
+  childName?: string;
 }) {
   const lead = batch.registrations[0];
   const isFree = batch.paymentMethod === "NONE";
@@ -86,7 +89,7 @@ export function RegistrationReceipt({
             label="Lokasi"
             value={`${event.location.venue}, ${event.location.city}`}
           />
-          <Line label="Orang tua" value={parentName} />
+          <Line label="Pendamping" value={parentName} />
           <Line label="Nomor customer" value={batch.customerNumber} mono />
           <Line
             label="Status pembayaran"
@@ -121,11 +124,11 @@ export function RegistrationReceipt({
       </div>
 
       {/* Payment routing */}
-      {!isFree && batch.payment ? (
+      {!isFree && isThirdParty && batch.payment ? (
         <div className="no-print rounded-card border border-sun/30 bg-sun-soft/50 p-5 sm:p-6">
           <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
             <CreditCard className="size-5 text-sun-dark" aria-hidden />
-            {isThirdParty ? "Pembayaran di Platform Mitra" : "Selesaikan Pembayaran"}
+            Pembayaran di Platform Mitra
           </h3>
 
           <ol className="mt-4 space-y-2.5">
@@ -139,8 +142,8 @@ export function RegistrationReceipt({
             ))}
           </ol>
 
-          <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-            {isThirdParty && batch.payment.redirectUrl ? (
+          {batch.payment.redirectUrl ? (
+            <div className="mt-5">
               <a
                 href={batch.payment.redirectUrl}
                 target="_blank"
@@ -150,21 +153,24 @@ export function RegistrationReceipt({
                 Lanjut ke Platform Mitra
                 <ExternalLink className="size-4" aria-hidden />
               </a>
-            ) : (
-              <Link
-                href={`/payment/${lead.registrationNumber}`}
-                className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-              >
-                Bayar Sekarang
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            )}
-          </div>
+            </div>
+          ) : null}
 
           <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <Info className="mt-px size-3.5 shrink-0" aria-hidden />
             {batch.payment.note}
           </p>
+        </div>
+      ) : null}
+
+      {!isFree && !isThirdParty ? (
+        <div className="no-print">
+          <BankTransferPanel
+            amount={batch.totalAmount}
+            registrationNumber={lead.registrationNumber}
+            eventTitle={event.title}
+            childName={childName}
+          />
         </div>
       ) : null}
 
@@ -179,7 +185,7 @@ export function RegistrationReceipt({
           <li>
             Isi kehadiran lewat halaman check-in menggunakan nomor pendaftaran di atas.
           </li>
-          {event.certificate.available ? (
+          {certificatesEnabled && event.certificate.available ? (
             <li>Setelah kehadiran tercatat, e-sertifikat anak bisa langsung diunduh.</li>
           ) : null}
         </ul>

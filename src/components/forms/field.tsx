@@ -16,6 +16,7 @@ export function Field({
   error,
   hint,
   required,
+  fixed,
   children,
   className,
 }: {
@@ -24,6 +25,8 @@ export function Field({
   error?: string;
   hint?: string;
   required?: boolean;
+  /** Prefilled and not editable — neither "required" nor "(opsional)" fits. */
+  fixed?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -31,7 +34,7 @@ export function Field({
     <div className={cn("flex flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className="text-sm font-semibold text-ink">
         {label}
-        {required ? (
+        {fixed ? null : required ? (
           <span className="ml-0.5 text-brand" aria-hidden>
             *
           </span>

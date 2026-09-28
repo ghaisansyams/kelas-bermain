@@ -24,33 +24,68 @@ export type RegistrationSource =
   | "qr"
   | "website"
   | "instagram"
+  | "tiktok"
+  | "threads"
+  | "facebook"
   | "poster"
   | "banner"
   | "brosur"
+  | "teman"
+  | "affiliator"
   | "referral"
-  | "walk_in";
+  | "walk_in"
+  | "lainnya";
 
 export const REGISTRATION_SOURCES: RegistrationSource[] = [
   "qr",
   "website",
   "instagram",
+  "tiktok",
+  "threads",
+  "facebook",
   "poster",
   "banner",
   "brosur",
+  "teman",
+  "affiliator",
   "referral",
   "walk_in",
+  "lainnya",
 ];
 
 export const sourceLabel: Record<RegistrationSource, string> = {
   qr: "QR Code",
   website: "Website",
   instagram: "Instagram",
+  tiktok: "TikTok",
+  threads: "Threads",
+  facebook: "Facebook",
   poster: "Poster",
   banner: "Banner",
   brosur: "Brosur",
+  teman: "Teman",
+  affiliator: "Affiliator",
   referral: "Referral",
   walk_in: "Walk-in",
+  lainnya: "Lainnya",
 };
+
+/**
+ * What the public form offers under "Mengetahui Kelas Bermain dari".
+ * `qr`, `website` and `walk_in` are recorded by the system rather than picked.
+ */
+export const SELECTABLE_SOURCES: RegistrationSource[] = [
+  "teman",
+  "instagram",
+  "tiktok",
+  "threads",
+  "facebook",
+  "affiliator",
+  "poster",
+  "banner",
+  "brosur",
+  "lainnya",
+];
 
 /** Parent/guardian. One customer record per family contact. */
 export interface Customer {
@@ -58,8 +93,12 @@ export interface Customer {
   /** KB-CUS-00001 */
   customerNumber: string;
   fullName: string;
+  /** Optional since v2.0 — the real intake form does not ask for it. */
   email: string;
   whatsapp: string;
+  /** Free-text "Domisili", e.g. "Pekayon, Jakarta Timur". */
+  domicile: string;
+  /** Legacy split kept for seeded rows; new sign-ups only fill `domicile`. */
   address: string;
   city: string;
   occupation: string;
@@ -79,9 +118,20 @@ export interface Child {
   customerId: string;
   fullName: string;
   nickname: string;
-  gender: Gender;
-  /** ISO date; age is always derived, never stored. */
+  gender: Gender | "";
+  /**
+   * ISO date. Optional since v2.0: the intake form asks for an age
+   * ("3 THN 8 BULAN"), not a birthday. Seeded rows still carry one, and it
+   * remains the better source when present because it never goes stale.
+   */
   dateOfBirth: string;
+  /**
+   * Age as the parent stated it, with the date it was stated. Together these
+   * let the real age be recomputed later instead of silently ageing out.
+   */
+  ageYears?: number;
+  ageMonths?: number;
+  ageRecordedAt?: string;
   school: string;
   grade: string;
   specialNotes?: string;
@@ -133,6 +183,12 @@ export interface Registration {
   source: RegistrationSource;
   /** Raw `?source=` value from the scanned QR, kept for attribution. */
   qrSource?: string;
+  /**
+   * Affiliate code as typed by the parent, uppercased. Stored unvalidated
+   * for now — the affiliate programme itself lands later (PRD F13), and a
+   * typo must never block a sign-up.
+   */
+  affiliateCode?: string;
   notes?: string;
 }
 
@@ -181,6 +237,53 @@ export interface CertificateRecord {
   issuedAt: string;
   status: CertificateState;
   signatory: { name: string; role: string };
+}
+
+/* ------------------------------------------------------------------ */
+/* Affiliate programme                                                 */
+/* ------------------------------------------------------------------ */
+
+export type AffiliateStatus = "PENDING" | "ACTIVE" | "INACTIVE" | "REJECTED";
+
+export const affiliateStatusLabel: Record<AffiliateStatus, string> = {
+  PENDING: "Menunggu Verifikasi",
+  ACTIVE: "Aktif",
+  INACTIVE: "Nonaktif",
+  REJECTED: "Ditolak",
+};
+
+/**
+ * Someone who promotes classes with a personal code and earns a commission
+ * per paid participant.
+ *
+ * Bank details sit here because payouts are transferred by hand. They are
+ * third-party financial data: only SUPER_ADMIN should ever see them, and they
+ * must never reach the public side.
+ */
+export interface Affiliate {
+  id: string;
+  /** KB-AFF-00001 */
+  affiliateNumber: string;
+  /**
+   * Public code the parent types at sign-up. Empty until an admin approves
+   * the application — an unverified applicant must not be able to earn.
+   */
+  code: string;
+  fullName: string;
+  whatsapp: string;
+  email?: string;
+  domicile: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  /** Free text: why they want to join. */
+  reason?: string;
+  status: AffiliateStatus;
+  appliedAt: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  /** Reason shown to the team when an application is rejected. */
+  notes?: string;
 }
 
 /**

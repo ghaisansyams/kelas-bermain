@@ -19,6 +19,7 @@ export type Permission =
   | "certificates"
   | "activities"
   | "gallery"
+  | "affiliates"
   | "reports"
   | "settings";
 
@@ -34,6 +35,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "certificates",
     "activities",
     "gallery",
+    "affiliates",
     "reports",
     "settings",
   ],
@@ -48,6 +50,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "certificates",
     "activities",
     "gallery",
+    "affiliates",
     "reports",
   ],
   STAFF: ["dashboard", "customers", "children", "registrations", "attendance", "reports"],

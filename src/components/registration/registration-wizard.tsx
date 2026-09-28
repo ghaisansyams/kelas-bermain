@@ -1,26 +1,35 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Baby,
+  Info,
   Loader2,
   Plus,
   Trash2,
   UserRound,
 } from "lucide-react";
-import { Checkbox, Field, Select, TextArea, TextInput } from "@/components/forms/field";
+import { Checkbox, Field, Select, TextInput } from "@/components/forms/field";
 import { StepProgress, type WizardStep } from "@/components/registration/steps";
 import { RegistrationReceipt } from "@/components/registration/receipt";
 import { Button } from "@/components/ui/button";
-import type { RegistrationSource } from "@/lib/repositories/types";
+import {
+  SELECTABLE_SOURCES,
+  sourceLabel,
+  type RegistrationSource,
+} from "@/lib/repositories/types";
+import { findAffiliateByCode } from "@/lib/services/affiliate";
 import { createRegistration, type RegistrationBatch } from "@/lib/services/registration";
 import type { EventView } from "@/lib/types";
 import { formatRupiah } from "@/lib/utils/format";
 import { formatDateRange } from "@/lib/utils/date";
+import { formatAge } from "@/lib/utils/age";
 import {
+  ageOutsideRange,
   emptyChild,
   emptyParent,
   hasErrors,
@@ -32,8 +41,8 @@ import {
 } from "@/lib/utils/validation";
 
 const STEPS: WizardStep[] = [
-  { key: "parent", label: "Orang Tua" },
-  { key: "children", label: "Anak" },
+  { key: "children", label: "Data Anak" },
+  { key: "parent", label: "Pendamping" },
   { key: "confirm", label: "Konfirmasi" },
   { key: "done", label: "Selesai" },
 ];
@@ -41,6 +50,15 @@ const STEPS: WizardStep[] = [
 /** Max children per submission — keeps the form usable on a phone. */
 const MAX_CHILDREN = 4;
 
+/**
+ * Public sign-up form.
+ *
+ * The field list mirrors the intake sheet the team already uses in WhatsApp
+ * (PRD v2.0, R-02), in the same order: child first, then the accompanying
+ * adult, then how they heard about Kelas Bermain and an affiliate code.
+ * Email, gender, school, grade and occupation were dropped — that sheet has
+ * never asked for them, and every extra field costs sign-ups.
+ */
 export function RegistrationWizard({
   event,
   source,
@@ -51,10 +69,13 @@ export function RegistrationWizard({
   qrSource?: string;
 }) {
   const [step, setStep] = useState(0);
-  const [parent, setParent] = useState<ParentFormValues>(emptyParent);
-  const [parentErrors, setParentErrors] = useState<FieldErrors<ParentFormValues>>({});
   const [children, setChildren] = useState<ChildFormValues[]>([{ ...emptyChild }]);
   const [childErrors, setChildErrors] = useState<FieldErrors<ChildFormValues>[]>([{}]);
+  const [parent, setParent] = useState<ParentFormValues>(emptyParent);
+  const [parentErrors, setParentErrors] = useState<FieldErrors<ParentFormValues>>({});
+  const [heardFrom, setHeardFrom] = useState<RegistrationSource | "">("");
+  const [heardFromError, setHeardFromError] = useState<string | null>(null);
+  const [affiliateCode, setAffiliateCode] = useState("");
   const [consent, setConsent] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,10 +91,13 @@ export function RegistrationWizard({
     [event.seatsLeft],
   );
 
-  function setParentField<K extends keyof ParentFormValues>(key: K, value: string) {
-    setParent((current) => ({ ...current, [key]: value }));
-    setParentErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
-  }
+  /** Soft advisories — these never block the form. See PRD KONF-02. */
+  const ageWarnings = children.map((child) => ageOutsideRange(child, event.ageRange));
+
+  const affiliateMatch = useMemo(() => {
+    const code = affiliateCode.trim();
+    return code ? findAffiliateByCode(code) : null;
+  }, [affiliateCode]);
 
   function setChildField(index: number, key: keyof ChildFormValues, value: string) {
     setChildren((current) =>
@@ -84,6 +108,11 @@ export function RegistrationWizard({
         i === index && errors[key] ? { ...errors, [key]: undefined } : errors,
       ),
     );
+  }
+
+  function setParentField<K extends keyof ParentFormValues>(key: K, value: string) {
+    setParent((current) => ({ ...current, [key]: value }));
+    setParentErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
   }
 
   function addChild() {
@@ -97,20 +126,8 @@ export function RegistrationWizard({
     setChildErrors((current) => current.filter((_, i) => i !== index));
   }
 
-  function goToChildren() {
-    const errors = validateParent(parent);
-    setParentErrors(errors);
-    if (hasErrors(errors)) {
-      const first = Object.keys(errors).find((k) => errors[k as keyof ParentFormValues]);
-      if (first) document.getElementById(first)?.focus();
-      return;
-    }
-    setStep(1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function goToConfirm() {
-    const errors = children.map((child) => validateChild(child, event.ageRange));
+  function goToParent() {
+    const errors = children.map(validateChild);
     setChildErrors(errors);
     if (errors.some(hasErrors)) {
       const index = errors.findIndex(hasErrors);
@@ -118,6 +135,21 @@ export function RegistrationWizard({
         (k) => errors[index][k as keyof ChildFormValues],
       );
       if (key) document.getElementById(`${key}-${index}`)?.focus();
+      return;
+    }
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goToConfirm() {
+    const errors = validateParent(parent);
+    setParentErrors(errors);
+    const missingSource = !heardFrom;
+    setHeardFromError(missingSource ? "Pilih salah satu." : null);
+
+    if (hasErrors(errors) || missingSource) {
+      const first = Object.keys(errors).find((k) => errors[k as keyof ParentFormValues]);
+      document.getElementById(first ?? "heardFrom")?.focus();
       return;
     }
     setStep(2);
@@ -133,27 +165,28 @@ export function RegistrationWizard({
     setFormError(null);
     setSubmitting(true);
 
+    // What the parent picked outranks the channel we inferred from the URL,
+    // except when they scanned a QR — that is a fact, not a recollection.
+    const attributed: RegistrationSource =
+      source === "qr" ? "qr" : (heardFrom || source);
+
     const result = await createRegistration({
       event,
-      source,
+      source: attributed,
       qrSource,
+      heardFrom: heardFrom || undefined,
+      affiliateCode: affiliateCode.trim().toUpperCase() || undefined,
       parent: {
         fullName: parent.fullName,
-        email: parent.email,
         whatsapp: parent.whatsapp,
-        address: parent.address,
-        city: parent.city,
-        occupation: parent.occupation,
-        source,
+        domicile: parent.domicile,
+        source: attributed,
       },
       children: children.map((child) => ({
         fullName: child.fullName,
         nickname: child.nickname,
-        gender: child.gender === "P" ? "P" : "L",
-        dateOfBirth: child.dateOfBirth,
-        school: child.school,
-        grade: child.grade,
-        specialNotes: child.specialNotes,
+        ageYears: Number(child.ageYears),
+        ageMonths: child.ageMonths.trim() === "" ? 0 : Number(child.ageMonths),
       })),
     });
 
@@ -171,7 +204,12 @@ export function RegistrationWizard({
     return (
       <div className="space-y-6">
         <StepProgress steps={STEPS} current={3} />
-        <RegistrationReceipt event={event} batch={batch} parentName={parent.fullName} />
+        <RegistrationReceipt
+          event={event}
+          batch={batch}
+          parentName={parent.fullName}
+          childName={children[0]?.fullName}
+        />
       </div>
     );
   }
@@ -190,109 +228,8 @@ export function RegistrationWizard({
         </p>
       ) : null}
 
-      {/* ---------------- Step 1: parent ---------------- */}
+      {/* ---------------- Step 1: children ---------------- */}
       {step === 0 ? (
-        <section aria-label="Data orang tua" className="space-y-5">
-          <header className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
-              <UserRound className="size-[1.125rem]" aria-hidden />
-            </span>
-            <div>
-              <h2 className="text-base font-extrabold text-ink">Data Orang Tua / Wali</h2>
-              <p className="text-xs text-muted">Kontak ini yang akan kami hubungi.</p>
-            </div>
-          </header>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Nama Lengkap" htmlFor="fullName" error={parentErrors.fullName} required className="sm:col-span-2">
-              <TextInput
-                id="fullName"
-                autoComplete="name"
-                placeholder="Contoh: Ratna Fajar"
-                value={parent.fullName}
-                error={parentErrors.fullName}
-                onChange={(e) => setParentField("fullName", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Email" htmlFor="email" error={parentErrors.email} required>
-              <TextInput
-                id="email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="nama@email.com"
-                value={parent.email}
-                error={parentErrors.email}
-                onChange={(e) => setParentField("email", e.target.value)}
-              />
-            </Field>
-
-            <Field
-              label="Nomor WhatsApp"
-              htmlFor="whatsapp"
-              error={parentErrors.whatsapp}
-              hint="Dipakai untuk konfirmasi dan info lokasi."
-              required
-            >
-              <TextInput
-                id="whatsapp"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="08123456789"
-                value={parent.whatsapp}
-                error={parentErrors.whatsapp}
-                hint="Dipakai untuk konfirmasi dan info lokasi."
-                onChange={(e) => setParentField("whatsapp", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Alamat" htmlFor="address" error={parentErrors.address} required className="sm:col-span-2">
-              <TextInput
-                id="address"
-                autoComplete="street-address"
-                placeholder="Jl. Margonda Raya No. 45"
-                value={parent.address}
-                error={parentErrors.address}
-                onChange={(e) => setParentField("address", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Kota" htmlFor="city" error={parentErrors.city} required>
-              <TextInput
-                id="city"
-                autoComplete="address-level2"
-                placeholder="Depok"
-                value={parent.city}
-                error={parentErrors.city}
-                onChange={(e) => setParentField("city", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Pekerjaan" htmlFor="occupation" error={parentErrors.occupation}>
-              <TextInput
-                id="occupation"
-                autoComplete="organization-title"
-                placeholder="Karyawan swasta"
-                value={parent.occupation}
-                error={parentErrors.occupation}
-                onChange={(e) => setParentField("occupation", e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <div className="flex justify-end border-t border-line pt-5">
-            <Button size="lg" onClick={goToChildren} className="w-full sm:w-auto">
-              Lanjut ke Data Anak
-              <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ---------------- Step 2: children ---------------- */}
-      {step === 1 ? (
         <section aria-label="Data anak" className="space-y-5">
           <header className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-xl bg-sun-soft text-sun-dark">
@@ -301,8 +238,8 @@ export function RegistrationWizard({
             <div>
               <h2 className="text-base font-extrabold text-ink">Data Anak</h2>
               <p className="text-xs text-muted">
-                Usia {event.ageRange[0]}–{event.ageRange[1]} tahun. Bisa mendaftarkan lebih
-                dari satu anak.
+                Kelas ini untuk usia {event.ageRange[0]}–{event.ageRange[1]} tahun. Bisa
+                mendaftarkan lebih dari satu anak.
               </p>
             </div>
           </header>
@@ -328,107 +265,83 @@ export function RegistrationWizard({
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field
-                  label="Nama Lengkap Anak"
+                  label="Nama Anak"
                   htmlFor={`fullName-${index}`}
                   error={childErrors[index]?.fullName}
-                  hint="Nama ini yang tercetak pada sertifikat."
                   required
                   className="sm:col-span-2"
                 >
                   <TextInput
                     id={`fullName-${index}`}
-                    placeholder="Contoh: Aisyah Fajar"
+                    placeholder="Contoh: Adyatama Hamizan Nur Adam"
                     value={child.fullName}
                     error={childErrors[index]?.fullName}
-                    hint="Nama ini yang tercetak pada sertifikat."
                     onChange={(e) => setChildField(index, "fullName", e.target.value)}
                   />
                 </Field>
 
-                <Field label="Nama Panggilan" htmlFor={`nickname-${index}`}>
+                <Field
+                  label="Nama Panggilan"
+                  htmlFor={`nickname-${index}`}
+                  error={childErrors[index]?.nickname}
+                  required
+                >
                   <TextInput
                     id={`nickname-${index}`}
-                    placeholder="Aisyah"
+                    placeholder="Contoh: Tama"
                     value={child.nickname}
+                    error={childErrors[index]?.nickname}
                     onChange={(e) => setChildField(index, "nickname", e.target.value)}
                   />
                 </Field>
 
                 <Field
-                  label="Jenis Kelamin"
-                  htmlFor={`gender-${index}`}
-                  error={childErrors[index]?.gender}
+                  label="Usia Anak"
+                  htmlFor={`ageYears-${index}`}
+                  error={childErrors[index]?.ageYears ?? childErrors[index]?.ageMonths}
+                  hint="Contoh: 3 tahun 8 bulan."
                   required
                 >
-                  <Select
-                    id={`gender-${index}`}
-                    value={child.gender}
-                    error={childErrors[index]?.gender}
-                    onChange={(e) => setChildField(index, "gender", e.target.value)}
+                  <div className="flex items-center gap-2">
+                    <TextInput
+                      id={`ageYears-${index}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={17}
+                      placeholder="3"
+                      className="w-full"
+                      value={child.ageYears}
+                      error={childErrors[index]?.ageYears}
+                      onChange={(e) => setChildField(index, "ageYears", e.target.value)}
+                    />
+                    <span className="shrink-0 text-sm text-muted">tahun</span>
+                    <TextInput
+                      id={`ageMonths-${index}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={11}
+                      placeholder="8"
+                      className="w-full"
+                      aria-label={`Usia anak ${index + 1} dalam bulan`}
+                      value={child.ageMonths}
+                      error={childErrors[index]?.ageMonths}
+                      onChange={(e) => setChildField(index, "ageMonths", e.target.value)}
+                    />
+                    <span className="shrink-0 text-sm text-muted">bulan</span>
+                  </div>
+                </Field>
+
+                {ageWarnings[index] ? (
+                  <p
+                    role="status"
+                    className="flex items-start gap-2 rounded-xl border border-sun/35 bg-sun-soft/70 p-3.5 text-xs leading-relaxed text-ink-soft sm:col-span-2"
                   >
-                    <option value="">Pilih…</option>
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </Select>
-                </Field>
-
-                <Field
-                  label="Tanggal Lahir"
-                  htmlFor={`dateOfBirth-${index}`}
-                  error={childErrors[index]?.dateOfBirth}
-                  required
-                >
-                  <TextInput
-                    id={`dateOfBirth-${index}`}
-                    type="date"
-                    value={child.dateOfBirth}
-                    error={childErrors[index]?.dateOfBirth}
-                    onChange={(e) => setChildField(index, "dateOfBirth", e.target.value)}
-                  />
-                </Field>
-
-                <Field
-                  label="Asal Sekolah"
-                  htmlFor={`school-${index}`}
-                  error={childErrors[index]?.school}
-                  required
-                >
-                  <TextInput
-                    id={`school-${index}`}
-                    placeholder="SDN Menteng 03"
-                    value={child.school}
-                    error={childErrors[index]?.school}
-                    onChange={(e) => setChildField(index, "school", e.target.value)}
-                  />
-                </Field>
-
-                <Field label="Kelas" htmlFor={`grade-${index}`}>
-                  <TextInput
-                    id={`grade-${index}`}
-                    placeholder="Kelas 2"
-                    value={child.grade}
-                    onChange={(e) => setChildField(index, "grade", e.target.value)}
-                  />
-                </Field>
-
-                <Field
-                  label="Catatan Khusus"
-                  htmlFor={`specialNotes-${index}`}
-                  error={childErrors[index]?.specialNotes}
-                  hint="Alergi, kebutuhan khusus, atau hal yang perlu panitia tahu."
-                  className="sm:col-span-2"
-                >
-                  <TextArea
-                    id={`specialNotes-${index}`}
-                    rows={3}
-                    maxLength={300}
-                    placeholder="Opsional"
-                    value={child.specialNotes}
-                    error={childErrors[index]?.specialNotes}
-                    hint="Alergi, kebutuhan khusus, atau hal yang perlu panitia tahu."
-                    onChange={(e) => setChildField(index, "specialNotes", e.target.value)}
-                  />
-                </Field>
+                    <Info className="mt-0.5 size-4 shrink-0 text-sun-dark" aria-hidden />
+                    {ageWarnings[index]}
+                  </p>
+                ) : null}
               </div>
             </fieldset>
           ))}
@@ -447,6 +360,149 @@ export function RegistrationWizard({
               Maksimal {maxChildren} anak per pendaftaran.
             </p>
           )}
+
+          <div className="flex justify-end border-t border-line pt-5">
+            <Button size="lg" onClick={goToParent} className="w-full sm:w-auto">
+              Lanjut ke Data Pendamping
+              <ArrowRight className="size-4" aria-hidden />
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---------------- Step 2: guardian + attribution ---------------- */}
+      {step === 1 ? (
+        <section aria-label="Data pendamping" className="space-y-5">
+          <header className="flex items-center gap-2.5">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
+              <UserRound className="size-[1.125rem]" aria-hidden />
+            </span>
+            <div>
+              <h2 className="text-base font-extrabold text-ink">Data Pendamping</h2>
+              <p className="text-xs text-muted">Kontak ini yang akan kami hubungi.</p>
+            </div>
+          </header>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              label="Nama Pendamping / Orang Tua"
+              htmlFor="fullName"
+              error={parentErrors.fullName}
+              hint="Boleh dua nama, contoh: Annisa / Adam."
+              required
+              className="sm:col-span-2"
+            >
+              <TextInput
+                id="fullName"
+                autoComplete="name"
+                placeholder="Contoh: Annisa / Adam"
+                value={parent.fullName}
+                error={parentErrors.fullName}
+                onChange={(e) => setParentField("fullName", e.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="No. WhatsApp Aktif"
+              htmlFor="whatsapp"
+              error={parentErrors.whatsapp}
+              hint="Dipakai untuk konfirmasi pembayaran dan info lokasi."
+              required
+            >
+              <TextInput
+                id="whatsapp"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="08123456789"
+                value={parent.whatsapp}
+                error={parentErrors.whatsapp}
+                onChange={(e) => setParentField("whatsapp", e.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="Domisili"
+              htmlFor="domicile"
+              error={parentErrors.domicile}
+              hint="Cukup kecamatan dan kota."
+              required
+            >
+              <TextInput
+                id="domicile"
+                autoComplete="address-level2"
+                placeholder="Contoh: Pekayon, Jakarta Timur"
+                value={parent.domicile}
+                error={parentErrors.domicile}
+                onChange={(e) => setParentField("domicile", e.target.value)}
+              />
+            </Field>
+
+            <Field label="Kelas yang Diikuti" htmlFor="eventTitle" fixed className="sm:col-span-2">
+              <TextInput
+                id="eventTitle"
+                value={event.title}
+                readOnly
+                aria-readonly
+                className="bg-canvas-deep/50 text-muted"
+              />
+            </Field>
+
+            <Field
+              label="Mengetahui Kelas Bermain dari"
+              htmlFor="heardFrom"
+              error={heardFromError ?? undefined}
+              required
+            >
+              <Select
+                id="heardFrom"
+                value={heardFrom}
+                error={heardFromError ?? undefined}
+                onChange={(e) => {
+                  setHeardFrom(e.target.value as RegistrationSource | "");
+                  setHeardFromError(null);
+                }}
+              >
+                <option value="">Pilih salah satu</option>
+                {SELECTABLE_SOURCES.map((key) => (
+                  <option key={key} value={key}>
+                    {sourceLabel[key]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field label="Kode Affiliate" htmlFor="affiliateCode">
+              <TextInput
+                id="affiliateCode"
+                placeholder="Contoh: FIKA10"
+                autoCapitalize="characters"
+                value={affiliateCode}
+                onChange={(e) => setAffiliateCode(e.target.value.toUpperCase())}
+              />
+              {affiliateCode.trim() ? (
+                affiliateMatch && affiliateMatch.status === "ACTIVE" ? (
+                  <p className="mt-1 text-xs font-semibold text-pine-dark">
+                    Kode {affiliateMatch.code} milik {affiliateMatch.fullName} ✓
+                  </p>
+                ) : (
+                  // Never blocks — a mistyped or inactive code is not the
+                  // parent's problem to solve. See PRD v2.0, validation table.
+                  <p className="mt-1 text-xs text-sun-dark">
+                    Kode tidak dikenal atau belum aktif. Pendaftaran tetap bisa dilanjutkan.
+                  </p>
+                )
+              ) : (
+                <p className="mt-1 text-xs text-muted">
+                  Belum punya kode?{" "}
+                  <Link href="/affiliate" className="font-semibold text-brand hover:underline">
+                    Jadi affiliator
+                  </Link>{" "}
+                  dan dapatkan komisi dari share-anmu sendiri.
+                </p>
+              )}
+            </Field>
+          </div>
 
           <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:justify-between">
             <Button
@@ -472,18 +528,29 @@ export function RegistrationWizard({
           <h2 className="text-base font-extrabold text-ink">Konfirmasi Pendaftaran</h2>
 
           <dl className="divide-y divide-line rounded-card border border-line bg-surface text-sm">
-            <Row label="Kelas" value={event.title} />
+            <Row label="Kelas yang diikuti" value={event.title} />
             <Row label="Tanggal" value={formatDateRange(event.startDate, event.endDate)} />
-            <Row
-              label="Lokasi"
-              value={`${event.location.venue}, ${event.location.city}`}
-            />
-            <Row label="Orang tua" value={parent.fullName} />
-            <Row label="Kontak" value={`${parent.email} · ${parent.whatsapp}`} />
+            <Row label="Lokasi" value={`${event.location.venue}, ${event.location.city}`} />
             <Row
               label="Anak"
-              value={children.map((c) => c.fullName).join(", ")}
+              value={children
+                .map(
+                  (c) =>
+                    `${c.fullName} (${c.nickname}) · ${formatAge(
+                      Number(c.ageYears),
+                      Number(c.ageMonths || 0),
+                    )}`,
+                )
+                .join(" — ")}
             />
+            <Row label="Pendamping" value={parent.fullName} />
+            <Row label="WhatsApp" value={parent.whatsapp} />
+            <Row label="Domisili" value={parent.domicile} />
+            <Row
+              label="Mengetahui dari"
+              value={heardFrom ? sourceLabel[heardFrom] : "—"}
+            />
+            {affiliateCode ? <Row label="Kode affiliate" value={affiliateCode} /> : null}
             <Row label="Jumlah peserta" value={`${children.length} anak`} />
             <Row
               label={isFree ? "Biaya" : "Harga per anak"}
@@ -554,7 +621,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 px-4 py-3">
       <dt className="shrink-0 text-muted">{label}</dt>
-      <dd className="text-right font-semibold text-ink">{value}</dd>
+      <dd className="min-w-0 text-right font-semibold text-ink">{value}</dd>
     </div>
   );
 }

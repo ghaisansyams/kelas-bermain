@@ -9,11 +9,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useCollection } from "@/hooks/use-collection";
 import { certificatesRepo, childrenRepo, customersRepo } from "@/lib/repositories";
 import type { CertificateRecord } from "@/lib/repositories/types";
-import { ageOf } from "@/lib/services/customer";
 import { getRegistrationRows, type RegistrationRow } from "@/lib/services/admin";
 import { formatDate, formatDateShort } from "@/lib/utils/date";
 import { certificatesEnabled } from "@/lib/features";
 import { cn } from "@/lib/utils/cn";
+import { ageOfChild } from "@/lib/utils/age";
 
 export function ChildDetailView({ childId }: { childId: string }) {
   const { data, loading } = useCollection(async () => {
@@ -44,6 +44,7 @@ export function ChildDetailView({ childId }: { childId: string }) {
 
   const { child, parent, registrations, certs } = data;
   const attended = registrations.filter((r) => r.registration.attendanceStatus === "PRESENT").length;
+  const age = ageOfChild(child);
 
   const regColumns: Column<RegistrationRow>[] = [
     { key: "number", header: "No. Pendaftaran", render: (r) => <span className="whitespace-nowrap font-mono text-xs font-bold">{r.registration.registrationNumber}</span> },
@@ -85,7 +86,7 @@ export function ChildDetailView({ childId }: { childId: string }) {
       />
 
       <div className={cn("mb-4 grid gap-3", certificatesEnabled ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
-        <StatCard label="Usia" value={`${ageOf(child.dateOfBirth)} th`} tone="sun" />
+        <StatCard label="Usia" value={age === null ? "—" : `${age} th`} tone="sun" />
         <StatCard label="Kelas Diikuti" value={String(registrations.length)} tone="pine" />
         <StatCard label="Kehadiran" value={String(attended)} tone="sky" />
         {certificatesEnabled ? (
@@ -106,11 +107,13 @@ export function ChildDetailView({ childId }: { childId: string }) {
                       { label: "Nomor Anak", value: <span className="font-mono">{child.childNumber}</span> },
                       { label: "Nama Lengkap", value: child.fullName },
                       { label: "Nama Panggilan", value: child.nickname },
-                      { label: "Jenis Kelamin", value: child.gender === "L" ? "Laki-laki" : "Perempuan" },
-                      { label: "Tanggal Lahir", value: formatDate(child.dateOfBirth) },
-                      { label: "Usia", value: `${ageOf(child.dateOfBirth)} tahun` },
-                      { label: "Sekolah", value: child.school },
-                      { label: "Kelas", value: child.grade },
+                      // Gender, birthday, school and grade left the sign-up
+                      // form in PRD v2.0 (R-02); show them only when known.
+                      { label: "Jenis Kelamin", value: child.gender === "L" ? "Laki-laki" : child.gender === "P" ? "Perempuan" : "Tidak dicatat" },
+                      { label: "Tanggal Lahir", value: child.dateOfBirth ? formatDate(child.dateOfBirth) : "Tidak dicatat" },
+                      { label: "Usia", value: age === null ? "Tidak dicatat" : `${age} tahun` },
+                      { label: "Sekolah", value: child.school || "Tidak dicatat" },
+                      { label: "Kelas", value: child.grade || "—" },
                       { label: "Catatan Khusus", value: child.specialNotes ?? "—" },
                       { label: "Kontak Darurat", value: child.emergencyContact },
                     ]}
@@ -129,10 +132,12 @@ export function ChildDetailView({ childId }: { childId: string }) {
                           ),
                         },
                         { label: "Nomor Customer", value: <span className="font-mono">{parent.customerNumber}</span> },
-                        { label: "Email", value: parent.email },
                         { label: "WhatsApp", value: parent.whatsapp },
-                        { label: "Alamat", value: parent.address },
-                        { label: "Kota", value: parent.city },
+                        { label: "Domisili", value: parent.domicile || parent.city || "—" },
+                        // Email and street address are no longer asked for at
+                        // sign-up (PRD v2.0, R-02); show them only when known.
+                        ...(parent.email ? [{ label: "Email", value: parent.email }] : []),
+                        ...(parent.address ? [{ label: "Alamat", value: parent.address }] : []),
                       ]}
                     />
                   ) : (

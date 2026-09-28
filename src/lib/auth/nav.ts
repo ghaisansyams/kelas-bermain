@@ -19,6 +19,7 @@ const allNavItems: AdminNavItem[] = [
   { href: "/admin/payments", label: "Pembayaran", permission: "payments", icon: "wallet", group: "Operasional" },
   { href: "/admin/attendance", label: "Kehadiran", permission: "attendance", icon: "check", group: "Operasional" },
   { href: "/admin/certificates", label: "Sertifikat", permission: "certificates", icon: "award", group: "Operasional" },
+  { href: "/admin/affiliates", label: "Affiliate", permission: "affiliates", icon: "megaphone", group: "Operasional" },
   { href: "/admin/activities", label: "Kegiatan", permission: "activities", icon: "sparkles", group: "Konten" },
   { href: "/admin/gallery", label: "Galeri", permission: "gallery", icon: "image", group: "Konten" },
   { href: "/admin/reports", label: "Laporan", permission: "reports", icon: "chart", group: "Sistem" },

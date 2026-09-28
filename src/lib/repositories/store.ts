@@ -69,4 +69,5 @@ export const STORAGE_KEYS = {
   payments: "kb.payments.v2",
   attendance: "kb.attendance.v2",
   certificates: "kb.certificates.v2",
+  affiliates: "kb.affiliates.v1",
 } as const;

@@ -10,10 +10,10 @@ import { useCollection } from "@/hooks/use-collection";
 import { childrenRepo, customersRepo } from "@/lib/repositories";
 import type { Child } from "@/lib/repositories/types";
 import { sourceLabel } from "@/lib/repositories/types";
-import { ageOf } from "@/lib/services/customer";
 import { getPaymentRows, getRegistrationRows, type PaymentRow, type RegistrationRow } from "@/lib/services/admin";
 import { formatDate, formatDateShort } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
+import { ageOfChild } from "@/lib/utils/age";
 
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const { data, loading } = useCollection(async () => {
@@ -60,8 +60,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
       ),
     },
     { key: "name", header: "Nama", render: (child) => <span className="font-semibold text-ink">{child.fullName}</span> },
-    { key: "age", header: "Usia", render: (child) => <span className="tabular-nums">{ageOf(child.dateOfBirth)}</span> },
-    { key: "gender", header: "L/P", render: (child) => (child.gender === "L" ? "Laki-laki" : "Perempuan") },
+    { key: "age", header: "Usia", render: (child) => <span className="tabular-nums">{ageOfChild(child) ?? "—"}</span> },
+    { key: "gender", header: "L/P", render: (child) => (child.gender === "L" ? "Laki-laki" : child.gender === "P" ? "Perempuan" : "—") },
     { key: "school", header: "Sekolah", hideBelow: "md", render: (child) => <span className="text-xs">{child.school}</span> },
     { key: "notes", header: "Catatan", hideBelow: "lg", render: (child) => <span className="text-xs text-muted">{child.specialNotes ?? "—"}</span> },
   ];
@@ -118,12 +118,18 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                 <DefinitionList
                   items={[
                     { label: "Nomor Customer", value: <span className="font-mono">{customer.customerNumber}</span> },
-                    { label: "Nama Lengkap", value: customer.fullName },
-                    { label: "Email", value: <span className="inline-flex items-center gap-1.5"><Mail className="size-3.5 text-muted" aria-hidden />{customer.email}</span> },
+                    { label: "Nama Pendamping", value: customer.fullName },
                     { label: "WhatsApp", value: <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-muted" aria-hidden />{customer.whatsapp}</span> },
-                    { label: "Alamat", value: <span className="inline-flex items-center gap-1.5 text-right"><MapPin className="size-3.5 shrink-0 text-muted" aria-hidden />{customer.address}</span> },
-                    { label: "Kota", value: customer.city },
-                    { label: "Pekerjaan", value: customer.occupation },
+                    { label: "Domisili", value: <span className="inline-flex items-center gap-1.5 text-right"><MapPin className="size-3.5 shrink-0 text-muted" aria-hidden />{customer.domicile || customer.city || "—"}</span> },
+                    // Email, street address and occupation are no longer asked
+                    // for at sign-up (PRD v2.0, R-02); only show what exists.
+                    ...(customer.email
+                      ? [{ label: "Email", value: <span className="inline-flex items-center gap-1.5"><Mail className="size-3.5 text-muted" aria-hidden />{customer.email}</span> }]
+                      : []),
+                    ...(customer.address ? [{ label: "Alamat", value: customer.address }] : []),
+                    ...(customer.occupation && customer.occupation !== "—"
+                      ? [{ label: "Pekerjaan", value: customer.occupation }]
+                      : []),
                     { label: "Sumber", value: sourceLabel[customer.source] },
                     { label: "Terdaftar", value: formatDate(customer.createdAt) },
                     { label: "Diperbarui", value: formatDate(customer.updatedAt) },

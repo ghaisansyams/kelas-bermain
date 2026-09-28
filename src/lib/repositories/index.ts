@@ -1,3 +1,4 @@
+import { affiliates } from "@/data/affiliates";
 import { attendanceRecords } from "@/data/attendance";
 import { certificates } from "@/data/certificates";
 import { children } from "@/data/children";
@@ -6,6 +7,7 @@ import { payments } from "@/data/payments";
 import { registrations } from "@/data/registrations";
 import { createStore, STORAGE_KEYS } from "./store";
 import type {
+  Affiliate,
   AttendanceRecord,
   CertificateRecord,
   Child,
@@ -104,11 +106,39 @@ export const certificatesRepo = createRepository<CertificateRecord>(
   (c) => c.number,
 );
 
+export const affiliatesRepo = createRepository<Affiliate>(
+  STORAGE_KEYS.affiliates,
+  () => [...affiliates],
+  (a) => a.id,
+);
+
+/** 0812…, +62812… and 62812… are the same number. */
+function normalizeWhatsapp(value: string): string {
+  const digits = (value ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  return digits;
+}
+
 /** Look-ups that span repositories but stay too small to deserve a service. */
 export const lookups = {
   customerByEmail(email: string): Customer | null {
     const needle = email.trim().toLowerCase();
+    if (!needle) return null;
     return customersRepo.all().find((c) => c.email.toLowerCase() === needle) ?? null;
+  },
+  /**
+   * Families are deduplicated on WhatsApp now that the intake form no longer
+   * asks for an email. Compared in normalised form so 0812…, +62812… and
+   * 62812… all resolve to the same household.
+   */
+  customerByWhatsapp(value: string): Customer | null {
+    const needle = normalizeWhatsapp(value);
+    if (!needle) return null;
+    return (
+      customersRepo.all().find((c) => normalizeWhatsapp(c.whatsapp) === needle) ?? null
+    );
   },
   registrationByNumber(value: string): Registration | null {
     const needle = value.trim().toUpperCase();

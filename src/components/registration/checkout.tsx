@@ -8,7 +8,6 @@ import {
   Clock3,
   CreditCard,
   ExternalLink,
-  Landmark,
   Loader2,
   ShieldAlert,
 } from "lucide-react";
@@ -21,6 +20,7 @@ import { events } from "@/data/events";
 import { getPaymentByRegistration, settlePayment } from "@/lib/services/payment";
 import { getRegistration } from "@/lib/services/registration";
 import { formatDate } from "@/lib/utils/date";
+import { BankTransferPanel } from "@/components/registration/bank-transfer";
 import { formatRupiah } from "@/lib/utils/format";
 
 /**
@@ -226,38 +226,31 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
         </p>
       ) : null}
 
+      {/* The team's own transfer wording and real accounts, shared with the
+          registration receipt so the site and WhatsApp never disagree. */}
+      <BankTransferPanel
+        amount={payment.amount}
+        registrationNumber={registration.registrationNumber}
+        eventTitle={event?.title ?? "Kelas Bermain"}
+        childName={child?.fullName}
+      />
+
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
-          <Landmark className="size-5 text-brand" aria-hidden />
-          Transfer Bank
-        </h3>
-        <dl className="mt-4 grid gap-3 rounded-2xl bg-canvas-deep/50 p-4 text-sm sm:grid-cols-3">
-          <div>
-            <dt className="text-xs font-bold uppercase tracking-wider text-muted">Bank</dt>
-            <dd className="mt-0.5 font-bold text-ink">Bank Contoh Indonesia</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-bold uppercase tracking-wider text-muted">
-              Nomor Rekening
-            </dt>
-            <dd className="mt-0.5 font-mono font-bold text-ink">1234 5678 9012</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-bold uppercase tracking-wider text-muted">
-              Berita Transfer
-            </dt>
-            <dd className="mt-0.5 font-mono font-bold text-ink">
-              {registration.registrationNumber}
-            </dd>
-          </div>
-        </dl>
+        <h3 className="text-base font-extrabold text-ink">Status pembayaran</h3>
 
         {payment.expiresAt ? (
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
             <Clock3 className="size-3.5" aria-hidden />
             Selesaikan sebelum {formatDate(payment.expiresAt)}.
           </p>
         ) : null}
+
+        <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+          Berita transfer:{" "}
+          <span className="font-mono font-bold text-ink">
+            {registration.registrationNumber}
+          </span>
+        </p>
 
         <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
           <Button size="lg" onClick={() => pay("PAID")} disabled={working} className="w-full sm:w-auto">
@@ -269,7 +262,7 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
             ) : (
               <>
                 <CreditCard className="size-4" aria-hidden />
-                Bayar Sekarang
+                Saya Sudah Transfer
               </>
             )}
           </Button>
@@ -285,8 +278,9 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
         </div>
 
         <p className="mt-4 rounded-xl bg-canvas-deep/60 p-3.5 text-xs leading-relaxed text-muted">
-          Gerbang pembayaran ini masih simulasi — tidak ada uang yang berpindah. Integrasi
-          penyedia pembayaran sungguhan dilakukan lewat <code>lib/services/payment.ts</code>.
+          Catatan versi demo: menekan tombol di atas langsung menandai pembayaran lunas.
+          Alur sungguhnya — unggah bukti transfer lalu diverifikasi admin — menunggu
+          penyimpanan berkas (PRD F10/F11).
         </p>
       </div>
     </div>
@@ -314,7 +308,7 @@ function Summary({
     <dl className="divide-y divide-line rounded-card border border-line bg-surface text-sm">
       <Row label="Kelas" value={event} />
       <Row label="Tanggal" value={date} />
-      <Row label="Orang tua" value={parent} />
+      <Row label="Pendamping" value={parent} />
       <Row label="Anak" value={child} />
       <Row label="Jumlah" value={`${quantity} peserta`} />
       <Row label="Status" value={status} />

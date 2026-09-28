@@ -6,7 +6,7 @@ import { AdminPageHeader, FilterBar, FilterSelect, Panel, StatCard } from "@/com
 import { buttonStyles } from "@/components/ui/button";
 import { useCollection } from "@/hooks/use-collection";
 import { events } from "@/data/events";
-import { sourceLabel } from "@/lib/repositories/types";
+import { affiliateStatusLabel, sourceLabel } from "@/lib/repositories/types";
 import {
   downloadCsv,
   getCertificateRows,
@@ -16,8 +16,9 @@ import {
   getRegistrationRows,
   toCsv,
 } from "@/lib/services/admin";
-import { ageOf } from "@/lib/services/customer";
+import { listAffiliates, statsForAffiliate } from "@/lib/services/affiliate";
 import { formatRupiah } from "@/lib/utils/format";
+import { ageOfChild } from "@/lib/utils/age";
 
 type ReportKey =
   | "registrations"
@@ -25,7 +26,8 @@ type ReportKey =
   | "children"
   | "payments"
   | "attendance"
-  | "events";
+  | "events"
+  | "affiliates";
 
 const REPORTS: { key: ReportKey; title: string; description: string }[] = [
   { key: "registrations", title: "Laporan Pendaftaran", description: "Seluruh pendaftaran dengan status pembayaran, kehadiran, dan sertifikat." },
@@ -34,6 +36,7 @@ const REPORTS: { key: ReportKey; title: string; description: string }[] = [
   { key: "payments", title: "Laporan Pembayaran", description: "Transaksi berdasarkan metode, provider, dan status." },
   { key: "attendance", title: "Laporan Kehadiran", description: "Kehadiran peserta per event." },
   { key: "events", title: "Laporan Event", description: "Ringkasan per event: pendaftaran, kehadiran, dan pendapatan." },
+  { key: "affiliates", title: "Laporan Affiliate", description: "Per affiliator: peserta masuk, peserta lunas, dan estimasi komisi." },
 ];
 
 export function ReportsView() {
@@ -49,6 +52,7 @@ export function ReportsView() {
       children: await getChildRows(),
       payments: await getPaymentRows(),
       certificates: await getCertificateRows(),
+      affiliates: await listAffiliates(),
     }),
     [],
   );
@@ -100,9 +104,9 @@ export function ReportsView() {
           toCsv(scoped.customers, [
             { header: "Customer ID", value: (r) => r.customer.customerNumber },
             { header: "Nama", value: (r) => r.customer.fullName },
-            { header: "Email", value: (r) => r.customer.email },
             { header: "WhatsApp", value: (r) => r.customer.whatsapp },
-            { header: "Kota", value: (r) => r.customer.city },
+            { header: "Domisili", value: (r) => r.customer.domicile || r.customer.city },
+            { header: "Email", value: (r) => r.customer.email },
             { header: "Jumlah Anak", value: (r) => r.childCount },
             { header: "Jumlah Pendaftaran", value: (r) => r.registrationCount },
             { header: "Total Bayar", value: (r) => r.totalPaid },
@@ -115,8 +119,9 @@ export function ReportsView() {
           toCsv(scoped.children, [
             { header: "Child ID", value: (r) => r.child.childNumber },
             { header: "Nama", value: (r) => r.child.fullName },
-            { header: "Usia", value: (r) => ageOf(r.child.dateOfBirth) },
-            { header: "Jenis Kelamin", value: (r) => (r.child.gender === "L" ? "Laki-laki" : "Perempuan") },
+            { header: "Usia", value: (r) => ageOfChild(r.child) ?? "" },
+            { header: "Nama Panggilan", value: (r) => r.child.nickname },
+            { header: "Jenis Kelamin", value: (r) => (r.child.gender === "L" ? "Laki-laki" : r.child.gender === "P" ? "Perempuan" : "") },
             { header: "Sekolah", value: (r) => r.child.school },
             { header: "Orang Tua", value: (r) => r.parent?.fullName ?? "" },
             { header: "Jumlah Kelas", value: (r) => r.classCount },
@@ -173,6 +178,25 @@ export function ReportsView() {
                   .filter((p) => p.payment.eventId === e.id && p.payment.status === "PAID")
                   .reduce((sum, p) => sum + p.payment.amount, 0),
             },
+          ]),
+        );
+        break;
+      case "affiliates":
+        downloadCsv(
+          "laporan-affiliate.csv",
+          toCsv(scoped.affiliates, [
+            { header: "No. Affiliate", value: (a) => a.affiliateNumber },
+            { header: "Nama", value: (a) => a.fullName },
+            { header: "Kode", value: (a) => a.code || "" },
+            { header: "WhatsApp", value: (a) => a.whatsapp },
+            { header: "Status", value: (a) => affiliateStatusLabel[a.status] },
+            { header: "Peserta Masuk", value: (a) => statsForAffiliate(a.code).referrals },
+            { header: "Peserta Lunas", value: (a) => statsForAffiliate(a.code).paidReferrals },
+            {
+              header: "Estimasi Komisi",
+              value: (a) => statsForAffiliate(a.code).estimatedCommission,
+            },
+            { header: "Terdaftar", value: (a) => a.appliedAt.slice(0, 10) },
           ]),
         );
         break;

@@ -18,9 +18,9 @@ import { createPayment, type PaymentInstruction } from "./payment";
  * Registration service — the one place a sign-up is created.
  *
  * A single submission can enrol several children of the same family. It
- * produces: one customer (reused when the email is already known), one child
- * row per child, one registration per child, and one payment per registration
- * when the event is not free.
+ * produces: one customer (reused when the WhatsApp number is already known),
+ * one child row per child, one registration per child, and one payment per
+ * registration when the event is not free.
  *
  * Everything runs against the repository layer, which is localStorage-backed
  * for now. Point these functions at an API route or Supabase client and the
@@ -34,6 +34,10 @@ export interface RegistrationRequest {
   source: RegistrationSource;
   /** Raw `?source=` value carried by the scanned QR. */
   qrSource?: string;
+  /** What the parent picked under "Mengetahui Kelas Bermain dari". */
+  heardFrom?: RegistrationSource;
+  /** Affiliate code as typed, already uppercased. Never validated here. */
+  affiliateCode?: string;
   notes?: string;
 }
 
@@ -122,6 +126,7 @@ export async function createRegistration(
       amount: unitPrice,
       source,
       qrSource: request.qrSource,
+      affiliateCode: request.affiliateCode,
       notes: request.notes,
     };
     registrationsRepo.create(registration);

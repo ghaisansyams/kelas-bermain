@@ -49,6 +49,11 @@ export function nextPaymentNumber(
   return `${PREFIX}-PAY-${year}-${padSeq(highest(existing, pattern) + 1)}`;
 }
 
+/** KB-AFF-00001 */
+export function nextAffiliateNumber(existing: readonly string[]): string {
+  return `${PREFIX}-AFF-${padSeq(highest(existing, /^KB-AFF-(\d+)$/) + 1)}`;
+}
+
 /**
  * Internal ids stay opaque and short.
  *

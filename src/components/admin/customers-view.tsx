@@ -41,8 +41,8 @@ export function CustomersView() {
       const c = row.customer;
       const matchesQuery =
         !q ||
-        [c.fullName, c.customerNumber, c.email, c.whatsapp, c.city].some((v) =>
-          v.toLowerCase().includes(q),
+        [c.fullName, c.customerNumber, c.email, c.whatsapp, c.city, c.domicile].some(
+          (v) => (v ?? "").toLowerCase().includes(q),
         );
       return (
         matchesQuery &&

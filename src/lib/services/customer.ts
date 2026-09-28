@@ -5,17 +5,19 @@ import { nextChildNumber, nextCustomerNumber, nextId } from "@/lib/utils/numberi
 /**
  * Customer (parent/guardian) and child master data.
  *
- * A family is looked up by email so repeat registrations reuse the same
- * customer row instead of duplicating it — the parent's details are never
- * copied onto each child.
+ * A family is looked up by WhatsApp number so repeat registrations reuse the
+ * same customer row instead of duplicating it — the parent's details are never
+ * copied onto each child. Email used to be the key, but the intake form no
+ * longer asks for one.
  */
 
 export interface CustomerInput {
   fullName: string;
-  email: string;
   whatsapp: string;
-  address: string;
-  city: string;
+  domicile: string;
+  email?: string;
+  address?: string;
+  city?: string;
   occupation?: string;
   source: RegistrationSource;
 }
@@ -23,9 +25,12 @@ export interface CustomerInput {
 export interface ChildInput {
   fullName: string;
   nickname?: string;
-  gender: Gender;
-  dateOfBirth: string;
-  school: string;
+  /** Stated age, as the intake form asks for it. */
+  ageYears: number;
+  ageMonths?: number;
+  gender?: Gender | "";
+  dateOfBirth?: string;
+  school?: string;
   grade?: string;
   specialNotes?: string;
 }
@@ -41,20 +46,38 @@ export function ageOf(dateOfBirth: string, reference: Date = new Date()): number
   return Math.max(0, age);
 }
 
-/** Reuses an existing customer when the email matches, otherwise creates one. */
+/**
+ * "Pekayon, Jakarta Timur" -> "Jakarta Timur".
+ *
+ * The form asks for one free-text domicile, but the ERP still filters by city.
+ * Taking the last segment keeps that filter a short list of real cities
+ * instead of one entry per neighbourhood.
+ */
+function cityFromDomicile(domicile: string): string {
+  const parts = domicile
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] ?? domicile.trim();
+}
+
+/** Reuses an existing customer when the WhatsApp number matches, else creates one. */
 export function upsertCustomer(input: CustomerInput): {
   customer: Customer;
   created: boolean;
 } {
-  const existing = lookups.customerByEmail(input.email);
+  const existing =
+    lookups.customerByWhatsapp(input.whatsapp) ??
+    (input.email ? lookups.customerByEmail(input.email) : null);
   const now = new Date().toISOString();
 
   if (existing) {
     const updated = customersRepo.update(existing.id, {
       fullName: input.fullName.trim(),
       whatsapp: input.whatsapp.trim(),
-      address: input.address.trim(),
-      city: input.city.trim(),
+      domicile: input.domicile.trim() || existing.domicile,
+      city: input.domicile.trim() ? cityFromDomicile(input.domicile) : existing.city,
+      email: input.email?.trim().toLowerCase() || existing.email,
       occupation: input.occupation?.trim() || existing.occupation,
       updatedAt: now,
     });
@@ -66,10 +89,11 @@ export function upsertCustomer(input: CustomerInput): {
     id: nextId("cus", all.map((c) => c.id)),
     customerNumber: nextCustomerNumber(all.map((c) => c.customerNumber)),
     fullName: input.fullName.trim(),
-    email: input.email.trim().toLowerCase(),
+    email: input.email?.trim().toLowerCase() ?? "",
     whatsapp: input.whatsapp.trim(),
-    address: input.address.trim(),
-    city: input.city.trim(),
+    domicile: input.domicile.trim(),
+    address: input.address?.trim() ?? "",
+    city: input.city?.trim() || cityFromDomicile(input.domicile),
     occupation: input.occupation?.trim() || "—",
     source: input.source,
     status: "active",
@@ -95,9 +119,12 @@ export function upsertChild(customerId: string, input: ChildInput): Child {
     customerId,
     fullName: input.fullName.trim(),
     nickname: input.nickname?.trim() || input.fullName.trim().split(" ")[0],
-    gender: input.gender,
-    dateOfBirth: input.dateOfBirth,
-    school: input.school.trim(),
+    gender: input.gender ?? "",
+    dateOfBirth: input.dateOfBirth ?? "",
+    ageYears: input.ageYears,
+    ageMonths: input.ageMonths ?? 0,
+    ageRecordedAt: new Date().toISOString(),
+    school: input.school?.trim() ?? "",
     grade: input.grade?.trim() || "—",
     specialNotes: input.specialNotes?.trim() || undefined,
     emergencyContact: parent?.whatsapp ?? "—",

@@ -1,8 +1,10 @@
+import { ageOfChild } from "@/lib/utils/age";
 import { certificatesEnabled } from "@/lib/features";
 import { activities } from "@/data/activities";
 import { events } from "@/data/events";
 import { galleryItems } from "@/data/gallery";
 import {
+  affiliatesRepo,
   attendanceRepo,
   certificatesRepo,
   childrenRepo,
@@ -20,7 +22,6 @@ import type {
 } from "@/lib/repositories/types";
 import type { EventRecord } from "@/lib/types";
 import { resolveLifecycle } from "@/lib/utils/date";
-import { ageOf } from "./customer";
 
 /**
  * Read models for the ERP.
@@ -112,7 +113,7 @@ export async function getChildRows(): Promise<ChildRow[]> {
       return {
         child,
         parent: customersRepo.find(child.customerId),
-        age: ageOf(child.dateOfBirth),
+        age: ageOfChild(child) ?? 0,
         classCount: regs.length,
         lastActivityAt: last ?? null,
       };
@@ -529,7 +530,8 @@ export type SearchKind =
   | "registration"
   | "event"
   | "payment"
-  | "certificate";
+  | "certificate"
+  | "affiliate";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -545,6 +547,7 @@ const KIND_LABEL: Record<SearchKind, string> = {
   event: "Event",
   payment: "Pembayaran",
   certificate: "Sertifikat",
+  affiliate: "Affiliate",
 };
 
 export function searchKindLabel(kind: SearchKind): string {
@@ -618,6 +621,16 @@ export async function globalSearch(query: string, limit = 12): Promise<SearchHit
         title: c.number,
         subtitle: `${c.participantName} · ${c.eventTitle}`,
         href: `/certificate/${c.number}`,
+      });
+    }
+  }
+  for (const a of affiliatesRepo.all()) {
+    if (has(a.fullName, a.affiliateNumber, a.code, a.whatsapp)) {
+      hits.push({
+        kind: "affiliate",
+        title: a.fullName,
+        subtitle: `${a.affiliateNumber}${a.code ? ` · ${a.code}` : ""}`,
+        href: `/admin/affiliates?q=${encodeURIComponent(a.fullName)}`,
       });
     }
   }

@@ -116,6 +116,7 @@ export function GlobalSearch() {
                         hit.kind === "event" && "bg-sky-soft text-sky",
                         hit.kind === "payment" && "bg-grape-soft text-grape",
                         hit.kind === "certificate" && "bg-leaf-soft text-leaf",
+                        hit.kind === "affiliate" && "bg-sun-soft text-sun-dark",
                       )}
                     >
                       {searchKindLabel(hit.kind)}

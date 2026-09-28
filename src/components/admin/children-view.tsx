@@ -56,7 +56,13 @@ export function ChildrenView() {
         <div className="min-w-0">
           <p className="truncate font-semibold text-ink">{row.child.fullName}</p>
           <p className="truncate text-xs text-muted">
-            {row.child.gender === "L" ? "Laki-laki" : "Perempuan"} · {row.child.nickname}
+            {/* Gender is no longer collected at sign-up (R-02), so an empty
+                value must read as unknown rather than defaulting to one. */}
+            {row.child.gender === "L"
+              ? `Laki-laki · ${row.child.nickname}`
+              : row.child.gender === "P"
+                ? `Perempuan · ${row.child.nickname}`
+                : row.child.nickname}
           </p>
         </div>
       ),
@@ -120,8 +126,8 @@ export function ChildrenView() {
         { header: "Child ID", value: (r) => r.child.childNumber },
         { header: "Nama", value: (r) => r.child.fullName },
         { header: "Panggilan", value: (r) => r.child.nickname },
-        { header: "Jenis Kelamin", value: (r) => (r.child.gender === "L" ? "Laki-laki" : "Perempuan") },
-        { header: "Tanggal Lahir", value: (r) => r.child.dateOfBirth },
+        { header: "Jenis Kelamin", value: (r) => (r.child.gender === "L" ? "Laki-laki" : r.child.gender === "P" ? "Perempuan" : "") },
+        { header: "Tanggal Lahir", value: (r) => r.child.dateOfBirth || "—" },
         { header: "Usia", value: (r) => r.age },
         { header: "Sekolah", value: (r) => r.child.school },
         { header: "Kelas", value: (r) => r.child.grade },

@@ -50,6 +50,7 @@ export const footerNav: { title: string; links: NavLink[] }[] = [
       { href: "/event", label: "Semua Event" },
       { href: "/kegiatan", label: "Kegiatan" },
       { href: "/galeri", label: "Galeri" },
+      { href: "/affiliate", label: "Jadi Affiliator" },
     ],
   },
   {
