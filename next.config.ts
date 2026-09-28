@@ -28,7 +28,6 @@ const nextConfig: NextConfig = {
       { source: "/event/:slug/daftar", destination: "/register/:slug", permanent: true },
       { source: "/event/:slug/attendance", destination: "/attendance/:slug", permanent: true },
       { source: "/sertifikat/:id", destination: "/certificate/:id", permanent: true },
-      { source: "/admin", destination: "/admin/dashboard", permanent: false },
     ];
   },
 };
