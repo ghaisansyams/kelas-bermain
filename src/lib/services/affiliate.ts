@@ -5,14 +5,23 @@ import { nextAffiliateNumber, nextId } from "@/lib/utils/numbering";
 /**
  * Affiliate programme.
  *
- * Someone applies from the public site, an admin verifies them, and only then
- * does the system issue a code. Commission accounting (Rp10.000 per paid
- * participant, paid out the day before the class) is deliberately NOT here
- * yet — several of its rules are still open with the client, and guessing them
- * would mean paying real people the wrong amount. See PRD v2.0 §8, A-01…A-06.
+ * Someone applies from the public site (`applyAsAffiliate`), and the form
+ * looks up a typed code (`findAffiliateByCode`) — both stay wired to the
+ * public microsite.
  *
- * What does work today: applications, verification, code issuing, activation,
- * and counting the sign-ups that already carry a code.
+ * Everything else here — `listAffiliates`, `approveAffiliate`,
+ * `rejectAffiliate`, `setAffiliateStatus`, `statsForAffiliate`,
+ * `generateAffiliateCode` — was the ERP's job: verifying an applicant and
+ * minting their code. The ERP was removed to keep this project to the public
+ * microsite, so **no code is ever issued right now**: applications land as
+ * PENDING and sit there, and a code typed at sign-up will never match one.
+ * These functions are kept, unused, as the seam to wire up next — a thin
+ * approval screen, a spreadsheet-driven script, or a revived ERP — rather
+ * than deleted and rewritten from scratch later.
+ *
+ * Commission accounting itself (Rp10.000 per paid participant, paid out the
+ * day before the class) was never built — several of its rules are still
+ * open with the client. See PRD v2.0 §8, A-01…A-06.
  */
 
 export const COMMISSION_PER_PARTICIPANT = 10_000;

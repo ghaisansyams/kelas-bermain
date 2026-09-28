@@ -8,9 +8,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         disallow: [
-          // The ERP is staff-only. Pages also carry noindex, but keep crawlers
-          // off the path entirely.
-          "/admin",
           // Personal flows: forms, checkouts, and someone's certificate.
           "/register/",
           "/payment/",
