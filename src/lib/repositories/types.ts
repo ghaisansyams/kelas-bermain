@@ -168,8 +168,18 @@ export type PaymentMethod = "NONE" | "WEBSITE" | "THIRD_PARTY";
 
 export interface Registration {
   id: string;
-  /** KB-REG-2026-00001 */
+  /** KB-REG-2026-00001 — human-readable, sequential, safe to say out loud. */
   registrationNumber: string;
+  /**
+   * Opaque, unguessable id for public URLs (the payment/status page). Never
+   * derived from `registrationNumber`, which is sequential and must not be
+   * the only thing gating a page that shows a child's name or a parent's
+   * WhatsApp number once this data lives in a shared database. Optional only
+   * because the legacy localStorage seed data (src/data/registrations.ts,
+   * kept solely for the disabled certificate feature) predates this field —
+   * every Supabase-backed registration always has one.
+   */
+  accessToken?: string;
   customerId: string;
   childId: string;
   eventId: string;

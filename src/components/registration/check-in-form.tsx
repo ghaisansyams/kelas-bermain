@@ -13,7 +13,7 @@ import {
 import { Checkbox, Field, TextInput } from "@/components/forms/field";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { checkIn } from "@/lib/services/attendance";
-import { issueCertificate } from "@/lib/services/certificate";
+import { getCertificate } from "@/lib/services/certificate";
 import {
   hasErrors,
   validateCheckIn,
@@ -99,17 +99,23 @@ export function CheckInForm({
     setResult(response);
   }
 
+  // Participants look their certificate up; they never mint one. Issuing
+  // belongs to whoever can see the attendance record, which is the admin
+  // (admin_issue_certificate) — otherwise anyone who checked in could award
+  // themselves a document the organiser never signed off.
   async function handleCertificate() {
     if (!result) return;
     setIssuing(true);
     setCertError(null);
-    const response = await issueCertificate(result.registrationNumber);
+    const certificate = await getCertificate(result.registrationNumber);
     setIssuing(false);
-    if (!response.ok) {
-      setCertError(response.error);
+    if (!certificate) {
+      setCertError(
+        "Sertifikat belum diterbitkan tim Kelas Bermain. Coba cek lagi beberapa saat setelah kelas selesai.",
+      );
       return;
     }
-    router.push(`/certificate/${response.certificate.number}`);
+    router.push(`/certificate/${certificate.number}`);
   }
 
   if (result) {
@@ -136,10 +142,11 @@ export function CheckInForm({
           <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
             <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
               <Award className="size-5 text-brand" aria-hidden />
-              Sertifikat sudah bisa diterbitkan
+              Sertifikat kelas ini
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Sertifikat dibuat dengan nomor unik dan bisa diverifikasi publik kapan saja.
+              Sertifikat diterbitkan tim Kelas Bermain setelah kelas selesai, dengan nomor unik
+              yang bisa diverifikasi publik kapan saja.
             </p>
             {certError ? (
               <p role="alert" className="mt-3 text-sm font-medium text-brand-dark">
@@ -151,10 +158,10 @@ export function CheckInForm({
                 {issuing ? (
                   <>
                     <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Menerbitkan…
+                    Mencari…
                   </>
                 ) : (
-                  "Lihat Sertifikat"
+                  "Cek Sertifikat"
                 )}
               </Button>
               <Link

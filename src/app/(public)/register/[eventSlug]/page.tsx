@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Baby, CalendarDays, Clock, MapPin, QrCode, Ticket } from "lucide-react";
+import { EventPrice } from "@/components/event/event-price";
 import { RegistrationWizard } from "@/components/registration/registration-wizard";
 import { Badge, categoryTone } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
@@ -11,8 +12,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { siteConfig } from "@/data/site";
 import { REGISTRATION_SOURCES, type RegistrationSource } from "@/lib/repositories/types";
 import { getEventBySlug, getEventSlugs } from "@/lib/services/content";
+import { getPricingConfig } from "@/lib/services/pricing-settings";
+import { resolvePriceDisplay } from "@/lib/types";
 import { formatDateRange } from "@/lib/utils/date";
-import { formatRupiah, formatTimeRange } from "@/lib/utils/format";
+import { formatTimeRange } from "@/lib/utils/format";
 
 /**
  * QR landing page.
@@ -71,7 +74,10 @@ export default async function RegisterPage({
   searchParams: Promise<{ source?: string }>;
 }) {
   const [{ eventSlug }, { source: rawSource }] = await Promise.all([params, searchParams]);
-  const event = await getEventBySlug(eventSlug);
+  const [event, pricingConfig] = await Promise.all([
+    getEventBySlug(eventSlug),
+    getPricingConfig(),
+  ]);
   if (!event) notFound();
 
   const { source, qrSource } = resolveSource(rawSource);
@@ -115,9 +121,11 @@ export default async function RegisterPage({
         <div className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={categoryTone[event.category]}>{event.category}</Badge>
-            <Badge tone={isFree ? "pine" : "sun"}>
-              {isFree ? "Gratis" : formatRupiah(event.registration.price ?? 0)}
-            </Badge>
+            {resolvePriceDisplay(event.registration) === "HIDDEN" ? null : (
+              <Badge tone={isFree ? "pine" : "sun"}>
+                <EventPrice event={event} />
+              </Badge>
+            )}
           </div>
 
           <h1 className="mt-3 text-[1.625rem] leading-tight font-extrabold text-ink sm:text-3xl">
@@ -143,7 +151,12 @@ export default async function RegisterPage({
 
       <section className="mt-6 rounded-card border border-line bg-surface p-5 shadow-soft sm:p-7">
         {canRegister ? (
-          <RegistrationWizard event={event} source={source} qrSource={qrSource} />
+          <RegistrationWizard
+            event={event}
+            source={source}
+            qrSource={qrSource}
+            pricingConfig={pricingConfig}
+          />
         ) : (
           <EmptyState
             icon={<Ticket className="size-6" aria-hidden />}
@@ -159,7 +172,7 @@ export default async function RegisterPage({
             }
             className="border-none bg-transparent px-0 py-6"
             action={
-              <Link href="/event?filter=upcoming" className={buttonStyles()}>
+              <Link href="/event" className={buttonStyles()}>
                 Lihat Kelas Lain
               </Link>
             }

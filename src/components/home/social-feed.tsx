@@ -1,81 +1,83 @@
 import Image from "next/image";
-import { ExternalLink, Heart, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { InstagramIcon } from "@/components/brand/social-icons";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
-import type { SocialPost } from "@/lib/types";
+import type { UpdatesResult } from "@/lib/services/update";
+import { formatDateShort } from "@/lib/utils/date";
 
 /**
- * Social wall.
- *
- * Renders whatever `SocialPost[]` it is handed. Today that comes from a static
- * fixture — no scraping, no Instagram API. When an official integration is
- * approved, feed it the API response and this component stays as it is.
+ * Home teaser for the Update feed. Reads the same shared update service as
+ * /update, so the two never disagree. Each tile opens the internal detail
+ * page; the Instagram profile stays a secondary link.
  */
-export function SocialFeed({ posts }: { posts: SocialPost[] }) {
+export function SocialFeed({ updates }: { updates: UpdatesResult }) {
   return (
     <section className="py-16 sm:py-20">
       <Container>
         <SectionHeading
-          eyebrow="Media sosial"
+          eyebrow="Update terbaru"
           title="Ikuti keseruan Kelas Bermain"
-          description="Pengumuman jadwal, dokumentasi kelas, dan cerita di balik layar kami bagikan lewat Instagram."
+          description="Kabar kegiatan, pengumuman, dan dokumentasi kelas terbaru kami."
           action={
-            <a
-              href="https://instagram.com/kelasbermain.id"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonStyles({ variant: "secondary" })}
-            >
-              <InstagramIcon className="size-4" />
-              @kelasbermain.id
-              <ExternalLink className="size-3.5" aria-hidden />
-            </a>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Link href="/update" className={buttonStyles({ variant: "secondary" })}>
+                Lihat Semua Update
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+              <a
+                href="https://instagram.com/kelasbermain.id"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-brand"
+              >
+                <InstagramIcon className="size-4" />
+                Lihat di Instagram
+                <ExternalLink className="size-3.5" aria-hidden />
+              </a>
+            </div>
           }
         />
 
-        <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {posts.map((post, index) => (
-            <Reveal key={post.id} delay={index * 50}>
-              <a
-                href={post.permalink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative block aspect-square overflow-hidden rounded-2xl bg-canvas-deep"
-              >
-                <Image
-                  src={post.image.src}
-                  alt={post.image.alt}
-                  fill
-                  sizes="(max-width: 640px) 46vw, (max-width: 1024px) 30vw, 16vw"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <span
-                  aria-hidden
-                  className="absolute inset-0 bg-ink/65 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"
-                />
-                <span className="absolute inset-0 flex flex-col justify-end gap-1.5 p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <span className="line-clamp-3 text-[0.6875rem] leading-snug text-white/90">
-                    {post.caption}
-                  </span>
-                  <span className="flex items-center gap-3 text-[0.6875rem] font-bold text-white">
-                    <span className="flex items-center gap-1">
-                      <Heart className="size-3.5" aria-hidden />
-                      {post.likes.toLocaleString("id-ID")}
+        {!updates.ok ? (
+          <p className="mt-10 text-sm text-muted">Update belum dapat dimuat.</p>
+        ) : updates.updates.length === 0 ? (
+          <p className="mt-10 text-sm text-muted">Update terbaru Kelas Bermain akan muncul di sini.</p>
+        ) : (
+          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {updates.updates.slice(0, 6).map((update, index) => (
+              <Reveal key={update.id} delay={index * 50}>
+                <Link
+                  href={`/update/${update.slug}`}
+                  className="group relative block aspect-square overflow-hidden rounded-2xl bg-canvas-deep"
+                >
+                  <Image
+                    src={update.image.src}
+                    alt={update.image.alt}
+                    fill
+                    sizes="(max-width: 640px) 46vw, (max-width: 1024px) 30vw, 16vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent"
+                  />
+                  <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-3">
+                    <span className="text-[0.625rem] font-bold uppercase tracking-wider text-white/80">
+                      {formatDateShort(update.publishedAt)}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="size-3.5" aria-hidden />
-                      {post.comments}
+                    <span className="line-clamp-2 text-xs leading-snug font-bold text-white">
+                      {update.title}
                     </span>
                   </span>
-                </span>
-                <span className="sr-only">Buka unggahan Instagram: {post.caption}</span>
-              </a>
-            </Reveal>
-          ))}
-        </div>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        )}
       </Container>
     </section>
   );

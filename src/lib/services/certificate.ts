@@ -1,117 +1,76 @@
-import {
-  certificatesRepo,
-  childrenRepo,
-  lookups,
-  registrationsRepo,
-} from "@/lib/repositories";
-import type { CertificateRecord } from "@/lib/repositories/types";
-import { events } from "@/data/events";
-import { nextCertificateNumber } from "@/lib/utils/certificate";
-
 /**
  * Certificate service.
  *
- * A certificate is issued once, only after attendance is recorded, and the same
- * number is returned on every later request. Numbering lives in
- * `lib/utils/certificate.ts` — move that to a database sequence when the real
- * backend lands so numbers stay unique under concurrent writes.
+ * Reads the same `certificates` table the ERP writes to, through the
+ * `verify_certificate` SECURITY DEFINER function — so a certificate issued in
+ * the admin is findable on the public checker straight away. It used to read
+ * the old in-memory repositories, which real sign-ups never write to, meaning
+ * every lookup of a genuinely issued certificate failed.
+ *
+ * Issuing lives in the admin (`admin_issue_certificate`), not here: a
+ * certificate is proof of attendance, so only someone who can see the
+ * attendance record may mint one.
  */
 
-const DEFAULT_SIGNATORY = {
-  name: "Kak Rangga",
-  role: "Lead Facilitator, Kelas Bermain",
+import type { CertificateRecord } from "@/lib/repositories/types";
+import { getSupabase } from "@/lib/supabase/client";
+
+const REASON_MESSAGE: Record<string, string> = {
+  TOO_SHORT: "Masukkan nomor sertifikat atau nomor pendaftaran.",
+  NOT_FOUND: "Sertifikat tidak ditemukan. Periksa kembali nomor yang kamu masukkan.",
+  REVOKED: "Sertifikat ini sudah dibatalkan oleh penyelenggara.",
 };
 
-export type IssueResult =
-  | { ok: true; certificate: CertificateRecord; alreadyIssued: boolean }
+export type VerifyResult =
+  | { ok: true; certificate: CertificateRecord }
   | { ok: false; error: string };
 
-const MOCK_LATENCY_MS = 500;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function issueCertificate(registrationId: string): Promise<IssueResult> {
-  await delay(MOCK_LATENCY_MS);
-
-  const registration =
-    registrationsRepo.find(registrationId) ?? lookups.registrationByNumber(registrationId);
-  if (!registration) return { ok: false, error: "Data pendaftaran tidak ditemukan." };
-
-  const existing = lookups.certificateByRegistration(registration.id);
-  if (existing) return { ok: true, certificate: existing, alreadyIssued: true };
-
-  if (registration.attendanceStatus !== "PRESENT") {
-    return {
-      ok: false,
-      error: "Sertifikat baru bisa diterbitkan setelah kehadiran tercatat.",
-    };
-  }
-
-  const event = events.find((e) => e.id === registration.eventId);
-  if (!event) return { ok: false, error: "Data kelas tidak ditemukan." };
-  if (!event.certificate.available) {
-    return { ok: false, error: "Kelas ini tidak menerbitkan sertifikat." };
-  }
-
-  const child = childrenRepo.find(registration.childId);
-  const certificate: CertificateRecord = {
-    number: nextCertificateNumber(certificatesRepo.all().map((c) => c.number)),
-    registrationId: registration.id,
-    childId: registration.childId,
-    eventId: registration.eventId,
-    participantName: child?.fullName ?? "Peserta Kelas Bermain",
-    eventTitle: event.title,
-    eventDate: event.startDate,
-    organizer: event.organizer,
-    template: event.certificate.template,
-    issuedAt: new Date().toISOString(),
-    status: "issued",
-    signatory: DEFAULT_SIGNATORY,
+function toRecord(row: Record<string, unknown>): CertificateRecord {
+  return {
+    number: String(row.number),
+    registrationId: String(row.registrationId),
+    childId: String(row.childId),
+    eventId: String(row.eventId),
+    participantName: String(row.participantName),
+    eventTitle: String(row.eventTitle),
+    eventDate: String(row.eventDate),
+    organizer: String(row.organizer),
+    template: row.template === "playful" ? "playful" : "classic",
+    issuedAt: String(row.issuedAt),
+    status: row.status === "revoked" ? "revoked" : "issued",
+    signatory: {
+      name: String(row.signatoryName ?? ""),
+      role: String(row.signatoryRole ?? ""),
+    },
   };
-
-  certificatesRepo.create(certificate);
-  registrationsRepo.update(registration.id, { certificateStatus: "ISSUED" });
-  return { ok: true, certificate, alreadyIssued: false };
-}
-
-export async function getCertificate(value: string): Promise<CertificateRecord | null> {
-  await delay(250);
-  return (
-    certificatesRepo.find(value) ??
-    certificatesRepo.all().find((c) => c.registrationId === value) ??
-    null
-  );
 }
 
 /** Public verification: accepts a certificate number or a registration number. */
-export async function verifyCertificate(query: string): Promise<
-  { ok: true; certificate: CertificateRecord } | { ok: false; error: string }
-> {
-  await delay(500);
+export async function verifyCertificate(query: string): Promise<VerifyResult> {
   const trimmed = query.trim();
-  if (trimmed.length < 6) {
-    return { ok: false, error: "Masukkan nomor sertifikat atau nomor pendaftaran." };
-  }
+  if (trimmed.length < 6) return { ok: false, error: REASON_MESSAGE.TOO_SHORT };
 
-  const byNumber = certificatesRepo.find(trimmed);
-  const registration = lookups.registrationByNumber(trimmed);
-  const certificate =
-    byNumber ?? (registration ? lookups.certificateByRegistration(registration.id) : null);
+  try {
+    const { data, error } = await getSupabase().rpc("verify_certificate", { p_query: trimmed });
 
-  if (!certificate) {
-    return {
-      ok: false,
-      error: "Sertifikat tidak ditemukan. Periksa kembali nomor yang kamu masukkan.",
-    };
+    if (error || !data || typeof data !== "object") {
+      return { ok: false, error: REASON_MESSAGE.NOT_FOUND };
+    }
+
+    const result = data as Record<string, unknown>;
+    if (result.ok !== true) {
+      const reason = String(result.reason ?? "NOT_FOUND");
+      return { ok: false, error: REASON_MESSAGE[reason] ?? REASON_MESSAGE.NOT_FOUND };
+    }
+
+    return { ok: true, certificate: toRecord(result) };
+  } catch {
+    return { ok: false, error: REASON_MESSAGE.NOT_FOUND };
   }
-  if (certificate.status === "revoked") {
-    return { ok: false, error: "Sertifikat ini sudah dibatalkan oleh penyelenggara." };
-  }
-  return { ok: true, certificate };
 }
 
-export async function listCertificates(): Promise<CertificateRecord[]> {
-  return certificatesRepo.all();
+/** Same lookup, for the certificate display page. */
+export async function getCertificate(value: string): Promise<CertificateRecord | null> {
+  const result = await verifyCertificate(value);
+  return result.ok ? result.certificate : null;
 }

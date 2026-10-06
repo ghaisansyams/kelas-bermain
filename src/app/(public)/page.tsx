@@ -9,10 +9,11 @@ import { SocialFeed } from "@/components/home/social-feed";
 import { Testimonials } from "@/components/home/testimonials";
 import { UpcomingEvents } from "@/components/home/upcoming-events";
 import { siteConfig } from "@/data/site";
+import { getHomeContent } from "@/lib/services/cms";
+import { getLatestUpdates } from "@/lib/services/update";
 import {
   getActivities,
   getGalleryItems,
-  getSocialFeed,
   getTestimonials,
   getUpcomingEvents,
 } from "@/lib/services/content";
@@ -27,12 +28,13 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [events, activities, testimonials, posts, gallery] = await Promise.all([
+  const [events, activities, testimonials, updates, gallery, content] = await Promise.all([
     getUpcomingEvents(6),
     getActivities(),
     getTestimonials(),
-    getSocialFeed(),
+    getLatestUpdates(6),
     getGalleryItems(),
+    getHomeContent(),
   ]);
 
   const jsonLd = {
@@ -55,14 +57,14 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Hero nextEvent={events.find((event) => event.lifecycle === "upcoming")} />
+      <Hero content={content.hero} slides={content.heroSlides} />
       <Pillars />
-      <UpcomingEvents events={events.slice(0, 6)} />
+      <UpcomingEvents events={events.slice(0, 6)} heading={content.eventsTeaser} />
       <JoinSteps />
       <ActivityPreview activities={activities.slice(0, 3)} />
       <GalleryPreview items={gallery.slice(0, 6)} />
       <Testimonials items={testimonials} />
-      <SocialFeed posts={posts} />
+      <SocialFeed updates={updates} />
       <CtaBanner />
     </>
   );

@@ -4,15 +4,12 @@ import type { Metadata } from "next";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { CertificateViewer } from "@/components/certificate/certificate-viewer";
 import { Container } from "@/components/ui/container";
-import { certificates } from "@/data/certificates";
 import { siteConfig } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
 
-export function generateStaticParams() {
-  // Nothing to prerender while certificates are switched off (R-06 / K-07).
-  if (!certificatesEnabled) return [];
-  return certificates.map((certificate) => ({ certificateId: certificate.number }));
-}
+// Certificates are issued continuously by the admin, so there is no fixed
+// set to prerender — every one is rendered on demand and verified live.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

@@ -185,6 +185,22 @@ export const events: EventRecord[] = [
       "Selain menghias, ada sesi dancing untuk pemanasan dan mewarnai sambil menunggu giliran. Semua bahan sudah disiapkan dan aman untuk anak.",
       "Kelas berlangsung di area The Harvest Margonda, dengan meja kerja yang disesuaikan tinggi anak.",
     ],
+    // Bespoke override for the "Tentang Event" visual block — deliberately a
+    // different asset than `cover` above (which is the page's hero image).
+    // No AI image generation tool was available in this environment, so this
+    // reuses a real photo already licensed for the site rather than a
+    // fabricated stock image; swap `images` here first if a purpose-shot
+    // photo of kids decorating mini cakes becomes available.
+    aboutEvent: {
+      images: [
+        {
+          src: "/images/galeri-15.jpg",
+          alt: "Kue dengan hiasan bunga dan buah di atasnya",
+          width: 1200,
+          height: 800,
+        },
+      ],
+    },
     category: "Kuliner",
     cover: {
       src: "/images/event-decorate-mini-cake.jpg",
@@ -245,6 +261,14 @@ export const events: EventRecord[] = [
       "Informasikan alergi makanan saat mendaftar",
     ],
     certificate: { available: true, template: "classic", requiresAttendance: true },
+    // Dummy preview video — no footage of this specific class exists yet, so
+    // this is a real, on-topic public video (kids decorating cakes) standing
+    // in until Kelas Bermain's own recording is ready. Swap `youtubeUrl` here
+    // when it is; EventVideoCard needs no changes.
+    video: {
+      youtubeUrl: "https://www.youtube.com/watch?v=fi4n4Ix8MgU",
+      title: "Keseruan Menghias Mini Cake",
+    },
     featured: true,
     published: true,
   },
@@ -764,6 +788,64 @@ export const events: EventRecord[] = [
       "Didampingi satu orang tua atau wali",
       "Maksimal dua anak per keluarga",
     ],
+    certificate: { available: false, template: "playful", requiresAttendance: true },
+    featured: false,
+    published: true,
+  },
+  {
+    id: "evt-012",
+    slug: "workshop-eksplorasi-desember-2026",
+    title: "Workshop Eksplorasi",
+    tagline: "Jelajah alam terbuka dengan pendampingan penuh — harga khusus, hubungi tim kami.",
+    summary:
+      "Kelas eksplorasi outdoor dengan slot terbatas. Biaya tidak dipublikasikan di sini — hubungi tim kami untuk info lengkap dan harga.",
+    description: [
+      "Workshop Eksplorasi mengajak anak mengenal lingkungan sekitar lewat permainan jelajah, pengamatan alam sederhana, dan tantangan kelompok kecil.",
+      "Karena kelas ini berjalan dengan kuota sangat terbatas dan paket pendampingan yang disesuaikan per kelompok, harga tidak dipublikasikan di halaman ini — hubungi tim kami lewat WhatsApp untuk info lengkap.",
+    ],
+    category: "Eksplorasi",
+    cover: {
+      src: "/images/galeri-05.jpg",
+      alt: "Anak-anak berjalan menjelajah area terbuka berumput bersama fasilitator",
+      width: 1200,
+      height: 800,
+    },
+    startDate: "2026-12-06",
+    endDate: "2026-12-06",
+    timeStart: "08:00",
+    timeEnd: "12:00",
+    timezone: "WIB",
+    location: {
+      venue: "Kampung Konservasi Rimbun",
+      city: "Tangerang Selatan",
+      note: "Titik kumpul dibagikan H-2 lewat WhatsApp panitia",
+    },
+    organizer: "Kelas Bermain",
+    ageRange: [5, 15],
+    capacity: 30,
+    registered: 8,
+    registration: {
+      type: "PAID",
+      method: "WEBSITE",
+      price: 199_000,
+      // Card intentionally hides the price — see priceDisplay's doc comment
+      // in lib/types.ts. The registration page still shows and charges the
+      // real amount; only the card badge is suppressed.
+      priceDisplay: "HIDDEN",
+      currency: "IDR",
+      deadline: "2026-12-03",
+      notes: ["Hubungi tim kami untuk info paket dan harga.", "Kuota terbatas per kelompok."],
+    },
+    agenda: [
+      { time: "07.45", title: "Registrasi ulang" },
+      { time: "08.00", title: "Pemanasan & pembagian kelompok" },
+      { time: "08.30", title: "Jelajah alam & pengamatan sederhana" },
+      { time: "10.00", title: "Tantangan kelompok kecil" },
+      { time: "11.30", title: "Foto bersama & penutupan" },
+    ],
+    speakerIds: ["fs-bimo", "fs-rangga"],
+    facilities: ["Pendamping per kelompok", "Snack ringan", "Dokumentasi kegiatan"],
+    requirements: ["Usia 5–15 tahun", "Didampingi satu orang tua atau wali"],
     certificate: { available: false, template: "playful", requiresAttendance: true },
     featured: false,
     published: true,

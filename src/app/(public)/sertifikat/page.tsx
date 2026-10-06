@@ -4,7 +4,6 @@ import { Award, Hash, ShieldCheck } from "lucide-react";
 import { CertificateLookup } from "@/components/certificate/certificate-lookup";
 import { PageHeader } from "@/components/layout/page-header";
 import { Container } from "@/components/ui/container";
-import { certificates } from "@/data/certificates";
 import { siteConfig } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
 
@@ -57,7 +56,9 @@ export default function CertificateLookupPage() {
           <div className="lg:col-span-7">
             <div className="rounded-card border border-line bg-surface p-5 shadow-soft sm:p-7">
               <CertificateLookup
-                examples={certificates.slice(0, 3).map((certificate) => certificate.number)}
+                // No real numbers here: printing issued certificate numbers on
+                // a public page would hand anyone a valid one to look up.
+                examples={[]}
               />
             </div>
           </div>

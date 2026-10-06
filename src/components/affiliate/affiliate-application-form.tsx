@@ -4,7 +4,6 @@ import { useState } from "react";
 import { AlertTriangle, CircleCheckBig, Loader2 } from "lucide-react";
 import { Checkbox, Field, TextArea, TextInput } from "@/components/forms/field";
 import { buttonStyles } from "@/components/ui/button";
-import { siteConfig, showWhatsapp } from "@/data/site";
 import { applyAsAffiliate } from "@/lib/services/affiliate";
 import {
   emptyAffiliate,
@@ -13,6 +12,13 @@ import {
   type AffiliateFormValues,
   type FieldErrors,
 } from "@/lib/utils/validation";
+
+/**
+ * Testing number for the affiliate team's WhatsApp — swap for the real
+ * affiliate-program admin number (or siteConfig.whatsappE164) before this
+ * goes live for real applicants.
+ */
+const AFFILIATE_WHATSAPP_E164 = "6282211278857";
 
 /**
  * Public affiliate sign-up.
@@ -58,7 +64,7 @@ export function AffiliateApplicationForm() {
       setFormError(result.error);
       return;
     }
-    setAffiliateNumber(result.affiliate.affiliateNumber);
+    setAffiliateNumber(result.affiliateNumber);
   }
 
   if (affiliateNumber) {
@@ -76,24 +82,20 @@ export function AffiliateApplicationForm() {
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-soft">
           Nomor pendaftaran affiliator kamu{" "}
           <span className="font-mono font-bold text-ink">{affiliateNumber}</span>. Status
-          saat ini <strong>menunggu verifikasi</strong>. Tim kami akan menghubungi
-          WhatsApp yang kamu daftarkan untuk verifikasi data dan mengundangmu ke grup
-          affiliator. Kode affiliate pribadimu diterbitkan setelah diverifikasi.
+          saat ini <strong>menunggu verifikasi</strong>. Kode affiliate pribadimu
+          diterbitkan setelah tim kami verifikasi.
         </p>
-        {showWhatsapp ? (
-          <a
-            href={`https://wa.me/${siteConfig.whatsappE164}?text=${waText}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonStyles({ className: "mt-5" })}
-          >
-            Hubungi Kami di WhatsApp
-          </a>
-        ) : (
-          <p className="mx-auto mt-5 max-w-md text-xs text-muted">
-            Belum perlu chat duluan — tim kami yang akan menghubungi kamu.
-          </p>
-        )}
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-soft">
+          Supaya lebih cepat diproses, kabari tim kami langsung lewat WhatsApp:
+        </p>
+        <a
+          href={`https://wa.me/${AFFILIATE_WHATSAPP_E164}?text=${waText}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonStyles({ className: "mt-5" })}
+        >
+          Hubungi Kami di WhatsApp
+        </a>
       </div>
     );
   }

@@ -17,12 +17,15 @@ import type {
 } from "./types";
 
 /**
- * Repository layer.
+ * localStorage-backed repository layer — legacy.
  *
- * Each collection is seeded from `src/data` and, in the browser, overlaid with
- * anything written since (registrations made on the public site show up in the
- * ERP straight away). Swapping to a database means reimplementing this one file
- * against a client — no service or component changes.
+ * The real data path (customers, children, registrations, payments,
+ * affiliates) has moved to Supabase; see src/lib/services/*.ts and
+ * supabase/schema.sql. Every repository exported here except
+ * `certificatesRepo` is now dead code kept only so `certificate.ts` still
+ * compiles while e-certificates stay switched off (FEATURE_CERTIFICATES,
+ * PRD R-06/K-07) — a registration created today never appears in this
+ * store, because nothing writes to it anymore.
  */
 
 export interface Repository<T> {

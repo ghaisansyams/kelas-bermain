@@ -6,16 +6,23 @@ import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import type { SectionHeadingContent } from "@/lib/services/cms";
 import type { EventView } from "@/lib/types";
 
-export function UpcomingEvents({ events }: { events: EventView[] }) {
+export function UpcomingEvents({
+  events,
+  heading,
+}: {
+  events: EventView[];
+  heading: SectionHeadingContent;
+}) {
   return (
     <section className="bg-canvas-deep/50 py-16 sm:py-20" id="event-terdekat">
       <Container>
         <SectionHeading
-          eyebrow="Jadwal terdekat"
-          title="Kelas yang bisa diikuti si kecil"
-          description="Pilih yang paling sesuai usia dan minat anak. Detail agenda, biaya, dan fasilitas ada di setiap halaman kelas."
+          eyebrow={heading.eyebrow}
+          title={heading.title}
+          description={heading.description}
           action={
             <Link
               href="/event"

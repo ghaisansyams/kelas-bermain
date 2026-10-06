@@ -1,11 +1,14 @@
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { getNavigationItems } from "@/lib/services/cms";
 
-/** Chrome for the customer-facing site. The ERP has its own shell. */
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+/** Chrome for the customer-facing site. The admin has its own shell. */
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  const navItems = await getNavigationItems();
+
   return (
     <>
-      <SiteHeader />
+      <SiteHeader navItems={navItems} />
       <main id="konten" className="flex-1">
         {children}
       </main>

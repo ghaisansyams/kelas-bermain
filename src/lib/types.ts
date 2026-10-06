@@ -29,7 +29,23 @@ export const EVENT_CATEGORIES: EventCategory[] = [
 /** How a participant pays to join. */
 export type RegistrationType = "FREE" | "PAID";
 
+/**
+ * How a price is shown on the event *card* — independent of whether the
+ * event actually costs money. A PAID event can still hide its price
+ * (HIDDEN); a FREE event always resolves to FREE. When an event doesn't set
+ * this explicitly, `resolvePriceDisplay` derives it from `type` so existing
+ * data keeps working unchanged.
+ */
+export type PriceDisplay = "HIDDEN" | "SHOW_PRICE" | "FREE";
 
+/** Card-display price rule, defaulting from `type` when not set explicitly. */
+export function resolvePriceDisplay(registration: {
+  type: RegistrationType;
+  priceDisplay?: PriceDisplay;
+}): PriceDisplay {
+  if (registration.priceDisplay) return registration.priceDisplay;
+  return registration.type === "FREE" ? "FREE" : "SHOW_PRICE";
+}
 
 /** Where an event sits on the calendar. Derived from its dates, never stored. */
 export type EventLifecycle = "upcoming" | "ongoing" | "past";
@@ -68,6 +84,8 @@ export interface EventRegistrationInfo {
   method: PaymentMethod;
   /** Rupiah, integer. Only meaningful when `type` is PAID. */
   price?: number;
+  /** Card-display override — see `resolvePriceDisplay`. Rarely set explicitly. */
+  priceDisplay?: PriceDisplay;
   currency?: "IDR";
   /** Where THIRD_PARTY registrations continue. */
   thirdPartyUrl?: string;
@@ -86,6 +104,30 @@ export interface CertificatePolicy {
   requiresAttendance: boolean;
 }
 
+/**
+ * Visual-first "Tentang Event" content. Both fields are optional per event —
+ * `description` falls back to the event's own `description` paragraphs, and
+ * `images` falls back to a category default (see `resolveAboutEvent`) — so
+ * existing events need no changes and an admin can override either piece
+ * independently later. `images` is a list (not a single field) so a second
+ * or third photo can be added without a shape change.
+ */
+export interface AboutEventContent {
+  description?: string[];
+  images: ImageAsset[];
+}
+
+/**
+ * Preview video for the detail page's sidebar, shown right under the
+ * registration card. Optional — an event without one simply renders no
+ * video card, never an empty placeholder (see `EventVideoCard`).
+ */
+export interface EventVideo {
+  youtubeUrl: string;
+  title?: string;
+  thumbnail?: string;
+}
+
 /** An event exactly as an admin would store it. */
 export interface EventRecord {
   id: string;
@@ -95,6 +137,8 @@ export interface EventRecord {
   summary: string;
   /** Long description, one string per paragraph. */
   description: string[];
+  /** Visual-first content for the detail page's "Tentang Event" section. */
+  aboutEvent?: AboutEventContent;
   category: EventCategory;
   /** Wide image used for card and hero crops. */
   cover: ImageAsset;
@@ -124,6 +168,8 @@ export interface EventRecord {
   facilities: string[];
   requirements: string[];
   certificate: CertificatePolicy;
+  /** Preview video for the detail page — absent for most events today. */
+  video?: EventVideo;
   featured: boolean;
   published: boolean;
 }
@@ -188,6 +234,18 @@ export interface Speaker {
   avatar: ImageAsset;
 }
 
+/**
+ * Optional per testimonial — the section renders whatever it's given, so a
+ * testimonial that hasn't been recorded on video yet still shows fine.
+ */
+export interface TestimonialVideo {
+  youtubeUrl: string;
+  /** Falls back to a YouTube-hosted thumbnail derived from the URL when absent. */
+  thumbnail?: string;
+  /** e.g. "1:24". Purely a display label, not validated against the video. */
+  duration?: string;
+}
+
 export interface Testimonial {
   id: string;
   name: string;
@@ -195,14 +253,32 @@ export interface Testimonial {
   quote: string;
   avatar: ImageAsset;
   eventTitle?: string;
+  video?: TestimonialVideo;
 }
 
-export interface SocialPost {
+export type UpdateCategory = "Kegiatan" | "Event" | "Pengumuman" | "Dokumentasi";
+
+export type UpdateStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+/**
+ * A public update, independent of where it came from. Today the mock adapter
+ * fills these in; a future Instagram Graph API adapter or ERP-managed post
+ * fills the same shape. Only PUBLISHED items ever reach the public site.
+ */
+export interface UpdatePost {
   id: string;
+  slug: string;
+  platform: "instagram";
+  username: string;
+  /** Link to the original post, for the "Lihat di Instagram" CTA. */
+  postUrl: string;
   image: ImageAsset;
+  title: string;
   caption: string;
-  likes: number;
-  comments: number;
-  permalink: string;
-  postedAt: string;
+  excerpt: string;
+  /** ISO date (YYYY-MM-DD). Sorted newest first. */
+  publishedAt: string;
+  type: "POST";
+  category: UpdateCategory;
+  status: UpdateStatus;
 }

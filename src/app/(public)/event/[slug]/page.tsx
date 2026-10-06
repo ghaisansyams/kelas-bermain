@@ -11,29 +11,19 @@ import {
   Clock,
   MapPin,
 } from "lucide-react";
-import { EventCard } from "@/components/event/event-card";
-import {
-  CheckList,
-  EventAgenda,
-  FacilityList,
-  SectionBlock,
-  SpeakerList,
-} from "@/components/event/event-detail-sections";
+import { AboutEvent } from "@/components/event/about-event";
+import { CheckList, EventAgenda, SectionBlock } from "@/components/event/event-detail-sections";
+import { EventTimeline } from "@/components/event/event-timeline";
+import { EventVideoCard } from "@/components/event/event-video-card";
 import {
   MobileRegistrationBar,
   RegistrationPanel,
 } from "@/components/event/registration-panel";
 import { Badge, categoryTone, LifecycleBadge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
-import { Reveal } from "@/components/ui/reveal";
 import { siteConfig } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
-import {
-  getEventBySlug,
-  getEventSlugs,
-  getRelatedEvents,
-  getSpeakersByIds,
-} from "@/lib/services/content";
+import { getEventBySlug, getEventSlugs, getEventTimeline } from "@/lib/services/content";
 import { formatDateRange, formatWeekday } from "@/lib/utils/date";
 import { formatTimeRange } from "@/lib/utils/format";
 
@@ -84,10 +74,7 @@ export default async function EventDetailPage({
   const event = await getEventBySlug(slug);
   if (!event) notFound();
 
-  const [speakers, related] = await Promise.all([
-    getSpeakersByIds(event.speakerIds),
-    getRelatedEvents(slug, 3),
-  ]);
+  const timeline = await getEventTimeline(slug, 6);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -210,20 +197,14 @@ export default async function EventDetailPage({
             {/* Registration panel sits inline on mobile, sticky in the sidebar on desktop */}
             <div className="mt-8 lg:hidden">
               <RegistrationPanel event={event} />
+              {event.video ? <EventVideoCard video={event.video} className="mt-4" /> : null}
             </div>
 
             <div className="mt-10 space-y-8">
               <section>
                 <h2 className="text-xl font-extrabold text-ink sm:text-2xl">Tentang Event</h2>
-                <div className="mt-4 space-y-4">
-                  {event.description.map((paragraph, index) => (
-                    <p
-                      key={index}
-                      className="text-[0.9375rem] leading-[1.75] text-ink-soft sm:text-base"
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
+                <div className="mt-4">
+                  <AboutEvent event={event} />
                 </div>
               </section>
 
@@ -247,16 +228,6 @@ export default async function EventDetailPage({
 
               <SectionBlock id="agenda" title="Agenda Kegiatan">
                 <EventAgenda items={event.agenda} />
-              </SectionBlock>
-
-              {speakers.length > 0 ? (
-                <SectionBlock id="pembicara" title="Mentor & Fasilitator">
-                  <SpeakerList speakers={speakers} />
-                </SectionBlock>
-              ) : null}
-
-              <SectionBlock id="fasilitas" title="Fasilitas Peserta">
-                <FacilityList items={event.facilities} />
               </SectionBlock>
 
               <SectionBlock id="ketentuan" title="Ketentuan Peserta">
@@ -298,19 +269,16 @@ export default async function EventDetailPage({
           <aside className="hidden lg:col-span-5 lg:block xl:col-span-4">
             <div className="sticky top-24">
               <RegistrationPanel event={event} />
+              {event.video ? <EventVideoCard video={event.video} className="mt-4" /> : null}
             </div>
           </aside>
         </div>
 
-        {related.length > 0 ? (
+        {timeline.length > 0 ? (
           <section className="mt-16 border-t border-line pt-12">
             <h2 className="text-xl font-extrabold text-ink sm:text-2xl">Event lainnya</h2>
-            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {related.map((item, index) => (
-                <Reveal key={item.id} delay={index * 70} className="h-full">
-                  <EventCard event={item} />
-                </Reveal>
-              ))}
+            <div className="mt-6 max-w-2xl">
+              <EventTimeline events={timeline} />
             </div>
           </section>
         ) : null}

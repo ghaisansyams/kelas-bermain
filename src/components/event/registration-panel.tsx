@@ -10,19 +10,22 @@ import {
 } from "lucide-react";
 import { availabilityLabel } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
-import type { EventView } from "@/lib/types";
+import { EventPrice } from "@/components/event/event-price";
+import { resolvePriceDisplay, type EventView } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/date";
-import { formatRupiah } from "@/lib/utils/format";
 import { certificatesEnabled } from "@/lib/features";
 
 /**
  * The registration box on the event detail template. Its contents are driven
  * entirely by the event record, so a free workshop and a paid camp both render
- * correctly without a bespoke page.
+ * correctly without a bespoke page. Price follows the same HIDDEN /
+ * SHOW_PRICE / FREE rule as the event card — a HIDDEN event still charges the
+ * real amount once someone actually registers, it's just not advertised here.
  */
 export function RegistrationPanel({ event }: { event: EventView }) {
   const isPaid = event.registration.type === "PAID";
+  const priceDisplay = resolvePriceDisplay(event.registration);
   const isOpen = event.availability === "open";
   const showAttendance = event.lifecycle !== "upcoming";
 
@@ -30,13 +33,13 @@ export function RegistrationPanel({ event }: { event: EventView }) {
     <div className="overflow-hidden rounded-card border border-line bg-surface shadow-soft">
       <div className="border-b border-line bg-canvas-deep/40 px-5 py-5">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
-          {isPaid ? "Biaya Registrasi" : "Registrasi"}
+          {priceDisplay === "SHOW_PRICE" ? "Biaya Registrasi" : "Registrasi"}
         </p>
         <p className="mt-1.5 flex items-baseline gap-2">
           <span className="text-3xl leading-none font-extrabold text-ink">
-            {isPaid ? formatRupiah(event.registration.price ?? 0) : "Gratis"}
+            {priceDisplay === "HIDDEN" ? "Hubungi Kami" : <EventPrice event={event} />}
           </span>
-          {isPaid ? (
+          {priceDisplay === "SHOW_PRICE" ? (
             <span className="text-sm font-semibold text-muted">/ peserta</span>
           ) : null}
         </p>
@@ -179,7 +182,7 @@ export function RegistrationPanel({ event }: { event: EventView }) {
 
 /** Fixed action bar shown only on small screens. */
 export function MobileRegistrationBar({ event }: { event: EventView }) {
-  const isPaid = event.registration.type === "PAID";
+  const priceDisplay = resolvePriceDisplay(event.registration);
   const isOpen = event.availability === "open";
 
   return (
@@ -187,10 +190,10 @@ export function MobileRegistrationBar({ event }: { event: EventView }) {
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[0.6875rem] font-semibold uppercase tracking-wider text-muted">
-            {isPaid ? "Biaya registrasi" : "Registrasi"}
+            {priceDisplay === "SHOW_PRICE" ? "Biaya registrasi" : "Registrasi"}
           </p>
           <p className="truncate text-lg leading-tight font-extrabold text-ink">
-            {isPaid ? formatRupiah(event.registration.price ?? 0) : "Gratis"}
+            {priceDisplay === "HIDDEN" ? "Hubungi Kami" : <EventPrice event={event} />}
           </p>
         </div>
         {isOpen ? (

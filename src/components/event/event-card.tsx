@@ -7,11 +7,12 @@ import {
   LifecycleBadge,
 } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
+import { EventPrice } from "@/components/event/event-price";
 import { MetaRow } from "@/components/event/event-meta";
-import type { EventView } from "@/lib/types";
+import { resolvePriceDisplay, type EventView } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 import { dateChip, formatDateRange } from "@/lib/utils/date";
-import { formatRupiah, formatTimeRange } from "@/lib/utils/format";
+import { formatTimeRange } from "@/lib/utils/format";
 
 /**
  * The one event card used on the home page, the listing, and related sections.
@@ -27,8 +28,8 @@ export function EventCard({
   className?: string;
 }) {
   const chip = dateChip(event.startDate);
-  const isPaid = event.registration.type === "PAID";
   const href = `/event/${event.slug}`;
+  const priceHidden = resolvePriceDisplay(event.registration) === "HIDDEN";
 
   return (
     <article
@@ -94,9 +95,11 @@ export function EventCard({
           <Badge tone={categoryTone[event.category]} className="bg-surface/95 backdrop-blur-sm">
             {event.category}
           </Badge>
-          <span className="rounded-pill bg-surface/95 px-2.5 py-1 text-xs font-bold text-ink backdrop-blur-sm">
-            {isPaid ? formatRupiah(event.registration.price ?? 0) : "Gratis"}
-          </span>
+          {priceHidden ? null : (
+            <span className="rounded-pill bg-surface/95 px-2.5 py-1 text-xs font-bold text-ink backdrop-blur-sm">
+              <EventPrice event={event} />
+            </span>
+          )}
         </div>
       </div>
 

@@ -6,11 +6,14 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { mainNav } from "@/data/site";
+import { getNavigationItems } from "@/lib/services/cms";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const navItems = await getNavigationItems();
+
   return (
     <>
-      <SiteHeader />
+      <SiteHeader navItems={navItems} />
       <Container
         as="main"
         className="flex min-h-[70vh] max-w-2xl flex-1 flex-col items-center justify-center py-16 text-center"

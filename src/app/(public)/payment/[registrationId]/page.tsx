@@ -5,17 +5,20 @@ import { Checkout } from "@/components/registration/checkout";
 import { Container } from "@/components/ui/container";
 
 export const metadata: Metadata = {
-  title: "Pembayaran",
-  description: "Halaman pembayaran pendaftaran kelas Kelas Bermain.",
+  title: "Status Pendaftaran",
+  description: "Status pendaftaran dan instruksi pembayaran kelas Kelas Bermain.",
   robots: { index: false, follow: false },
 };
 
 export default async function PaymentPage({
   params,
 }: {
+  // The URL segment is an opaque access token (a UUID), not the human-readable
+  // registration number — see accessToken on Registration in
+  // src/lib/repositories/types.ts for why.
   params: Promise<{ registrationId: string }>;
 }) {
-  const { registrationId } = await params;
+  const { registrationId: accessToken } = await params;
 
   return (
     <Container className="max-w-2xl py-10 sm:py-14">
@@ -30,16 +33,15 @@ export default async function PaymentPage({
       <header className="mt-5">
         <span className="inline-flex items-center gap-2 rounded-pill bg-sun-soft px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-sun-dark">
           <CreditCard className="size-3.5" aria-hidden />
-          Pembayaran
+          Status Pendaftaran
         </span>
         <h1 className="mt-4 text-[1.75rem] leading-tight font-extrabold text-ink sm:text-4xl">
-          Checkout Pendaftaran
+          Status &amp; Pembayaran
         </h1>
-        <p className="mt-2 font-mono text-sm text-muted">{registrationId}</p>
       </header>
 
       <div className="mt-8">
-        <Checkout registrationRef={registrationId} />
+        <Checkout accessToken={accessToken} />
       </div>
     </Container>
   );

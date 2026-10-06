@@ -3,64 +3,49 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
   CircleCheckBig,
   Clock3,
-  CreditCard,
   ExternalLink,
-  Loader2,
+  RotateCw,
   ShieldAlert,
+  XCircle,
 } from "lucide-react";
-import { Button, buttonStyles } from "@/components/ui/button";
+import { buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { childrenRepo, customersRepo } from "@/lib/repositories";
-import type { Payment, Registration } from "@/lib/repositories/types";
 import { events } from "@/data/events";
-import { getPaymentByRegistration, settlePayment } from "@/lib/services/payment";
-import { getRegistration } from "@/lib/services/registration";
+import {
+  getRegistrationByToken,
+  type RegistrationStatusView,
+} from "@/lib/services/registration";
 import { formatDate } from "@/lib/utils/date";
 import { BankTransferPanel } from "@/components/registration/bank-transfer";
 import { formatRupiah } from "@/lib/utils/format";
 
 /**
- * Mock checkout.
+ * Read-only registration/payment status, looked up by the opaque access
+ * token in the URL (never the sequential registration number).
  *
- * Settles through `lib/services/payment.ts`; no real gateway is contacted. The
- * failure button exists so the FAILED branch can be demonstrated rather than
- * described.
+ * This page cannot mark anything PAID — that used to be a "Saya Sudah
+ * Transfer" button here, which was harmless when every visitor's data lived
+ * only in their own browser but becomes a real fraud path against a shared
+ * database: anyone could call the same function and mark their own transfer
+ * paid without sending a rupiah. Verifying a transfer is admin's job, done
+ * by hand in the Supabase Table Editor once the WhatsApp proof arrives.
  */
-export function Checkout({ registrationRef }: { registrationRef: string }) {
+export function Checkout({ accessToken }: { accessToken: string }) {
   const [loading, setLoading] = useState(true);
-  const [registration, setRegistration] = useState<Registration | null>(null);
-  const [payment, setPayment] = useState<Payment | null>(null);
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<RegistrationStatusView | null>(null);
 
   const load = useCallback(async () => {
-    const found = await getRegistration(registrationRef);
-    setRegistration(found);
-    setPayment(found ? await getPaymentByRegistration(found.id) : null);
+    setLoading(true);
+    setView(await getRegistrationByToken(accessToken));
     setLoading(false);
-  }, [registrationRef]);
+  }, [accessToken]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function pay(outcome: "PAID" | "FAILED") {
-    if (!registration) return;
-    setWorking(true);
-    setError(null);
-    const result = await settlePayment(registration.id, outcome);
-    setWorking(false);
-    if (!result.ok) {
-      setError(result.error);
-      await load();
-      return;
-    }
-    await load();
-  }
 
   if (loading) {
     return (
@@ -71,12 +56,12 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
     );
   }
 
-  if (!registration) {
+  if (!view) {
     return (
       <EmptyState
         icon={<ShieldAlert className="size-6" aria-hidden />}
         title="Pendaftaran tidak ditemukan"
-        description={`Nomor ${registrationRef} tidak terdaftar. Periksa kembali nomor pendaftaran yang kamu terima.`}
+        description="Tautan ini tidak valid atau pendaftaran sudah tidak ada."
         action={
           <Link href="/event" className={buttonStyles()}>
             Lihat Daftar Kelas
@@ -86,30 +71,41 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
     );
   }
 
-  const event = events.find((e) => e.id === registration.eventId);
-  const child = childrenRepo.find(registration.childId);
-  const customer = customersRepo.find(registration.customerId);
-  const siblings = registration
-    ? // Everyone registered by the same family for the same class shares one payment.
-      [registration]
-    : [];
+  const event = events.find((e) => e.id === view.eventId);
 
-  if (!payment || registration.paymentMethod === "NONE") {
+  const summary = (
+    <dl className="divide-y divide-line rounded-card border border-line bg-surface text-sm">
+      <Row label="Kelas" value={event?.title ?? "—"} />
+      <Row label="Tanggal" value={event ? formatDate(event.startDate) : "—"} />
+      <Row label="Pendamping" value={view.customerFullName} />
+      <Row label="Anak" value={view.childFullName} />
+      <Row label="Nomor Pendaftaran" value={view.registrationNumber} mono />
+      <div className="flex items-baseline justify-between gap-4 bg-canvas-deep/40 px-4 py-3.5">
+        <dt className="font-bold text-ink">Total</dt>
+        <dd className="text-lg font-extrabold text-brand">{formatRupiah(view.amount)}</dd>
+      </div>
+    </dl>
+  );
+
+  if (view.paymentMethod === "NONE") {
     return (
-      <EmptyState
-        icon={<CircleCheckBig className="size-6" aria-hidden />}
-        title="Kelas ini tidak memerlukan pembayaran"
-        description="Pendaftaran sudah terkonfirmasi. Sampai jumpa di lokasi!"
-        action={
-          <Link href={`/event/${event?.slug ?? ""}`} className={buttonStyles()}>
-            Lihat Detail Kelas
-          </Link>
-        }
-      />
+      <div className="space-y-6">
+        {summary}
+        <EmptyState
+          icon={<CircleCheckBig className="size-6" aria-hidden />}
+          title="Kelas ini tidak memerlukan pembayaran"
+          description="Pendaftaran sudah terkonfirmasi. Sampai jumpa di lokasi!"
+          action={
+            <Link href={`/event/${event?.slug ?? ""}`} className={buttonStyles()}>
+              Lihat Detail Kelas
+            </Link>
+          }
+        />
+      </div>
     );
   }
 
-  if (payment.status === "PAID") {
+  if (view.paymentStatus === "PAID") {
     return (
       <div className="space-y-6">
         <div className="rounded-card border border-pine/25 bg-pine-soft/60 p-6 text-center sm:p-8">
@@ -117,27 +113,14 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
             <CircleCheckBig className="size-8" aria-hidden />
           </span>
           <h2 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">
-            Pembayaran Berhasil
+            Pembayaran Terverifikasi
           </h2>
           <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
-            Pendaftaran {registration.registrationNumber} sudah terkonfirmasi. Sampai jumpa
-            di {event?.location.venue}!
-          </p>
-          <p className="mx-auto mt-4 inline-block rounded-xl border border-pine/20 bg-surface px-4 py-2 font-mono text-sm font-bold text-ink">
-            {payment.paymentNumber}
+            Pendaftaran {view.registrationNumber} sudah lunas. Sampai jumpa di{" "}
+            {event?.location.venue}!
           </p>
         </div>
-
-        <Summary
-          event={event?.title ?? "—"}
-          date={event ? formatDate(event.startDate) : "—"}
-          parent={customer?.fullName ?? "—"}
-          child={child?.fullName ?? "—"}
-          quantity={siblings.length}
-          amount={payment.amount}
-          status="Lunas"
-        />
-
+        {summary}
         <div className="flex flex-col gap-2.5 sm:flex-row">
           <Link
             href={`/attendance/${event?.slug ?? ""}`}
@@ -147,11 +130,7 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
           </Link>
           <Link
             href={`/event/${event?.slug ?? ""}`}
-            className={buttonStyles({
-              variant: "secondary",
-              size: "lg",
-              className: "w-full sm:w-auto",
-            })}
+            className={buttonStyles({ variant: "secondary", size: "lg", className: "w-full sm:w-auto" })}
           >
             Detail Kelas
           </Link>
@@ -160,7 +139,7 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
     );
   }
 
-  if (payment.method === "THIRD_PARTY") {
+  if (view.paymentMethod === "THIRD_PARTY") {
     return (
       <div className="space-y-6">
         <div className="rounded-card border border-sky/25 bg-sky-soft/60 p-6">
@@ -173,17 +152,7 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
             pembayaran di platform mitra, lalu panitia akan memperbarui status pendaftaranmu.
           </p>
         </div>
-
-        <Summary
-          event={event?.title ?? "—"}
-          date={event ? formatDate(event.startDate) : "—"}
-          parent={customer?.fullName ?? "—"}
-          child={child?.fullName ?? "—"}
-          quantity={siblings.length}
-          amount={payment.amount}
-          status="Menunggu konfirmasi mitra"
-        />
-
+        {summary}
         {event?.registration.thirdPartyUrl ? (
           <a
             href={event.registration.thirdPartyUrl}
@@ -199,132 +168,60 @@ export function Checkout({ registrationRef }: { registrationRef: string }) {
     );
   }
 
-  const expired = payment.status === "EXPIRED";
-  const failed = payment.status === "FAILED";
+  const rejected = view.paymentStatus === "FAILED";
 
   return (
     <div className="space-y-6">
-      <Summary
-        event={event?.title ?? "—"}
-        date={event ? formatDate(event.startDate) : "—"}
-        parent={customer?.fullName ?? "—"}
-        child={child?.fullName ?? "—"}
-        quantity={siblings.length}
-        amount={payment.amount}
-        status={
-          expired ? "Kedaluwarsa" : failed ? "Gagal" : "Menunggu pembayaran"
-        }
-      />
+      {summary}
 
-      {failed || error ? (
+      {rejected ? (
         <p
           role="alert"
           className="flex items-start gap-2 rounded-xl border border-brand/30 bg-brand-soft p-4 text-sm font-medium text-brand-ink"
         >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {error ?? "Pembayaran sebelumnya gagal diproses. Silakan coba lagi."}
+          <XCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          Bukti transfer sebelumnya belum bisa diverifikasi. Silakan kirim ulang lewat
+          WhatsApp di bawah.
         </p>
       ) : null}
 
-      {/* The team's own transfer wording and real accounts, shared with the
-          registration receipt so the site and WhatsApp never disagree. */}
       <BankTransferPanel
-        amount={payment.amount}
-        registrationNumber={registration.registrationNumber}
+        amount={view.amount}
+        registrationNumber={view.registrationNumber}
         eventTitle={event?.title ?? "Kelas Bermain"}
-        childName={child?.fullName}
+        childName={view.childFullName}
       />
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <h3 className="text-base font-extrabold text-ink">Status pembayaran</h3>
-
-        {payment.expiresAt ? (
+        <h3 className="text-base font-extrabold text-ink">Status saat ini</h3>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Menunggu pembayaran. Setelah kami menerima dan memverifikasi bukti transfer lewat
+          WhatsApp, halaman ini akan menunjukkan status lunas.
+        </p>
+        {view.paymentExpiresAt ? (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
             <Clock3 className="size-3.5" aria-hidden />
-            Selesaikan sebelum {formatDate(payment.expiresAt)}.
+            Selesaikan sebelum {formatDate(view.paymentExpiresAt)}.
           </p>
         ) : null}
-
-        <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-          Berita transfer:{" "}
-          <span className="font-mono font-bold text-ink">
-            {registration.registrationNumber}
-          </span>
-        </p>
-
-        <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-          <Button size="lg" onClick={() => pay("PAID")} disabled={working} className="w-full sm:w-auto">
-            {working ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Memproses…
-              </>
-            ) : (
-              <>
-                <CreditCard className="size-4" aria-hidden />
-                Saya Sudah Transfer
-              </>
-            )}
-          </Button>
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={() => pay("FAILED")}
-            disabled={working}
-            className="w-full sm:w-auto"
-          >
-            Simulasikan Pembayaran Gagal
-          </Button>
-        </div>
-
-        <p className="mt-4 rounded-xl bg-canvas-deep/60 p-3.5 text-xs leading-relaxed text-muted">
-          Catatan versi demo: menekan tombol di atas langsung menandai pembayaran lunas.
-          Alur sungguhnya — unggah bukti transfer lalu diverifikasi admin — menunggu
-          penyimpanan berkas (PRD F10/F11).
-        </p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className={buttonStyles({ variant: "secondary", size: "sm", className: "mt-4" })}
+        >
+          <RotateCw className="size-3.5" aria-hidden />
+          Muat Ulang Status
+        </button>
       </div>
     </div>
   );
 }
 
-function Summary({
-  event,
-  date,
-  parent,
-  child,
-  quantity,
-  amount,
-  status,
-}: {
-  event: string;
-  date: string;
-  parent: string;
-  child: string;
-  quantity: number;
-  amount: number;
-  status: string;
-}) {
-  return (
-    <dl className="divide-y divide-line rounded-card border border-line bg-surface text-sm">
-      <Row label="Kelas" value={event} />
-      <Row label="Tanggal" value={date} />
-      <Row label="Pendamping" value={parent} />
-      <Row label="Anak" value={child} />
-      <Row label="Jumlah" value={`${quantity} peserta`} />
-      <Row label="Status" value={status} />
-      <div className="flex items-baseline justify-between gap-4 bg-canvas-deep/40 px-4 py-3.5">
-        <dt className="font-bold text-ink">Total</dt>
-        <dd className="text-lg font-extrabold text-brand">{formatRupiah(amount)}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 px-4 py-3">
       <dt className="shrink-0 text-muted">{label}</dt>
-      <dd className="text-right font-semibold text-ink">{value}</dd>
+      <dd className={`text-right font-semibold text-ink ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
   );
 }

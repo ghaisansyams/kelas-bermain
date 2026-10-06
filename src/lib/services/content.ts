@@ -1,7 +1,8 @@
 import { activities } from "@/data/activities";
-import { events } from "@/data/events";
+import { events as catalogueEvents } from "@/data/events";
+import { getSupabase } from "@/lib/supabase/client";
+import { rowToEventRecord, type EventRow } from "./event-mapper";
 import { galleryDrive, galleryFeatured, galleryItems } from "@/data/gallery";
-import { instagramPosts } from "@/data/instagram";
 import { speakers } from "@/data/speakers";
 import { testimonials } from "@/data/testimonials";
 import { isDeadlinePassed, resolveLifecycle } from "@/lib/utils/date";
@@ -11,7 +12,6 @@ import type {
   EventView,
   GalleryItem,
   RegistrationAvailability,
-  SocialPost,
   Speaker,
   Testimonial,
 } from "@/lib/types";
@@ -71,11 +71,27 @@ function sortEvents(a: EventView, b: EventView): number {
   return a.lifecycle === "past" ? bTime - aTime : aTime - bTime;
 }
 
+/**
+ * Events now live in the database so the admin can edit them. The static
+ * catalogue in src/data/events.ts stays as the fallback: an empty table, a
+ * missing env var or a database hiccup shows the same classes the site has
+ * always shown instead of an empty page.
+ */
+async function loadEventRecords(): Promise<EventRecord[]> {
+  try {
+    const { data, error } = await getSupabase().rpc("get_public_events");
+    if (error || !Array.isArray(data) || data.length === 0) {
+      return catalogueEvents.filter((event) => event.published);
+    }
+    return (data as EventRow[]).map(rowToEventRecord);
+  } catch {
+    return catalogueEvents.filter((event) => event.published);
+  }
+}
+
 export async function getEvents(now: Date = new Date()): Promise<EventView[]> {
-  return events
-    .filter((event) => event.published)
-    .map((event) => toEventView(event, now))
-    .sort(sortEvents);
+  const records = await loadEventRecords();
+  return records.map((event) => toEventView(event, now)).sort(sortEvents);
 }
 
 export async function getUpcomingEvents(
@@ -93,12 +109,14 @@ export async function getEventBySlug(
   slug: string,
   now: Date = new Date(),
 ): Promise<EventView | null> {
-  const record = events.find((event) => event.slug === slug && event.published);
+  const records = await loadEventRecords();
+  const record = records.find((event) => event.slug === slug);
   return record ? toEventView(record, now) : null;
 }
 
 export async function getEventSlugs(): Promise<string[]> {
-  return events.filter((event) => event.published).map((event) => event.slug);
+  const records = await loadEventRecords();
+  return records.map((event) => event.slug);
 }
 
 export async function getRelatedEvents(
@@ -113,6 +131,21 @@ export async function getRelatedEvents(
   const sameCategory = others.filter((event) => event.category === current.category);
   const rest = others.filter((event) => event.category !== current.category);
   return [...sameCategory, ...rest].slice(0, limit);
+}
+
+/**
+ * "Event lainnya" as a chronological timeline: nearest upcoming first, then
+ * further out, then past events last — exactly `getEvents`' own ordering,
+ * just with the current event excluded. Unlike `getRelatedEvents`, category
+ * plays no part, since the timeline's whole point is date order.
+ */
+export async function getEventTimeline(
+  slug: string,
+  limit = 6,
+  now: Date = new Date(),
+): Promise<EventView[]> {
+  const all = await getEvents(now);
+  return all.filter((event) => event.slug !== slug).slice(0, limit);
 }
 
 export async function getActivities(): Promise<ActivityRecord[]> {
@@ -180,6 +213,3 @@ export async function getTestimonials(): Promise<Testimonial[]> {
   return testimonials;
 }
 
-export async function getSocialFeed(): Promise<SocialPost[]> {
-  return instagramPosts;
-}

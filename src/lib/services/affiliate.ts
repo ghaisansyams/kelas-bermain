@@ -1,27 +1,21 @@
-import { affiliatesRepo, registrationsRepo } from "@/lib/repositories";
-import type { Affiliate, AffiliateStatus } from "@/lib/repositories/types";
-import { nextAffiliateNumber, nextId } from "@/lib/utils/numbering";
+import { getSupabase } from "@/lib/supabase/client";
 
 /**
  * Affiliate programme.
  *
- * Someone applies from the public site (`applyAsAffiliate`), and the form
- * looks up a typed code (`findAffiliateByCode`) — both stay wired to the
- * public microsite.
+ * `applyAsAffiliate` and `findAffiliateByCode` are the only two things the
+ * public microsite ever calls — both go through SECURITY DEFINER functions
+ * in supabase/schema.sql, and both are deliberately narrow about what they
+ * return (an application never gets its own bank details echoed back; a
+ * code lookup never returns bank details, WhatsApp or domicile at all).
  *
- * Everything else here — `listAffiliates`, `approveAffiliate`,
- * `rejectAffiliate`, `setAffiliateStatus`, `statsForAffiliate`,
- * `generateAffiliateCode` — was the ERP's job: verifying an applicant and
- * minting their code. The ERP was removed to keep this project to the public
- * microsite, so **no code is ever issued right now**: applications land as
- * PENDING and sit there, and a code typed at sign-up will never match one.
- * These functions are kept, unused, as the seam to wire up next — a thin
- * approval screen, a spreadsheet-driven script, or a revived ERP — rather
- * than deleted and rewritten from scratch later.
- *
- * Commission accounting itself (Rp10.000 per paid participant, paid out the
- * day before the class) was never built — several of its rules are still
- * open with the client. See PRD v2.0 §8, A-01…A-06.
+ * There is no admin UI, on purpose (PRD: "fokus di microsite saja"). The
+ * team reviews applications and flips PENDING -> ACTIVE directly in the
+ * Supabase Table Editor — a Postgres trigger (affiliates_assign_code in
+ * schema.sql) mints the code automatically the moment they do, so nobody
+ * has to invent one or check it isn't already taken. Once a code exists,
+ * every registration that used it becomes visible the same way: open the
+ * registrations table in Supabase, filter affiliate_code.
  */
 
 export const COMMISSION_PER_PARTICIPANT = 10_000;
@@ -38,183 +32,54 @@ export interface AffiliateApplication {
 }
 
 export type AffiliateResult =
-  | { ok: true; affiliate: Affiliate }
+  | { ok: true; affiliateNumber: string }
   | { ok: false; error: string; field?: string };
-
-const MOCK_LATENCY_MS = 600;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** 0812…, +62812… and 62812… are the same person. */
-function normalizeWhatsapp(value: string): string {
-  const digits = (value ?? "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("62")) return digits;
-  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
-  return digits;
-}
-
-/**
- * A code that is readable on a poster but not guessable from another one.
- *
- * Four letters of the person's name make it feel personal and easy to dictate
- * over the phone; four random characters stop anyone from walking the list and
- * reading a colleague's earnings. Ambiguous characters (O/0, I/1) are left out
- * because these get typed from memory.
- */
-const CODE_ALPHABET = "ACDEFGHJKLMNPQRTUVWXY2346789";
-
-function randomChunk(length: number): string {
-  const values = new Uint32Array(length);
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
-    crypto.getRandomValues(values);
-  } else {
-    for (let i = 0; i < length; i += 1) values[i] = Math.floor(Math.random() * 0xffffffff);
-  }
-  return Array.from(values, (v) => CODE_ALPHABET[v % CODE_ALPHABET.length]).join("");
-}
-
-export function generateAffiliateCode(fullName: string): string {
-  const letters = fullName.toUpperCase().replace(/[^A-Z]/g, "");
-  const stem = (letters.slice(0, 4) || "KLBM").padEnd(4, "X");
-  const taken = new Set(
-    affiliatesRepo.all().map((a) => a.code.toUpperCase()).filter(Boolean),
-  );
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const candidate = `${stem}${randomChunk(4)}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-  // Practically unreachable; better a longer code than a duplicate one.
-  return `${stem}${randomChunk(8)}`;
-}
 
 export async function applyAsAffiliate(
   input: AffiliateApplication,
 ): Promise<AffiliateResult> {
-  await delay(MOCK_LATENCY_MS);
+  const { data, error } = await getSupabase().rpc("apply_as_affiliate", {
+    p_full_name: input.fullName.trim(),
+    p_whatsapp: input.whatsapp.trim(),
+    p_email: input.email?.trim().toLowerCase() ?? "",
+    p_domicile: input.domicile.trim(),
+    p_bank_name: input.bankName.trim(),
+    p_bank_account_number: input.bankAccountNumber.replace(/\D/g, ""),
+    p_bank_account_name: input.bankAccountName.trim(),
+    p_reason: input.reason?.trim() ?? "",
+  });
 
-  const whatsapp = normalizeWhatsapp(input.whatsapp);
-  const existing = affiliatesRepo
-    .all()
-    .find((a) => normalizeWhatsapp(a.whatsapp) === whatsapp);
-
-  if (existing) {
-    if (existing.status === "PENDING") {
+  if (error) {
+    if (error.message?.includes("ALREADY_APPLIED")) {
       return {
         ok: false,
+        field: "whatsapp",
         error:
-          "Nomor WhatsApp ini sudah mendaftar dan sedang menunggu verifikasi. Tim kami akan menghubungi kamu.",
-        field: "whatsapp",
+          "Nomor WhatsApp ini sudah mendaftar sebagai affiliator. Tim kami akan menghubungi kamu.",
       };
     }
-    if (existing.status === "ACTIVE") {
-      return {
-        ok: false,
-        error: "Nomor WhatsApp ini sudah terdaftar sebagai affiliator aktif.",
-        field: "whatsapp",
-      };
-    }
+    return { ok: false, error: "Gagal mengirim pendaftaran. Coba lagi sebentar lagi." };
   }
 
-  const all = affiliatesRepo.all();
-  const affiliate: Affiliate = {
-    id: nextId("aff", all.map((a) => a.id)),
-    affiliateNumber: nextAffiliateNumber(all.map((a) => a.affiliateNumber)),
-    // No code until a human approves the application.
-    code: "",
-    fullName: input.fullName.trim(),
-    whatsapp: input.whatsapp.trim(),
-    email: input.email?.trim().toLowerCase() || undefined,
-    domicile: input.domicile.trim(),
-    bankName: input.bankName.trim(),
-    bankAccountNumber: input.bankAccountNumber.replace(/\D/g, ""),
-    bankAccountName: input.bankAccountName.trim(),
-    reason: input.reason?.trim() || undefined,
-    status: "PENDING",
-    appliedAt: new Date().toISOString(),
-  };
-
-  affiliatesRepo.create(affiliate);
-  return { ok: true, affiliate };
+  const row = Array.isArray(data) ? data[0] : data;
+  return { ok: true, affiliateNumber: row.affiliate_number };
 }
 
-export async function listAffiliates(): Promise<Affiliate[]> {
-  return affiliatesRepo
-    .all()
-    .slice()
-    .sort((a, b) => b.appliedAt.localeCompare(a.appliedAt));
+export interface AffiliateLookup {
+  code: string;
+  fullName: string;
+  status: "PENDING" | "ACTIVE" | "INACTIVE" | "REJECTED";
 }
 
-export async function getAffiliate(id: string): Promise<Affiliate | null> {
-  return affiliatesRepo.find(id);
-}
-
-export function findAffiliateByCode(code: string): Affiliate | null {
-  const needle = code.trim().toUpperCase();
-  if (!needle) return null;
-  return (
-    affiliatesRepo.all().find((a) => a.code.toUpperCase() === needle) ?? null
-  );
-}
-
-/** Approving an application is what mints the code. */
-export async function approveAffiliate(
-  id: string,
-  verifiedBy: string,
-): Promise<Affiliate | null> {
-  const affiliate = affiliatesRepo.find(id);
-  if (!affiliate) return null;
-  return affiliatesRepo.update(id, {
-    status: "ACTIVE",
-    code: affiliate.code || generateAffiliateCode(affiliate.fullName),
-    verifiedAt: new Date().toISOString(),
-    verifiedBy,
+/** For the registration form's live "Kode FIKA7QM2 milik ... ✓" hint. */
+export async function findAffiliateByCode(code: string): Promise<AffiliateLookup | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+  const { data, error } = await getSupabase().rpc("find_affiliate_by_code", {
+    p_code: trimmed,
   });
-}
-
-export async function rejectAffiliate(
-  id: string,
-  verifiedBy: string,
-  reason: string,
-): Promise<Affiliate | null> {
-  return affiliatesRepo.update(id, {
-    status: "REJECTED",
-    verifiedAt: new Date().toISOString(),
-    verifiedBy,
-    notes: reason.trim() || undefined,
-  });
-}
-
-export async function setAffiliateStatus(
-  id: string,
-  status: AffiliateStatus,
-): Promise<Affiliate | null> {
-  return affiliatesRepo.update(id, { status });
-}
-
-export interface AffiliateStats {
-  /** Sign-ups carrying this code, whatever their payment status. */
-  referrals: number;
-  /** Those whose payment has settled — the ones a commission is owed on. */
-  paidReferrals: number;
-  /** Indicative only until the commission rules are agreed. */
-  estimatedCommission: number;
-}
-
-export function statsForAffiliate(code: string): AffiliateStats {
-  const needle = code.trim().toUpperCase();
-  if (!needle) return { referrals: 0, paidReferrals: 0, estimatedCommission: 0 };
-
-  const referred = registrationsRepo.where(
-    (r) => (r.affiliateCode ?? "").toUpperCase() === needle && r.status !== "CANCELLED",
-  );
-  const paidReferrals = referred.filter((r) => r.paymentStatus === "PAID").length;
-
-  return {
-    referrals: referred.length,
-    paidReferrals,
-    estimatedCommission: paidReferrals * COMMISSION_PER_PARTICIPANT,
-  };
+  if (error || !data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { code: row.code, fullName: row.full_name, status: row.status };
 }

@@ -9,7 +9,6 @@ import {
   Info,
   Printer,
 } from "lucide-react";
-import { BankTransferPanel } from "@/components/registration/bank-transfer";
 import { buttonStyles } from "@/components/ui/button";
 import type { RegistrationBatch } from "@/lib/services/registration";
 import type { EventView } from "@/lib/types";
@@ -18,22 +17,20 @@ import { formatDate, formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
 /**
- * Success state after a registration is created.
- *
- * Shows every registration number produced by the batch (one per child) and
- * routes the family to whatever comes next: pay here, pay at the partner, or
- * nothing at all for a free class.
+ * "Selesai" step content. The registration/payment rows are already
+ * created by this point (PENDING for a paid class) — this never claims a
+ * payment succeeded, since nothing here can actually verify one. Marking a
+ * payment PAID is admin's job today, and will be the future ERP's job later;
+ * see the note on set_payment_status in supabase/schema.sql.
  */
 export function RegistrationReceipt({
   event,
   batch,
   parentName,
-  childName,
 }: {
   event: EventView;
   batch: RegistrationBatch;
   parentName: string;
-  childName?: string;
 }) {
   const lead = batch.registrations[0];
   const isFree = batch.paymentMethod === "NONE";
@@ -163,15 +160,17 @@ export function RegistrationReceipt({
         </div>
       ) : null}
 
-      {!isFree && !isThirdParty ? (
-        <div className="no-print">
-          <BankTransferPanel
-            amount={batch.totalAmount}
-            registrationNumber={lead.registrationNumber}
-            eventTitle={event.title}
-            childName={childName}
-          />
-        </div>
+      {!isFree ? (
+        <p className="no-print text-center text-xs text-muted">
+          Simpan halaman ini atau{" "}
+          <Link
+            href={`/payment/${lead.accessToken}`}
+            className="font-semibold text-brand hover:underline"
+          >
+            buka status pendaftaran
+          </Link>{" "}
+          kapan pun untuk melihatnya lagi.
+        </p>
       ) : null}
 
       {/* Next steps */}
@@ -222,10 +221,6 @@ export function RegistrationReceipt({
         </div>
       </div>
 
-      <p className="no-print rounded-xl bg-canvas-deep/60 p-4 text-xs leading-relaxed text-muted">
-        Catatan versi demo: data pendaftaran ini disimpan sementara di peramban kamu dan
-        belum terhubung ke basis data produksi.
-      </p>
     </div>
   );
 }

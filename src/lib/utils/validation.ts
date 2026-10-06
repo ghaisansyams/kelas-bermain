@@ -28,12 +28,15 @@ export function isPhone(value: string): boolean {
 export interface ParentFormValues {
   fullName: string;
   whatsapp: string;
+  /** Optional — kept off the required list per the team's intake sheet. */
+  email: string;
   domicile: string;
 }
 
 export const emptyParent: ParentFormValues = {
   fullName: "",
   whatsapp: "",
+  email: "",
   domicile: "",
 };
 
@@ -45,6 +48,9 @@ export function validateParent(values: ParentFormValues): FieldErrors<ParentForm
   }
   if (!isPhone(values.whatsapp)) {
     errors.whatsapp = "Gunakan format nomor Indonesia, contoh 08123456789.";
+  }
+  if (values.email.trim() !== "" && !isEmail(values.email)) {
+    errors.email = "Masukkan alamat email yang valid, atau kosongkan.";
   }
   if (values.domicile.trim().length < 3) {
     errors.domicile = "Isi domisili, contoh: Pekayon, Jakarta Timur.";
@@ -197,6 +203,29 @@ export function validateCheckIn(
   }
   if (!values.confirmed) {
     errors.confirmed = "Konfirmasi kehadiran terlebih dahulu.";
+  }
+  return errors;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cek Tiket                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface TicketLookupFormValues {
+  registrationNumber: string;
+  contact: string;
+}
+
+export function validateTicketLookup(
+  values: TicketLookupFormValues,
+): FieldErrors<TicketLookupFormValues> {
+  const errors: FieldErrors<TicketLookupFormValues> = {};
+  if (values.registrationNumber.trim().length < 6) {
+    errors.registrationNumber = "Masukkan nomor pendaftaran, contoh KB-REG-2026-00001.";
+  }
+  const contact = values.contact.trim();
+  if (!isEmail(contact) && !isPhone(contact)) {
+    errors.contact = "Masukkan email atau nomor WhatsApp yang dipakai saat mendaftar.";
   }
   return errors;
 }

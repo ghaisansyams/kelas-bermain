@@ -1,6 +1,5 @@
-import Image from "next/image";
-import { CircleCheck, Dot, ListChecks, Package } from "lucide-react";
-import type { AgendaItem, Speaker } from "@/lib/types";
+import { CircleCheck, ListChecks } from "lucide-react";
+import type { AgendaItem } from "@/lib/types";
 
 export function SectionBlock({
   id,
@@ -43,37 +42,6 @@ export function EventAgenda({ items }: { items: AgendaItem[] }) {
   );
 }
 
-export function SpeakerList({ speakers }: { speakers: Speaker[] }) {
-  return (
-    <ul className="grid gap-4 sm:grid-cols-2">
-      {speakers.map((speaker) => (
-        <li
-          key={speaker.id}
-          className="flex gap-4 rounded-card border border-line bg-surface p-4 transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-soft"
-        >
-          <Image
-            src={speaker.avatar.src}
-            alt={speaker.avatar.alt}
-            width={72}
-            height={72}
-            sizes="72px"
-            className="size-16 shrink-0 rounded-2xl object-cover sm:size-[4.5rem]"
-          />
-          <div className="min-w-0">
-            <p className="text-[0.9375rem] font-extrabold text-ink">{speaker.name}</p>
-            <p className="mt-0.5 flex flex-wrap items-center text-xs font-semibold text-brand">
-              {speaker.role}
-              <Dot className="size-4 text-muted" aria-hidden />
-              <span className="font-medium text-muted">{speaker.organization}</span>
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{speaker.bio}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function CheckList({
   items,
   variant = "check",
@@ -100,18 +68,3 @@ export function CheckList({
   );
 }
 
-export function FacilityList({ items }: { items: string[] }) {
-  return (
-    <ul className="grid gap-2.5 sm:grid-cols-2">
-      {items.map((item) => (
-        <li
-          key={item}
-          className="flex items-start gap-2.5 rounded-xl border border-line bg-surface p-3.5 text-sm leading-relaxed text-ink-soft"
-        >
-          <Package className="mt-0.5 size-4 shrink-0 text-grape" aria-hidden />
-          {item}
-        </li>
-      ))}
-    </ul>
-  );
-}

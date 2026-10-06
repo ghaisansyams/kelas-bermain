@@ -39,7 +39,8 @@ export interface NavLink {
 export const mainNav: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/event", label: "Event" },
-  { href: "/kegiatan", label: "Kegiatan" },
+  { href: "/update", label: "Update" },
+  { href: "/kegiatan", label: "Berita" },
   { href: "/galeri", label: "Galeri" },
 ];
 
@@ -51,15 +52,6 @@ export const footerNav: { title: string; links: NavLink[] }[] = [
       { href: "/kegiatan", label: "Kegiatan" },
       { href: "/galeri", label: "Galeri" },
       { href: "/affiliate", label: "Jadi Affiliator" },
-    ],
-  },
-  {
-    title: "Jadwal",
-    links: [
-      { href: "/event?filter=upcoming", label: "Akan Datang" },
-      { href: "/event?filter=ongoing", label: "Sedang Berlangsung" },
-      { href: "/event?filter=past", label: "Sudah Selesai" },
-      { href: "/kegiatan", label: "Dokumentasi Kegiatan" },
     ],
   },
 ];

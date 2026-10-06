@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Menu, Ticket, X } from "lucide-react";
+import { Menu, Ticket, TicketCheck, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
-import { mainNav } from "@/data/site";
+import type { NavItem } from "@/lib/services/cms";
 import { cn } from "@/lib/utils/cn";
 
 function isActive(pathname: string, href: string): boolean {
@@ -15,7 +15,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SiteHeader() {
+export function SiteHeader({ navItems }: { navItems: NavItem[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -76,8 +76,22 @@ export function SiteHeader() {
 
         <nav aria-label="Navigasi utama" className="hidden md:block">
           <ul className="flex items-center gap-1">
-            {mainNav.map((link) => {
+            {navItems.map((link) => {
               const active = isActive(pathname, link.href);
+              if (link.openInNewTab) {
+                return (
+                  <li key={link.href}>
+                    <a
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-pill px-3.5 py-2 text-[0.9375rem] font-semibold text-ink-soft transition-colors hover:text-ink"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                );
+              }
               return (
                 <li key={link.href}>
                   <Link
@@ -105,8 +119,23 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <Link
+            href="/tiket"
+            aria-label="Cek Tiket"
+            className={buttonStyles({
+              variant: "secondary",
+              size: "sm",
+              className: "hidden whitespace-nowrap md:inline-flex",
+            })}
+          >
+            <TicketCheck className="size-4" aria-hidden />
+            <span className="hidden lg:inline">Cek Tiket</span>
+          </Link>
+          <Link
             href="/event"
-            className={buttonStyles({ size: "sm", className: "hidden md:inline-flex" })}
+            className={buttonStyles({
+              size: "sm",
+              className: "hidden whitespace-nowrap md:inline-flex",
+            })}
           >
             <Ticket className="size-4" aria-hidden />
             Daftar Kelas
@@ -135,8 +164,26 @@ export function SiteHeader() {
         <Container className="flex flex-col gap-2 py-5">
           <nav aria-label="Navigasi utama (seluler)">
             <ul className="flex flex-col gap-1">
-              {mainNav.map((link, index) => {
+              {navItems.map((link, index) => {
                 const active = isActive(pathname, link.href);
+                if (link.openInNewTab) {
+                  return (
+                    <li
+                      key={link.href}
+                      className="motion-safe:animate-fade-up"
+                      style={{ animationDelay: `${index * 45}ms` }}
+                    >
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex min-h-13 items-center rounded-xl px-4 text-base font-semibold text-ink transition-colors hover:bg-canvas-deep"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  );
+                }
                 return (
                   <li
                     key={link.href}
@@ -163,10 +210,19 @@ export function SiteHeader() {
               })}
             </ul>
           </nav>
-          <Link href="/event" className={buttonStyles({ size: "lg", className: "mt-2 w-full" })}>
-            <Ticket className="size-4" aria-hidden />
-            Daftar Kelas
-          </Link>
+          <div className="mt-2 flex flex-col gap-2">
+            <Link href="/event" className={buttonStyles({ size: "lg", className: "w-full" })}>
+              <Ticket className="size-4" aria-hidden />
+              Daftar Kelas
+            </Link>
+            <Link
+              href="/tiket"
+              className={buttonStyles({ variant: "secondary", size: "lg", className: "w-full" })}
+            >
+              <TicketCheck className="size-4" aria-hidden />
+              Cek Tiket
+            </Link>
+          </div>
         </Container>
       </div>
     </header>
