@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "qa": "node scripts/qa.mjs",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "qa:registration": "node scripts/qa-registration.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
