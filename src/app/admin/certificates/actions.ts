@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/auth";
+import { findTemplateNameForEvent } from "@/lib/services/certificate";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const ERROR_CODE: Record<string, string> = {
@@ -22,12 +23,17 @@ export async function issueCertificateAction(formData: FormData) {
   const eventId = String(formData.get("eventId") ?? "");
   if (!registrationId) back(eventId, "error");
 
-  const supabase = await createSupabaseServerClient();
+  const [supabase, templateName] = await Promise.all([
+    createSupabaseServerClient(),
+    findTemplateNameForEvent(eventId),
+  ]);
   const { error } = await supabase.rpc("admin_issue_certificate", {
     p_registration_id: registrationId,
-    p_template: "classic",
-    p_signatory_name: String(formData.get("signatoryName") ?? ""),
-    p_signatory_role: String(formData.get("signatoryRole") ?? ""),
+    // The template name is stored on the certificate, so a later design
+    // change never alters a document already handed out.
+    p_template: templateName,
+    p_signatory_name: "",
+    p_signatory_role: "",
   });
 
   if (error) {
@@ -45,7 +51,10 @@ export async function issueAllCertificatesAction(formData: FormData) {
   const eventId = String(formData.get("eventId") ?? "");
   if (!eventId) back(eventId, "error");
 
-  const supabase = await createSupabaseServerClient();
+  const [supabase, templateName] = await Promise.all([
+    createSupabaseServerClient(),
+    findTemplateNameForEvent(eventId),
+  ]);
   const { data } = await supabase
     .from("registrations")
     .select("id")
@@ -58,7 +67,7 @@ export async function issueAllCertificatesAction(formData: FormData) {
   for (const id of ids) {
     const { error } = await supabase.rpc("admin_issue_certificate", {
       p_registration_id: id,
-      p_template: "classic",
+      p_template: templateName,
       p_signatory_name: "",
       p_signatory_role: "",
     });

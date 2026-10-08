@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   EmptyRow,
   FilterBar,
+  RefCell,
   SelectField,
   StatusBadge,
   TableShell,
@@ -78,6 +79,7 @@ export default async function AdminCertificatesPage({
         .eq("event_id", selected)
         .neq("status", "CANCELLED")
         .order("registration_number")
+        .limit(500)
     : { data: [], error: null };
 
   const rows = (data ?? []) as unknown as Row[];
@@ -144,9 +146,9 @@ export default async function AdminCertificatesPage({
               <Th>Registrasi</Th>
               <Th>Anak</Th>
               <Th>Kehadiran</Th>
-              <Th>Status sertifikat</Th>
+              <Th className="w-[12rem]">Status sertifikat</Th>
               <Th>Nomor</Th>
-              <Th>Aksi</Th>
+              <Th className="w-[12rem]">Aksi</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -161,8 +163,8 @@ export default async function AdminCertificatesPage({
                 };
                 return (
                   <tr key={row.id}>
-                    <Td className="font-mono text-xs font-bold text-ink">
-                      {row.registration_number}
+                    <Td>
+                      <RefCell>{row.registration_number}</RefCell>
                     </Td>
                     <Td className="font-semibold text-ink">{row.children?.full_name ?? "—"}</Td>
                     <Td>
@@ -173,12 +175,8 @@ export default async function AdminCertificatesPage({
                     <Td>
                       <StatusBadge tone={label.tone}>{label.text}</StatusBadge>
                     </Td>
-                    <Td className="font-mono text-xs">
-                      {cert ? (
-                        <span className="font-bold text-ink">{cert.number}</span>
-                      ) : (
-                        "—"
-                      )}
+                    <Td>
+                      {cert ? <RefCell>{cert.number}</RefCell> : "—"}
                     </Td>
                     <Td>
                       {cert ? (

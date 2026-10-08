@@ -14,6 +14,7 @@
 
 import type { CertificateRecord } from "@/lib/repositories/types";
 import { getSupabase } from "@/lib/supabase/client";
+import { normaliseConfig, type CertificateTemplate } from "@/lib/cms/certificate-template";
 
 const REASON_MESSAGE: Record<string, string> = {
   TOO_SHORT: "Masukkan nomor sertifikat atau nomor pendaftaran.",
@@ -73,4 +74,67 @@ export async function verifyCertificate(query: string): Promise<VerifyResult> {
 export async function getCertificate(value: string): Promise<CertificateRecord | null> {
   const result = await verifyCertificate(value);
   return result.ok ? result.certificate : null;
+}
+
+/**
+ * The published template a certificate should be rendered with. Falls back to
+ * null, in which case the viewer keeps using the built-in card — so a site
+ * with no templates still shows every certificate it has issued.
+ */
+export async function getCertificateTemplate(
+  name?: string,
+): Promise<CertificateTemplate | null> {
+  try {
+    const { data, error } = await getSupabase().rpc("get_certificate_template", {
+      p_name: name ?? null,
+    });
+    if (error || !data || typeof data !== "object") return null;
+
+    const row = data as Record<string, unknown>;
+    // Without artwork there is nothing to overlay, so the built-in card is
+    // the better fallback than an empty page with two floating strings.
+    const backgroundUrl = String(row.backgroundUrl ?? "");
+    if (!backgroundUrl) return null;
+
+    return {
+      id: String(row.id),
+      name: String(row.name),
+      description: "",
+      backgroundUrl,
+      orientation: row.orientation === "PORTRAIT" ? "PORTRAIT" : "LANDSCAPE",
+      config: normaliseConfig(row.config),
+      status: "PUBLISHED",
+      isDefault: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The published template for one event, or the general one when that event
+ * has none. Returns the template's name, which is what gets stored on the
+ * certificate so an old document keeps rendering with the design it was
+ * issued under.
+ */
+export async function findTemplateNameForEvent(eventId: string): Promise<string> {
+  try {
+    const { data, error } = await getSupabase()
+      .from("certificate_templates")
+      .select("name, config, is_default")
+      .eq("status", "PUBLISHED");
+
+    if (error || !Array.isArray(data)) return "classic";
+
+    const rows = data as { name: string; config: unknown; is_default: boolean }[];
+    const forEvent = rows.find(
+      (row) => normaliseConfig(row.config).eventId === eventId,
+    );
+    if (forEvent) return forEvent.name;
+
+    const general = rows.find((row) => !normaliseConfig(row.config).eventId);
+    return general?.name ?? rows.find((row) => row.is_default)?.name ?? "classic";
+  } catch {
+    return "classic";
+  }
 }

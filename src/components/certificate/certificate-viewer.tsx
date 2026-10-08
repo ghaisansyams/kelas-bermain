@@ -8,19 +8,28 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CertificateRecord } from "@/lib/repositories/types";
-import { getCertificate } from "@/lib/services/certificate";
+import { getCertificate, getCertificateTemplate } from "@/lib/services/certificate";
+import { TemplateCanvas } from "@/components/certificate/template-canvas";
+import type { CertificateTemplate } from "@/lib/cms/certificate-template";
 import { formatDate } from "@/lib/utils/date";
 
 export function CertificateViewer({ number }: { number: string }) {
   const [state, setState] = useState<"loading" | "found" | "missing">("loading");
   const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
+  const [template, setTemplate] = useState<CertificateTemplate | null>(null);
 
   useEffect(() => {
     let active = true;
-    getCertificate(number).then((record) => {
+    getCertificate(number).then(async (record) => {
       if (!active) return;
       setCertificate(record);
       setState(record ? "found" : "missing");
+      if (record) {
+        // A template designed in the CMS wins; with none published the
+        // built-in card is used, so every certificate still renders.
+        const design = await getCertificateTemplate(record.template);
+        if (active) setTemplate(design);
+      }
     });
     return () => {
       active = false;
@@ -60,7 +69,19 @@ export function CertificateViewer({ number }: { number: string }) {
           certificate keeps a legible width and scrolls sideways instead. */}
       <div className="cert-scroll no-scrollbar -mx-5 overflow-x-auto px-5 sm:mx-0 sm:overflow-x-visible sm:px-0">
         <div className="cert-inner print-area min-w-[34rem] sm:min-w-0">
-          <CertificateCard certificate={certificate} />
+          {template ? (
+            <TemplateCanvas
+              config={template.config}
+              backgroundUrl={template.backgroundUrl}
+              orientation={template.orientation}
+              data={{
+                participantName: certificate.participantName,
+                certificateNumber: certificate.number,
+              }}
+            />
+          ) : (
+            <CertificateCard certificate={certificate} />
+          )}
         </div>
       </div>
       <p className="no-print text-center text-xs text-muted sm:hidden">
