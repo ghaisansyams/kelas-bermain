@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +20,8 @@ export function ConfirmDialog({
   confirmLabel,
   tone = "brand",
   reasonField,
+  size = "sm",
+  icon,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   hidden: Record<string, string>;
@@ -30,6 +32,9 @@ export function ConfirmDialog({
   confirmLabel: string;
   tone?: "brand" | "danger";
   reasonField?: { name: string; label: string; placeholder: string };
+  /** "md" matches the other buttons in a page header. */
+  size?: "sm" | "md";
+  icon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -40,12 +45,14 @@ export function ConfirmDialog({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "inline-flex min-h-9 items-center rounded-pill px-3 text-xs font-bold transition-colors",
+          "inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill font-bold transition-colors",
+          size === "md" ? "min-h-10 px-4 text-sm" : "min-h-9 px-3 text-xs",
           tone === "danger"
             ? "border border-line text-ink-soft hover:border-brand/40 hover:text-brand"
             : "bg-brand text-white hover:bg-brand-dark",
         )}
       >
+        {icon}
         {trigger}
       </button>
 
