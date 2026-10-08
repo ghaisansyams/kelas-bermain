@@ -126,7 +126,7 @@ export function SiteHeader({
 
         <div className="flex items-center gap-2">
           <Link
-            href="/tiket"
+            href="/cek-tiket"
             aria-label="Cek Tiket"
             className={buttonStyles({
               variant: "secondary",
@@ -223,7 +223,7 @@ export function SiteHeader({
               Daftar Kelas
             </Link>
             <Link
-              href="/tiket"
+              href="/cek-tiket"
               className={buttonStyles({ variant: "secondary", size: "lg", className: "w-full" })}
             >
               <TicketCheck className="size-4" aria-hidden />
