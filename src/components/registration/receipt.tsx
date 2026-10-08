@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   CalendarPlus,
   CircleCheckBig,
+  Clock,
   CreditCard,
   ExternalLink,
   Info,
@@ -64,22 +65,46 @@ export function RegistrationReceipt({
     URL.revokeObjectURL(url);
   }
 
+  // A green tick reads as "paid" to a parent, and nothing is paid yet. Until
+  // an admin verifies the transfer this stays amber and says thank you —
+  // settled is a state only the ERP may declare. Free classes have nothing to
+  // settle, so those do get the tick.
+  const settled = isFree;
+
   return (
     <div className="space-y-6">
-      <div className="print-area rounded-card border border-pine/25 bg-pine-soft/60 p-6 text-center sm:p-8">
-        <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-pine text-white motion-safe:animate-fade-up">
-          <CircleCheckBig className="size-8" aria-hidden />
+      <div
+        className={`print-area rounded-card border p-6 text-center sm:p-8 ${
+          settled ? "border-pine/25 bg-pine-soft/60" : "border-sun/40 bg-sun-soft/60"
+        }`}
+      >
+        <span
+          className={`mx-auto flex size-16 items-center justify-center rounded-full text-white motion-safe:animate-fade-up ${
+            settled ? "bg-pine" : "bg-sun-dark"
+          }`}
+        >
+          {settled ? (
+            <CircleCheckBig className="size-8" aria-hidden />
+          ) : (
+            <Clock className="size-8" aria-hidden />
+          )}
         </span>
         <h2 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">
-          Registrasi Berhasil!
+          {settled ? "Registrasi Berhasil!" : "Terima kasih sudah mendaftar"}
         </h2>
         <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
           {isFree
             ? "Tempat sudah kami simpan. Detail kegiatan dikirimkan ke kontak yang kamu berikan."
-            : "Pendaftaran tercatat. Selesaikan pembayaran agar tempatnya terkunci."}
+            : isThirdParty
+              ? "Data pendaftaranmu tercatat. Pembayaran diselesaikan di platform mitra."
+              : "Data pendaftaranmu sudah kami terima. Tempatnya terkunci setelah pembayaran diverifikasi tim Kelas Bermain."}
         </p>
 
-        <dl className="mx-auto mt-6 max-w-md space-y-3 rounded-2xl border border-pine/20 bg-surface p-4 text-left text-sm">
+        <dl
+          className={`mx-auto mt-6 max-w-md space-y-3 rounded-2xl border bg-surface p-4 text-left text-sm ${
+            settled ? "border-pine/20" : "border-sun/30"
+          }`}
+        >
           <Line label="Kelas" value={event.title} />
           <Line label="Tanggal" value={formatDateRange(event.startDate, event.endDate)} />
           <Line
@@ -107,7 +132,9 @@ export function RegistrationReceipt({
           {batch.registrations.map((registration, index) => (
             <div
               key={registration.id}
-              className="rounded-2xl border border-pine/20 bg-surface p-4 text-left"
+              className={`rounded-2xl border bg-surface p-4 text-left ${
+                settled ? "border-pine/20" : "border-sun/30"
+              }`}
             >
               <p className="text-xs font-bold uppercase tracking-wider text-muted">
                 Nomor Pendaftaran · Anak {index + 1}
