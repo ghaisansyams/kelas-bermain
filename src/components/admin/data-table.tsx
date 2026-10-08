@@ -51,8 +51,10 @@ export function StatusBadge({ tone, children }: { tone: keyof typeof BADGE_TONES
 
 /** Indonesian labels for the statuses stored in English. */
 export const PAYMENT_LABEL: Record<string, { text: string; tone: string }> = {
-  PENDING: { text: "Belum Bayar", tone: "amber" },
+  PENDING: { text: "Belum Bayar", tone: "grey" },
+  WAITING_VERIFICATION: { text: "Menunggu Dicek", tone: "amber" },
   PAID: { text: "Lunas", tone: "green" },
+  REJECTED: { text: "Ditolak", tone: "red" },
   FAILED: { text: "Gagal", tone: "red" },
   EXPIRED: { text: "Kadaluarsa", tone: "grey" },
   CANCELLED: { text: "Dibatalkan", tone: "grey" },
