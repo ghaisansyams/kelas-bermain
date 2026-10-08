@@ -40,7 +40,7 @@ export const mainNav: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/event", label: "Event" },
   { href: "/update", label: "Update" },
-  { href: "/kegiatan", label: "Berita" },
+  { href: "/kegiatan", label: "Kegiatan" },
   { href: "/galeri", label: "Galeri" },
 ];
 
