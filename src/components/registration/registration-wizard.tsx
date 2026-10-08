@@ -6,7 +6,9 @@ import {
   AlertTriangle,
   ArrowRight,
   Baby,
+  CircleCheckBig,
   Loader2,
+  MessageCircle,
   Pencil,
   Plus,
   Trash2,
@@ -18,7 +20,7 @@ import { Checkbox, Field, Select, TextInput } from "@/components/forms/field";
 import { PricingSummary } from "@/components/registration/pricing-summary";
 import { StepProgress, type WizardStep } from "@/components/registration/steps";
 import { RegistrationReceipt } from "@/components/registration/receipt";
-import { Button } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
 import {
   SELECTABLE_SOURCES,
   sourceLabel,
@@ -32,6 +34,14 @@ import {
 } from "@/lib/services/registration";
 import { calculateRegistrationPrice, type PricingConfig, type VoucherDefinition } from "@/lib/pricing";
 import { lookupVoucher, redeemVoucher } from "@/lib/services/voucher";
+import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
+import { formatRupiah } from "@/lib/utils/format";
+import {
+  clearDraft,
+  draftHasContent,
+  loadDraft,
+  saveDraft,
+} from "@/lib/registration/draft-storage";
 import type { EventView } from "@/lib/types";
 import { formatAge } from "@/lib/utils/age";
 import { cn } from "@/lib/utils/cn";
@@ -134,6 +144,65 @@ export function RegistrationWizard({
     // their data stays, the rest (if any) is dropped along with the mode.
     if (next === "PERSONAL") setGroups((current) => current.slice(0, 1));
   }
+
+  // Restore anything typed before a refresh. Runs once, and only while the
+  // parent is still filling the form — never after a registration exists.
+  const [restored, setRestored] = useState(false);
+  const [pendingVoucher, setPendingVoucher] = useState<string | null>(null);
+  useEffect(() => {
+    const draft = loadDraft(event.id);
+    if (!draft || !draftHasContent(draft)) return;
+
+    setModeState(draft.mode);
+    setGroups(
+      draft.groups.map((group) => ({
+        companion: group.companion,
+        companionErrors: {},
+        children: group.children,
+        childErrors: group.children.map(() => ({})),
+      })),
+    );
+    setHeardFrom(draft.heardFrom);
+    setAffiliateCode(draft.affiliateCode);
+    if (draft.voucherCode) setPendingVoucher(draft.voucherCode);
+    setStepKey(draft.stepKey);
+    setRestored(true);
+    // Intentionally only on mount: a later run would fight the parent's typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save on every change, but only before submission. Debounced so a fast
+  // typist is not writing to storage on each keystroke.
+  useEffect(() => {
+    if (batch) return;
+    if (stepKey !== "participants" && stepKey !== "confirm") return;
+
+    const timer = setTimeout(() => {
+      saveDraft(event.id, {
+        mode,
+        groups: groups.map((group) => ({
+          companion: group.companion,
+          children: group.children,
+        })),
+        heardFrom,
+        affiliateCode,
+        voucherCode: appliedVoucher?.code ?? "",
+        stepKey,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [event.id, mode, groups, heardFrom, affiliateCode, appliedVoucher, stepKey, batch]);
+
+  // A restored voucher is checked again rather than trusted: it may have
+  // expired, run out, or no longer match the number of children.
+  useEffect(() => {
+    if (!pendingVoucher) return;
+    setPendingVoucher(null);
+    void applyVoucher(pendingVoucher);
+    // applyVoucher reads the freshly restored group count, which this render
+    // already has.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingVoucher]);
 
   const [affiliateMatch, setAffiliateMatch] = useState<AffiliateLookup | null>(null);
   useEffect(() => {
@@ -381,6 +450,9 @@ export function RegistrationWizard({
       );
     }
 
+    // The registration exists now; a leftover draft would re-offer data the
+    // parent has already submitted.
+    clearDraft(event.id);
     setBatch(result.batch);
     setStepKey(isFree || isThirdParty ? "done" : "payment");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -421,9 +493,44 @@ export function RegistrationWizard({
             childName={groups[0]?.children[0]?.fullName}
           />
 
+          {/* The team works in WhatsApp, so that is where a parent is sent
+              next. The link carries their registration number, and the page
+              it points back to survives closing the tab. */}
+          <div className="space-y-3 rounded-card border border-brand/25 bg-brand-soft/35 p-5">
+            <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
+              <MessageCircle className="size-4 text-brand" aria-hidden />
+              Lanjutkan lewat WhatsApp
+            </h3>
+            <p className="text-sm leading-relaxed text-ink-soft">
+              Tim kami akan membalas dengan tautan halaman pembayaranmu. Simpan tautan itu —
+              lewat situ kamu mengirim bukti transfer dan memantau statusnya.
+            </p>
+            <a
+              href={registrationWhatsappUrl({
+                registrationNumber: lead.registrationNumber,
+                companionName: groups[0]?.companion.fullName || "Orang tua",
+                childrenCount: totalChildren,
+                eventName: event.title,
+                formattedTotal: formatRupiah(batch.totalAmount),
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setStepKey("done")}
+              className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
+            >
+              <MessageCircle className="size-4" aria-hidden />
+              Lanjut ke Pembayaran
+            </a>
+          </div>
+
           <div className="flex justify-end border-t border-line pt-5">
-            <Button size="lg" onClick={() => setStepKey("done")} className="w-full sm:w-auto">
-              Sudah Transfer, Lanjutkan
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setStepKey("done")}
+              className="w-full sm:w-auto"
+            >
+              Lanjut tanpa WhatsApp
               <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
@@ -435,6 +542,44 @@ export function RegistrationWizard({
   return (
     <div className="space-y-6">
       <StepProgress steps={steps} current={currentIndex} />
+
+      {/* Say so when data came back, rather than letting a parent wonder why
+          fields are already filled on what looks like a fresh page. */}
+      {restored ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pine/25 bg-pine-soft/50 p-4">
+          <p className="flex items-start gap-2 text-sm font-medium text-ink">
+            <CircleCheckBig className="mt-0.5 size-4 shrink-0 text-pine" aria-hidden />
+            Data pendaftaran Anda sebelumnya masih tersimpan.
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setRestored(false)}
+              className="text-xs font-bold text-pine underline-offset-2 hover:underline"
+            >
+              Lanjutkan
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearDraft(event.id);
+                setGroups([emptyGroup()]);
+                setModeState("PERSONAL");
+                setHeardFrom("");
+                setAffiliateCode("");
+                setAppliedVoucher(null);
+                setVoucherError(null);
+                setConsent(false);
+                setStepKey("participants");
+                setRestored(false);
+              }}
+              className="text-xs font-bold text-muted underline-offset-2 hover:text-brand hover:underline"
+            >
+              Mulai Baru
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {formError ? (
         <p
@@ -919,7 +1064,7 @@ export function RegistrationWizard({
               ) : isFree ? (
                 "Daftar Sekarang"
               ) : (
-                "Konfirmasi & Lanjut Pembayaran"
+                "Lanjut ke Pembayaran"
               )}
             </Button>
           </div>
