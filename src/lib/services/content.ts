@@ -1,5 +1,7 @@
 import { activities } from "@/data/activities";
 import { events as catalogueEvents } from "@/data/events";
+import { getCmsGallery, getCmsTestimonials } from "@/lib/services/cms-content";
+import { getGalleryDriveSettings } from "@/lib/services/gallery-settings";
 import { getSupabase } from "@/lib/supabase/client";
 import { rowToEventRecord, type EventRow } from "./event-mapper";
 import { galleryDrive, galleryFeatured, galleryItems } from "@/data/gallery";
@@ -179,6 +181,8 @@ export async function getRelatedActivities(
 }
 
 export async function getGalleryItems(): Promise<GalleryItem[]> {
+  const fromCms = await getCmsGallery();
+  if (fromCms) return fromCms;
   return [...galleryItems].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
@@ -189,8 +193,32 @@ export async function getGalleryFeatured(): Promise<typeof galleryFeatured> {
 }
 
 /** The Drive folder the gallery page links to, in place of a photo grid. */
-export async function getGalleryDrive(): Promise<typeof galleryDrive> {
-  return galleryDrive;
+/**
+ * The Drive folder shown on /galeri.
+ *
+ * CMS first, shipped copy as fallback — so changing the folder is a CMS edit,
+ * not a code change, and an unreachable CMS still shows a working link.
+ */
+export interface GalleryDriveView {
+  title: string;
+  description: string;
+  url: string;
+  updatedAt: string;
+  contents: readonly string[];
+  /** Button text, so "Buka Google Drive" is not frozen in the code. */
+  buttonLabel?: string;
+}
+
+export async function getGalleryDrive(): Promise<GalleryDriveView> {
+  const settings = await getGalleryDriveSettings();
+  return {
+    ...galleryDrive,
+    title: settings.title,
+    description: settings.description,
+    url: settings.url,
+    buttonLabel: settings.buttonLabel,
+    updatedAt: settings.updatedAt,
+  };
 }
 
 export async function getGalleryByIds(ids: readonly string[]): Promise<GalleryItem[]> {
@@ -210,6 +238,8 @@ export async function getSpeakers(): Promise<Speaker[]> {
 }
 
 export async function getTestimonials(): Promise<Testimonial[]> {
+  const fromCms = await getCmsTestimonials();
+  if (fromCms) return fromCms;
   return testimonials;
 }
 

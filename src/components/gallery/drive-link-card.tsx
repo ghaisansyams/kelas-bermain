@@ -16,9 +16,11 @@ export function DriveLinkCard({
     url: string;
     updatedAt: string;
     contents: readonly string[];
+    buttonLabel?: string;
   };
 }) {
   const configured = drive.url.trim().length > 0;
+  const buttonLabel = drive.buttonLabel?.trim() || "Buka Google Drive";
 
   return (
     <div className="overflow-hidden rounded-card border border-line bg-surface shadow-soft">
@@ -56,7 +58,7 @@ export function DriveLinkCard({
                 className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
               >
                 <FolderOpen className="size-4" aria-hidden />
-                Buka Google Drive
+                {buttonLabel}
                 <ExternalLink className="size-3.5" aria-hidden />
               </a>
             ) : (
@@ -65,7 +67,7 @@ export function DriveLinkCard({
                 className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-pill bg-canvas-deep px-7 text-base font-semibold text-muted sm:w-auto"
               >
                 <FolderOpen className="size-4" aria-hidden />
-                Buka Google Drive
+                {buttonLabel}
               </span>
             )}
 
