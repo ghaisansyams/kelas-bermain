@@ -4,15 +4,15 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
   ALLOWED_MIME,
   MAX_FILE_BYTES,
-  MEDIA_BUCKET,
+  MAX_VIDEO_BYTES,
   MEDIA_FOLDERS,
+  MEDIA_FOLDER_LABEL,
   formatFileSize,
-  safeFileName,
 } from "@/lib/admin/media";
+import { uploadMediaFile } from "@/lib/admin/upload";
 
 /**
  * Uploads straight to Supabase Storage with the admin's own session — the
@@ -33,47 +33,11 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
     setDone(null);
     setBusy(true);
 
-    const supabase = createSupabaseBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     let uploaded = 0;
     for (const file of Array.from(files)) {
-      if (!ALLOWED_MIME.includes(file.type)) {
-        setError(`"${file.name}" bukan gambar yang didukung (JPG, PNG, WEBP, AVIF, GIF).`);
-        continue;
-      }
-      if (file.size > MAX_FILE_BYTES) {
-        setError(
-          `"${file.name}" terlalu besar (${formatFileSize(file.size)}). Maksimal ${formatFileSize(MAX_FILE_BYTES)}.`,
-        );
-        continue;
-      }
-
-      const path = `${folder}/${safeFileName(file.name)}`;
-      const { error: uploadError } = await supabase.storage
-        .from(MEDIA_BUCKET)
-        .upload(path, file, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) {
-        setError(`Upload "${file.name}" gagal. ${uploadError.message}`);
-        continue;
-      }
-
-      const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
-      const { error: insertError } = await supabase.from("media").insert({
-        file_name: file.name,
-        storage_path: path,
-        public_url: urlData.publicUrl,
-        mime_type: file.type,
-        file_size: file.size,
-        folder,
-        created_by: user?.id ?? null,
-      });
-
-      if (insertError) {
-        setError(`Data "${file.name}" gagal disimpan. ${insertError.message}`);
+      const result = await uploadMediaFile(file, folder);
+      if (!result.ok) {
+        setError(result.error);
         continue;
       }
       uploaded += 1;
@@ -82,7 +46,7 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
     setBusy(false);
     if (inputRef.current) inputRef.current.value = "";
     if (uploaded > 0) {
-      setDone(`${uploaded} gambar berhasil diunggah.`);
+      setDone(`${uploaded} berkas berhasil diunggah.`);
       onUploaded?.();
       router.refresh();
     }
@@ -92,7 +56,7 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
-          Folder
+          Kategori
           <select
             value={folder}
             onChange={(event) => setFolder(event.target.value)}
@@ -101,7 +65,7 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
           >
             {MEDIA_FOLDERS.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {MEDIA_FOLDER_LABEL[item] ?? item}
               </option>
             ))}
           </select>
@@ -138,7 +102,9 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
       </div>
 
       <p className="text-xs text-muted">
-        JPG, PNG, WEBP, AVIF, atau GIF. Maksimal {formatFileSize(MAX_FILE_BYTES)} per file.
+        Gambar JPG, PNG, WEBP, AVIF, GIF — maksimal {formatFileSize(MAX_FILE_BYTES)}. Video MP4
+        atau WEBM — maksimal {formatFileSize(MAX_VIDEO_BYTES)}. Video panjang sebaiknya diunggah
+        ke YouTube saja, karena penyimpanan Supabase terbatas 1 GB.
       </p>
 
       {error ? (

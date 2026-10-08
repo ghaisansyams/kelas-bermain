@@ -1,17 +1,31 @@
 export const MEDIA_BUCKET = "website";
 
 export const MEDIA_FOLDERS = [
+  "general",
+  "logo",
+  "hero",
   "home",
   "events",
-  "updates",
-  "news",
   "gallery",
-  "general",
+  "updates",
+  "certificate",
 ] as const;
 
 export type MediaFolder = (typeof MEDIA_FOLDERS)[number];
 
-export const ALLOWED_MIME = [
+/** Plain-language names for the admin; the stored value stays the folder key. */
+export const MEDIA_FOLDER_LABEL: Record<string, string> = {
+  general: "Umum",
+  logo: "Logo",
+  hero: "Hero",
+  home: "Halaman Depan",
+  events: "Event",
+  gallery: "Galeri",
+  updates: "Update",
+  certificate: "Sertifikat",
+};
+
+export const ALLOWED_IMAGE_MIME = [
   "image/jpeg",
   "image/png",
   "image/webp",
@@ -19,7 +33,31 @@ export const ALLOWED_MIME = [
   "image/gif",
 ];
 
+/**
+ * Video is allowed, but only the two formats every browser plays natively.
+ * MOV and AVI are rejected on purpose — they upload fine and then refuse to
+ * play for half the visitors, which is worse than refusing them here.
+ */
+export const ALLOWED_VIDEO_MIME = ["video/mp4", "video/webm"];
+
+export const ALLOWED_MIME = [...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME];
+
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Video gets its own, larger cap. Supabase's free tier gives 1 GB of
+ * storage in total, so a handful of 50 MB clips is already a meaningful
+ * share of it — keep videos short, or host them on YouTube instead.
+ */
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
+export function isVideo(mimeType: string): boolean {
+  return ALLOWED_VIDEO_MIME.includes(mimeType);
+}
+
+export function maxBytesFor(mimeType: string): number {
+  return isVideo(mimeType) ? MAX_VIDEO_BYTES : MAX_FILE_BYTES;
+}
 
 export interface MediaItem {
   id: string;

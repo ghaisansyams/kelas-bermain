@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImageIcon, Loader2, X } from "lucide-react";
+import { ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { MediaItem } from "@/lib/admin/media";
+import { ALLOWED_MIME, type MediaItem } from "@/lib/admin/media";
+import { uploadMediaFile } from "@/lib/admin/upload";
 
 /**
  * Picks an image URL from the media library. Reads `media` with the admin's
@@ -15,14 +16,45 @@ export function MediaPicker({
   value,
   onChange,
   label = "Pilih dari Media",
+  folder = "general",
 }: {
   value: string;
   onChange: (url: string, altText: string) => void;
   label?: string;
+  /** Media Library category new uploads are filed under. */
+  folder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<MediaItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Uploads straight from this field. The old flow made the admin leave the
+   * form, go to Media Library, upload, come back, then pick — four steps for
+   * one picture. The file still lands in the Media Library, so nothing is
+   * lost by skipping the detour.
+   */
+  async function handleUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setUploading(true);
+    const result = await uploadMediaFile(file, folder);
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    // Alt text defaults to the file name so an image is never left unlabelled.
+    onChange(result.url, result.fileName);
+    // The library listing is now stale; reload it next time it opens.
+    setItems(null);
+  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -56,14 +88,39 @@ export function MediaPicker({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ALLOWED_MIME.join(",")}
+          onChange={(event) => void handleUpload(event.target.files)}
+          disabled={uploading}
+          className="hidden"
+        />
+
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-brand px-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+        >
+          {uploading ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <Upload className="size-4" aria-hidden />
+          )}
+          {uploading ? "Mengunggah…" : "Unggah dari Laptop"}
+        </button>
+
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-pill border border-line px-3.5 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand"
+          disabled={uploading}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-pill border border-line px-3.5 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:opacity-50"
         >
           <ImageIcon className="size-4" aria-hidden />
           {label}
         </button>
+
         {value ? (
           <button
             type="button"
@@ -74,6 +131,12 @@ export function MediaPicker({
           </button>
         ) : null}
       </div>
+
+      {error ? (
+        <p role="alert" className="mt-1.5 text-xs font-medium text-brand-ink">
+          {error}
+        </p>
+      ) : null}
 
       {open
         ? createPortal(
