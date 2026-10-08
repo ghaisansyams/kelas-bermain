@@ -52,3 +52,26 @@ export async function refundPaymentAction(formData: FormData) {
   revalidatePath("/admin");
   redirect("/admin/payments?status=refunded");
 }
+
+/**
+ * Rejects a proof of transfer. Never a silent revert to PENDING: the reason is
+ * required so the registrant is told what to fix, and it shows up on
+ * /cek-tiket.
+ */
+export async function rejectPaymentAction(formData: FormData) {
+  await requireAdmin();
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!paymentId || !reason) redirect("/admin/payments?status=error");
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("admin_reject_payment", {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+
+  if (error) redirect("/admin/payments?status=error");
+
+  revalidatePath("/admin/payments");
+  redirect("/admin/payments?status=rejected");
+}
