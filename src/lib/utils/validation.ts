@@ -197,9 +197,12 @@ export function validateCheckIn(
   if (values.registrationNumber.trim().length < 6) {
     errors.registrationNumber = "Masukkan nomor pendaftaran, contoh KB-REG-2026-00001.";
   }
+  // Contact is optional. Without it the lookup returns payment status only,
+  // never a name — registration numbers are sequential, so anyone could walk
+  // them and read other families' details otherwise.
   const contact = values.contact.trim();
-  if (!isEmail(contact) && !isPhone(contact)) {
-    errors.contact = "Masukkan email atau nomor WhatsApp yang dipakai saat mendaftar.";
+  if (contact && !isEmail(contact) && !isPhone(contact)) {
+    errors.contact = "Kalau diisi, gunakan email atau nomor WhatsApp yang valid.";
   }
   if (!values.confirmed) {
     errors.confirmed = "Konfirmasi kehadiran terlebih dahulu.";
@@ -223,9 +226,12 @@ export function validateTicketLookup(
   if (values.registrationNumber.trim().length < 6) {
     errors.registrationNumber = "Masukkan nomor pendaftaran, contoh KB-REG-2026-00001.";
   }
+  // Contact is optional. Without it the lookup returns payment status only,
+  // never a name — registration numbers are sequential, so anyone could walk
+  // them and read other families' details otherwise.
   const contact = values.contact.trim();
-  if (!isEmail(contact) && !isPhone(contact)) {
-    errors.contact = "Masukkan email atau nomor WhatsApp yang dipakai saat mendaftar.";
+  if (contact && !isEmail(contact) && !isPhone(contact)) {
+    errors.contact = "Kalau diisi, gunakan email atau nomor WhatsApp yang valid.";
   }
   return errors;
 }
