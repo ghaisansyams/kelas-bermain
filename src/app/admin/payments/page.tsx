@@ -135,9 +135,9 @@ export default async function AdminPaymentsPage({
                 <Th>Event</Th>
                 <Th>Nominal</Th>
                 <Th>Metode</Th>
-                <Th>Status</Th>
+                <Th className="w-[10rem]">Status</Th>
                 <Th>Dibuat</Th>
-                <Th>Aksi</Th>
+                <Th className="w-[11rem]">Aksi</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -157,7 +157,7 @@ export default async function AdminPaymentsPage({
                   ];
                   return (
                     <tr key={row.id}>
-                      <Td className="font-mono text-xs font-bold text-ink">
+                      <Td className="whitespace-nowrap font-mono text-xs font-bold text-ink">
                         {row.invoice_number ?? row.payment_number}
                       </Td>
                       <Td className="font-semibold text-ink">

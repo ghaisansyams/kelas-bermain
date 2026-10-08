@@ -58,7 +58,7 @@ export default async function AdminAffiliatesPage({
   const supabase = await createSupabaseServerClient();
 
   const [{ data, error }, statsRes] = await Promise.all([
-    supabase.from("affiliates").select("*").order("applied_at", { ascending: false }),
+    supabase.from("affiliates").select("*").order("applied_at", { ascending: false }).limit(200),
     supabase.rpc("admin_affiliate_stats"),
   ]);
 

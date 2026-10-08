@@ -26,6 +26,9 @@ export interface EventReportRow {
 
 export interface ReportSummary {
   range: ReportRange;
+  /** False when a source table could not be read, so zeros are not mistaken for "no activity". */
+  complete: boolean;
+  missing: string[];
   registrations: number;
   paidRegistrations: number;
   pendingRegistrations: number;
@@ -101,6 +104,11 @@ export async function buildReport(
       .lte("occurred_at", until),
   ]);
 
+  const missing: string[] = [];
+  if (registrationsRes.error) missing.push("registrations");
+  if (paymentsRes.error) missing.push("payments");
+  if (transactionsRes.error) missing.push("financial_transactions");
+
   const registrations = (registrationsRes.data ?? []) as unknown as RegistrationRow[];
   const payments = (paymentsRes.data ?? []) as unknown as PaymentRow[];
   const transactions = (transactionsRes.data ?? []) as unknown as TransactionRow[];
@@ -165,6 +173,8 @@ export async function buildReport(
 
   return {
     range,
+    complete: missing.length === 0,
+    missing,
     registrations: active.length,
     paidRegistrations,
     pendingRegistrations,

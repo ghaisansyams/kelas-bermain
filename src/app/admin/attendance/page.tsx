@@ -4,6 +4,7 @@ import {
   ATTENDANCE_LABEL,
   EmptyRow,
   FilterBar,
+  RefCell,
   PAYMENT_LABEL,
   SelectField,
   StatusBadge,
@@ -48,6 +49,7 @@ export default async function AdminAttendancePage({
         .eq("event_id", selected)
         .neq("status", "CANCELLED")
         .order("registration_number")
+        .limit(500)
     : { data: [], error: null };
 
   const rows = (data ?? []) as unknown as AttendanceRow[];
@@ -99,8 +101,8 @@ export default async function AdminAttendancePage({
               <Th>Pendamping</Th>
               <Th>Pembayaran</Th>
               <Th>Kehadiran</Th>
-              <Th>Check-in</Th>
-              <Th>Aksi</Th>
+              <Th className="w-[11rem]">Check-in</Th>
+              <Th className="w-[13rem]">Aksi</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -119,7 +121,9 @@ export default async function AdminAttendancePage({
                 const record = row.attendance_records?.[0];
                 return (
                   <tr key={row.id}>
-                    <Td className="font-mono text-xs font-bold text-ink">{row.registration_number}</Td>
+                    <Td>
+                      <RefCell>{row.registration_number}</RefCell>
+                    </Td>
                     <Td className="font-semibold text-ink">{row.children?.full_name ?? "—"}</Td>
                     <Td>{row.customers?.full_name ?? "—"}</Td>
                     <Td>
@@ -134,7 +138,7 @@ export default async function AdminAttendancePage({
                         : "—"}
                     </Td>
                     <Td>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5">
                         {row.attendance_status !== "PRESENT" ? (
                           <form action={setAttendanceAction}>
                             <input type="hidden" name="registrationId" value={row.id} />
@@ -142,7 +146,7 @@ export default async function AdminAttendancePage({
                             <input type="hidden" name="status" value="PRESENT" />
                             <button
                               type="submit"
-                              className="inline-flex min-h-9 items-center rounded-pill bg-brand px-3 text-xs font-bold text-white"
+                              className="inline-flex min-h-9 items-center whitespace-nowrap rounded-pill bg-brand px-3.5 text-xs font-bold text-white transition-colors hover:bg-brand-ink"
                             >
                               Hadir
                             </button>
@@ -155,7 +159,7 @@ export default async function AdminAttendancePage({
                             <input type="hidden" name="status" value="ABSENT" />
                             <button
                               type="submit"
-                              className="inline-flex min-h-9 items-center rounded-pill border border-line px-3 text-xs font-semibold text-ink-soft hover:border-brand/40 hover:text-brand"
+                              className="inline-flex min-h-9 items-center whitespace-nowrap rounded-pill border border-line px-3.5 text-xs font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
                             >
                               Tidak hadir
                             </button>

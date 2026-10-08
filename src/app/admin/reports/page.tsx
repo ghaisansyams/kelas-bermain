@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Download } from "lucide-react";
-import { Card, PageHeader, StatCard } from "@/components/admin/admin-ui";
+import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { EmptyRow, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
@@ -43,6 +43,13 @@ export default async function AdminReportsPage({
           </Link>
         }
       />
+
+      {!report.complete ? (
+        <Notice tone="error">
+          Angka di bawah belum lengkap: tabel {report.missing.join(", ")} tidak terbaca. Jalankan
+          file SQL yang belum dijalankan sebelum memakai laporan ini sebagai dasar keputusan.
+        </Notice>
+      ) : null}
 
       <Card>
         <form className="flex flex-wrap items-end gap-3" action="/admin/reports">

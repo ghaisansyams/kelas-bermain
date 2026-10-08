@@ -76,7 +76,7 @@ export default async function AdminVouchersPage({
   const supabase = await createSupabaseServerClient();
 
   const [{ data, error }, events] = await Promise.all([
-    supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
+    supabase.from("vouchers").select("*").order("created_at", { ascending: false }).limit(200),
     getEvents(),
   ]);
 

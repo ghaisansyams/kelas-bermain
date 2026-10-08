@@ -5,8 +5,15 @@ import { cn } from "@/lib/utils/cn";
 export function TableShell({ children }: { children: ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-soft">
-      <table className="w-full min-w-[48rem] text-left text-sm">{children}</table>
+      <table className="w-full min-w-[58rem] text-left text-sm">{children}</table>
     </div>
+  );
+}
+
+/** Monospaced reference numbers that must never wrap mid-code. */
+export function RefCell({ children }: { children: ReactNode }) {
+  return (
+    <span className="whitespace-nowrap font-mono text-xs font-bold text-ink">{children}</span>
   );
 }
 
@@ -19,7 +26,7 @@ export function Th({ children, className }: { children: ReactNode; className?: s
 }
 
 export function Td({ children, className }: { children: ReactNode; className?: string }) {
-  return <td className={cn("px-4 py-3 align-top text-ink-soft", className)}>{children}</td>;
+  return <td className={cn("px-4 py-3.5 align-middle text-ink-soft", className)}>{children}</td>;
 }
 
 const BADGE_TONES: Record<string, string> = {
@@ -33,7 +40,7 @@ export function StatusBadge({ tone, children }: { tone: keyof typeof BADGE_TONES
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-pill px-2.5 py-1 text-xs font-bold ring-1 ring-inset",
+        "inline-flex items-center whitespace-nowrap rounded-pill px-2.5 py-1 text-xs font-bold ring-1 ring-inset",
         BADGE_TONES[tone] ?? BADGE_TONES.grey,
       )}
     >
@@ -44,13 +51,13 @@ export function StatusBadge({ tone, children }: { tone: keyof typeof BADGE_TONES
 
 /** Indonesian labels for the statuses stored in English. */
 export const PAYMENT_LABEL: Record<string, { text: string; tone: string }> = {
-  PENDING: { text: "Menunggu Pembayaran", tone: "amber" },
+  PENDING: { text: "Belum Bayar", tone: "amber" },
   PAID: { text: "Lunas", tone: "green" },
   FAILED: { text: "Gagal", tone: "red" },
   EXPIRED: { text: "Kadaluarsa", tone: "grey" },
   CANCELLED: { text: "Dibatalkan", tone: "grey" },
   REFUNDED: { text: "Direfund", tone: "red" },
-  NOT_REQUIRED: { text: "Tidak Diperlukan", tone: "grey" },
+  NOT_REQUIRED: { text: "Tanpa Bayar", tone: "grey" },
 };
 
 export const REGISTRATION_LABEL: Record<string, { text: string; tone: string }> = {
@@ -61,7 +68,7 @@ export const REGISTRATION_LABEL: Record<string, { text: string; tone: string }> 
 };
 
 export const ATTENDANCE_LABEL: Record<string, { text: string; tone: string }> = {
-  NOT_ATTENDED: { text: "Belum Check-in", tone: "grey" },
+  NOT_ATTENDED: { text: "Belum Hadir", tone: "grey" },
   PRESENT: { text: "Hadir", tone: "green" },
   ABSENT: { text: "Tidak Hadir", tone: "red" },
 };

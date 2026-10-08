@@ -130,7 +130,7 @@ export default async function AdminRegistrationsPage({
                   const pay = PAYMENT_LABEL[row.payment_status] ?? { text: row.payment_status, tone: "grey" };
                   return (
                     <tr key={row.id}>
-                      <Td className="font-mono text-xs font-bold text-ink">{row.registration_number}</Td>
+                      <Td className="whitespace-nowrap font-mono text-xs font-bold text-ink">{row.registration_number}</Td>
                       <Td className="font-semibold text-ink">{row.children?.full_name ?? "—"}</Td>
                       <Td>
                         {row.customers ? (
