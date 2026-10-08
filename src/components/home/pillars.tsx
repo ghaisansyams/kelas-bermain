@@ -8,7 +8,8 @@ import {
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { pillars, type Pillar } from "@/data/site";
+import type { Pillar } from "@/data/site";
+import type { PillarItem } from "@/lib/services/cms-website";
 
 const icons: Record<Pillar["icon"], LucideIcon> = {
   compass: Compass,
@@ -26,24 +27,36 @@ const accents: Record<Pillar["accent"], string> = {
   sky: "bg-sky-soft text-sky",
 };
 
-export function Pillars() {
+/** Items and heading both come from the CMS; the layout stays in code. */
+export function Pillars({
+  items,
+  heading,
+}: {
+  items: PillarItem[];
+  heading: { eyebrow: string; title: string; description: string };
+}) {
+  if (items.length === 0) return null;
+
   return (
     <section className="py-16 sm:py-20">
       <Container>
         <SectionHeading
-          eyebrow="Yang diasah"
-          title="Empat keterampilan yang diasah di setiap kegiatan"
-          description="Temanya berganti setiap pekan — memasak, bertani, mengenal profesi. Tapi empat hal ini selalu jadi tujuannya."
+          eyebrow={heading.eyebrow}
+          title={heading.title}
+          description={heading.description}
         />
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {pillars.map((pillar, index) => {
-            const Icon = icons[pillar.icon];
+          {items.map((pillar, index) => {
+            // The CMS stores a free-text icon name, so an unknown value
+            // falls back rather than rendering nothing.
+            const Icon = icons[pillar.icon as Pillar["icon"]] ?? Sparkles;
+            const accent = accents[pillar.accent as Pillar["accent"]] ?? accents.brand;
             return (
               <Reveal key={pillar.title} delay={index * 70}>
                 <article className="group h-full rounded-card border border-line bg-surface p-6 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-brand/20 hover:shadow-lift">
                   <span
-                    className={`inline-flex size-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105 ${accents[pillar.accent]}`}
+                    className={`inline-flex size-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105 ${accent}`}
                   >
                     <Icon className="size-6" aria-hidden />
                   </span>

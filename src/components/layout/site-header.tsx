@@ -15,7 +15,14 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SiteHeader({ navItems }: { navItems: NavItem[] }) {
+export function SiteHeader({
+  navItems,
+  identity,
+}: {
+  navItems: NavItem[];
+  /** Name and logo from the CMS; absent means the built-in mark is used. */
+  identity?: { name: string; logoUrl: string };
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -71,7 +78,7 @@ export function SiteHeader({ navItems }: { navItems: NavItem[] }) {
 
       <Container className="flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
         <Link href="/" aria-label="Kelas Bermain — beranda" className="shrink-0">
-          <Logo />
+          <Logo imageUrl={identity?.logoUrl} name={identity?.name} />
         </Link>
 
         <nav aria-label="Navigasi utama" className="hidden md:block">

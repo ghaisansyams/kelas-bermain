@@ -21,17 +21,36 @@ const socialIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   facebook: FacebookIcon,
 };
 
-export function SiteFooter() {
+export function SiteFooter({
+  identity,
+  content,
+}: {
+  identity?: {
+    name: string;
+    logoUrl: string;
+    description: string;
+    email: string;
+    whatsapp: string;
+    social: { label: string; href: string; icon: string }[];
+  };
+  content?: {
+    description: string;
+    contactTitle: string;
+    copyright: string;
+    showWhatsapp: boolean;
+  };
+}) {
   const year = new Date().getFullYear();
+  const email = identity?.email || siteConfig.email;
 
   return (
     <footer className="mt-24 border-t border-line bg-canvas-deep/60">
       <Container className="py-14 lg:py-16">
         <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-5 lg:col-span-4">
-            <Logo />
+            <Logo imageUrl={identity?.logoUrl} name={identity?.name} />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
-              {siteConfig.description}
+              {content?.description || identity?.description || siteConfig.description}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               {socialLinks.map((social) => {
@@ -91,15 +110,15 @@ export function SiteFooter() {
 
           <div className="md:col-span-12 lg:col-span-4">
             <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-ink">
-              Hubungi Kami
+              {content?.contactTitle || "Hubungi Kami"}
             </h2>
             <div className="mt-4 space-y-3 text-sm text-muted">
               <p>
                 <a
-                  href={`mailto:${siteConfig.email}`}
+                  href={`mailto:${email}`}
                   className="font-semibold text-ink transition-colors hover:text-brand"
                 >
-                  {siteConfig.email}
+                  {email}
                 </a>
               </p>
               <p className="leading-relaxed">
@@ -127,7 +146,8 @@ export function SiteFooter() {
 
         <div className="mt-12 flex flex-col gap-3 border-t border-line pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {year} {siteConfig.name}. Seluruh hak cipta dilindungi.
+            {content?.copyright ||
+              `© ${year} ${identity?.name || siteConfig.name}. Seluruh hak cipta dilindungi.`}
           </p>
           <p>Dibangun untuk komunitas belajar di Indonesia.</p>
         </div>

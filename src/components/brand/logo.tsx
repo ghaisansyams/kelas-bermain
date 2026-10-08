@@ -43,21 +43,42 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
+/**
+ * `imageUrl` comes from the CMS. When an admin uploads a logo it replaces the
+ * built-in mark everywhere; with no upload the drawn mark is used, so the site
+ * is never without a logo.
+ */
 export function Logo({
   className,
   markClassName,
   showWordmark = true,
+  imageUrl,
+  name,
 }: {
   className?: string;
   markClassName?: string;
   showWordmark?: boolean;
+  imageUrl?: string;
+  name?: string;
 }) {
+  const label = name ?? "Kelas Bermain";
+  const [first, ...rest] = label.split(" ");
+
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <LogoMark className={markClassName} />
-      {showWordmark ? (
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt={label}
+          className={cn("size-9 object-contain", markClassName)}
+        />
+      ) : (
+        <LogoMark className={markClassName} />
+      )}
+      {showWordmark && !imageUrl ? (
         <span className="text-[1.0625rem] leading-none font-extrabold tracking-tight text-ink">
-          Kelas <span className="text-accent font-semibold text-brand">Bermain</span>
+          {first} <span className="text-accent font-semibold text-brand">{rest.join(" ")}</span>
         </span>
       ) : null}
     </span>
