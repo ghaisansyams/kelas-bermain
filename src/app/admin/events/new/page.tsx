@@ -38,6 +38,8 @@ const EMPTY: EventFormValues = {
   certificateAvailable: false,
   youtubeUrl: "",
   videoTitle: "",
+  videoFileUrl: "",
+  videoThumbnail: "",
   featured: false,
   status: "DRAFT",
 };

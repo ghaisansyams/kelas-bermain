@@ -13,6 +13,32 @@ export function EventVideoCard({ video, className }: { video: EventVideo; classN
   const thumbnail = video.thumbnail ?? getYoutubeThumbnail(video.youtubeUrl);
   const title = video.title ?? "Video Kegiatan";
 
+  // An uploaded file plays inline with the browser's own controls. No
+  // autoplay and no sound until the visitor presses play.
+  if (video.fileUrl) {
+    return (
+      <div
+        className={`overflow-hidden rounded-card border border-line bg-surface shadow-soft ${className ?? ""}`}
+      >
+        <video
+          src={video.fileUrl}
+          poster={video.thumbnail || undefined}
+          controls
+          preload="metadata"
+          playsInline
+          className="aspect-video w-full bg-ink object-cover"
+        >
+          Browser kamu tidak bisa memutar video ini.
+        </video>
+        <div className="p-4">
+          <p className="text-sm font-extrabold text-ink">{title}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!video.youtubeUrl) return null;
+
   return (
     <div className={`overflow-hidden rounded-card border border-line bg-surface shadow-soft ${className ?? ""}`}>
       <YoutubeModal

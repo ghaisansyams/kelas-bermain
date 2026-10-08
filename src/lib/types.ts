@@ -123,9 +123,12 @@ export interface AboutEventContent {
  * video card, never an empty placeholder (see `EventVideoCard`).
  */
 export interface EventVideo {
+  /** Empty when the event uses an uploaded file instead. */
   youtubeUrl: string;
   title?: string;
   thumbnail?: string;
+  /** Media Library URL of an uploaded MP4/WEBM. Takes priority over YouTube. */
+  fileUrl?: string;
 }
 
 /** An event exactly as an admin would store it. */

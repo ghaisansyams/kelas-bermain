@@ -40,6 +40,8 @@ export interface EventFormValues {
   certificateAvailable: boolean;
   youtubeUrl: string;
   videoTitle: string;
+  videoFileUrl: string;
+  videoThumbnail: string;
   featured: boolean;
   status: string;
 }
@@ -59,6 +61,8 @@ export function EventForm({
   submitLabel: string;
 }) {
   const [cover, setCover] = useState({ src: initial.coverSrc, alt: initial.coverAlt });
+  const [videoFileUrl, setVideoFileUrl] = useState(initial.videoFileUrl);
+  const [videoThumbnail, setVideoThumbnail] = useState(initial.videoThumbnail);
 
   return (
     <form action={action} className="space-y-5">
@@ -115,6 +119,7 @@ export function EventForm({
               )}
             </div>
             <MediaPicker
+              folder="events"
               value={cover.src}
               onChange={(url, altText) =>
                 setCover((current) => ({ src: url, alt: altText || current.alt }))
@@ -225,6 +230,31 @@ export function EventForm({
           </Field>
           <Field label="Judul video" htmlFor="videoTitle">
             <TextInput id="videoTitle" name="videoTitle" defaultValue={initial.videoTitle} />
+          </Field>
+          <Field
+            label="Atau unggah berkas video"
+            htmlFor="videoFileUrl"
+            hint="MP4 atau WEBM, maksimal 50 MB. Kalau diisi, ini dipakai dan tautan YouTube diabaikan."
+          >
+            <MediaPicker
+              folder="events"
+              value={videoFileUrl}
+              onChange={(url) => setVideoFileUrl(url)}
+              label="Pilih video dari Media"
+            />
+            <input type="hidden" name="videoFileUrl" value={videoFileUrl} />
+            {videoFileUrl ? (
+              <p className="mt-1 truncate text-xs text-muted">{videoFileUrl}</p>
+            ) : null}
+          </Field>
+          <Field label="Gambar sampul video" htmlFor="videoThumbnail">
+            <MediaPicker
+              folder="events"
+              value={videoThumbnail}
+              onChange={(url) => setVideoThumbnail(url)}
+              label="Pilih sampul"
+            />
+            <input type="hidden" name="videoThumbnail" value={videoThumbnail} />
           </Field>
         </div>
       </Card>

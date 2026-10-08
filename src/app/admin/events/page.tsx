@@ -33,7 +33,7 @@ export default async function AdminEventsPage({
   const { data, error } = await supabase
     .from("events")
     .select("id, slug, title, category, start_date, capacity, registered, status, featured")
-    .order("start_date", { ascending: false });
+    .order("start_date", { ascending: false }).limit(200);
 
   const rows = (data ?? []) as {
     id: string;

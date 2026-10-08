@@ -77,6 +77,8 @@ export default async function EditEventPage({
     certificateAvailable: Boolean(row.certificate?.available),
     youtubeUrl: row.video?.youtubeUrl ?? "",
     videoTitle: row.video?.title ?? "",
+    videoFileUrl: row.video?.fileUrl ?? "",
+    videoThumbnail: row.video?.thumbnail ?? "",
     featured: row.featured,
     status: row.status,
   };

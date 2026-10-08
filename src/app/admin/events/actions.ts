@@ -72,6 +72,8 @@ function buildPayload(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim() || slugify(title);
   const priceRaw = Number(formData.get("price") ?? 0);
+  const youtubeUrl = String(formData.get("youtubeUrl") ?? "").trim();
+  const videoFileUrl = String(formData.get("videoFileUrl") ?? "").trim();
   const price = Number.isFinite(priceRaw) ? priceRaw : 0;
   const registrationType = price > 0 ? "PAID" : "FREE";
 
@@ -123,10 +125,13 @@ function buildPayload(formData: FormData) {
       template: "classic" as const,
       requiresAttendance: true,
     },
-    video: String(formData.get("youtubeUrl") ?? "").trim()
+    // An uploaded file wins over a YouTube link when both are filled in.
+    video: videoFileUrl || youtubeUrl
       ? {
-          youtubeUrl: String(formData.get("youtubeUrl") ?? "").trim(),
+          youtubeUrl,
+          fileUrl: videoFileUrl || undefined,
           title: String(formData.get("videoTitle") ?? "").trim() || undefined,
+          thumbnail: String(formData.get("videoThumbnail") ?? "").trim() || undefined,
         }
       : null,
     featured: formData.get("featured") === "on",
