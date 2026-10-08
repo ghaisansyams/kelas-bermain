@@ -80,6 +80,14 @@ export function Checkout({ accessToken }: { accessToken: string }) {
       <Row label="Pendamping" value={view.customerFullName} />
       <Row label="Anak" value={view.childFullName} />
       <Row label="Nomor Pendaftaran" value={view.registrationNumber} mono />
+      {/* Only exists once an admin has confirmed the transfer, so its
+          presence is itself the proof that the payment was verified. */}
+      {view.invoiceNumber ? (
+        <Row label="Nomor Invoice" value={view.invoiceNumber} mono />
+      ) : null}
+      {view.paidAt ? (
+        <Row label="Dibayar pada" value={formatDate(view.paidAt.slice(0, 10))} />
+      ) : null}
       <div className="flex items-baseline justify-between gap-4 bg-canvas-deep/40 px-4 py-3.5">
         <dt className="font-bold text-ink">Total</dt>
         <dd className="text-lg font-extrabold text-brand">{formatRupiah(view.amount)}</dd>
@@ -119,6 +127,12 @@ export function Checkout({ accessToken }: { accessToken: string }) {
             Pendaftaran {view.registrationNumber} sudah lunas. Sampai jumpa di{" "}
             {event?.location.venue}!
           </p>
+          {view.invoiceNumber ? (
+            <p className="mx-auto mt-3 inline-block rounded-xl border border-pine/20 bg-surface px-4 py-2 text-sm font-semibold text-ink">
+              Nomor invoice:{" "}
+              <span className="font-mono font-bold">{view.invoiceNumber}</span>
+            </p>
+          ) : null}
         </div>
         {summary}
         <div className="flex flex-col gap-2.5 sm:flex-row">

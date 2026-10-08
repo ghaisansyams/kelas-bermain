@@ -221,6 +221,9 @@ export interface RegistrationStatusView {
   customerWhatsapp: string;
   paymentId: string | null;
   paymentExpiresAt: string | null;
+  /** Issued when an admin confirms the payment; null until then. */
+  invoiceNumber: string | null;
+  paidAt: string | null;
 }
 
 /** Looked up by the opaque access_token from the URL — never by the sequential number. */
@@ -245,5 +248,10 @@ export async function getRegistrationByToken(
     customerWhatsapp: row.customer_whatsapp,
     paymentId: row.payment_id,
     paymentExpiresAt: row.payment_expires_at,
+    // Older deployments of get_registration_by_token do not return these
+    // two columns, so an undefined value degrades to "not issued yet"
+    // rather than breaking the status page.
+    invoiceNumber: row.invoice_number ?? null,
+    paidAt: row.paid_at ?? null,
   };
 }
