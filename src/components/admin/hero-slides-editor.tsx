@@ -76,6 +76,7 @@ export function HeroSlidesEditor({ initial }: { initial: HeroSlideDraft[] }) {
                 )}
               </div>
               <MediaPicker
+              folder="hero"
                 value={slide.image}
                 onChange={(url, altText) =>
                   update(index, { image: url, alt: altText || slide.alt })
