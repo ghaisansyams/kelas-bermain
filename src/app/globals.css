@@ -306,3 +306,87 @@
     min-width: 0 !important;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Photo marquee — the "Cara ikut" collage                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A fixed-height window with a doubled photo strip looping inside. The
+ * height is capped so eight portrait photos never make this column taller
+ * than the instructions beside it.
+ */
+.kb-marquee {
+  height: 30rem;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .kb-marquee {
+    height: 34rem;
+  }
+}
+
+.kb-marquee-track {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  will-change: transform;
+}
+
+/* Translating by exactly half the doubled strip lands the seam on an
+   identical frame, so the restart is invisible. The gap is accounted for
+   by nudging half a gap back. */
+@keyframes kb-marquee-up {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, calc(-50% - 0.5rem), 0);
+  }
+}
+
+@keyframes kb-marquee-down {
+  from {
+    transform: translate3d(0, calc(-50% - 0.5rem), 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.kb-up {
+  animation: kb-marquee-up var(--kb-duration, 48s) linear infinite;
+}
+
+.kb-down {
+  animation: kb-marquee-down var(--kb-duration, 48s) linear infinite;
+}
+
+/* Softens both ends so photos fade out rather than being cut by a hard
+   edge — the section reads as a window, not a crop. */
+.kb-marquee-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0, #000 6%, #000 94%, transparent 100%);
+}
+
+/* Pausing on hover lets someone actually look at a photo that caught
+   their eye instead of chasing it. */
+@media (hover: hover) {
+  .kb-marquee:hover .kb-marquee-track {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-up,
+  .kb-down {
+    animation: none;
+  }
+}
