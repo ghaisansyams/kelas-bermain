@@ -1,6 +1,7 @@
 import type { RawInstagramMedia } from "@/data/updates";
+import { getCmsUpdates } from "@/lib/services/cms-content";
 import type { UpdatePost } from "@/lib/types";
-import { mockInstagramSource, type UpdateSource } from "./update-source";
+import { resolveUpdateSource } from "./update-source";
 
 /**
  * Update service — the one read path the home page and the /update pages
@@ -10,7 +11,6 @@ import { mockInstagramSource, type UpdateSource } from "./update-source";
  * "Update belum dapat dimuat" state instead of crashing the page.
  */
 
-const source: UpdateSource = mockInstagramSource;
 
 export type UpdatesResult =
   | { ok: true; updates: UpdatePost[] }
@@ -35,7 +35,22 @@ function toUpdatePost(raw: RawInstagramMedia): UpdatePost {
 }
 
 async function loadPublished(): Promise<UpdatesResult> {
+  // CMS first: once the team publishes updates in the admin, those win over
+  // whatever the configured Instagram source returns.
   try {
+    const fromCms = await getCmsUpdates();
+    if (fromCms && fromCms.length > 0) {
+      return {
+        ok: true,
+        updates: [...fromCms].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+      };
+    }
+  } catch {
+    // Fall through to the configured source.
+  }
+
+  try {
+    const source = await resolveUpdateSource();
     const media = await source.fetchMedia();
     const updates = media
       .filter((item) => item.status === "PUBLISHED")
