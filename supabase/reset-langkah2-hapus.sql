@@ -28,11 +28,12 @@ update events  set registered  = 0;
 commit;
 
 
--- LANGKAH 3 — PERIKSA. Delapan angka pertama harus 0,
--- dua angka terakhir harus tetap 12 dan 14.
+-- LANGKAH 3 — PERIKSA. Delapan angka pertama harus 0. Dua angka terakhir
+-- harus sama persis dengan hasil langkah 1 — kalau berubah, ada yang ikut
+-- terhapus padahal tidak seharusnya.
 
 select
-  (select count(*) from customers)              as peserta,
+  (select count(*) from customers)              as pendamping,
   (select count(*) from children)               as anak,
   (select count(*) from registrations)          as registrasi,
   (select count(*) from payments)               as pembayaran,
@@ -40,5 +41,5 @@ select
   (select count(*) from certificates)           as sertifikat,
   (select count(*) from financial_transactions) as catatan_kas,
   (select count(*) from affiliates)             as affiliate,
-  (select count(*) from events)                 as event_harus_12,
-  (select count(*) from cms_sections)           as cms_harus_14;
+  (select count(*) from events)                 as event_jangan_berubah,
+  (select count(*) from cms_sections)           as cms_jangan_berubah;
