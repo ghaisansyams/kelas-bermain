@@ -12,13 +12,15 @@ import {
   type AffiliateFormValues,
   type FieldErrors,
 } from "@/lib/utils/validation";
+import { siteConfig } from "@/data/site";
 
 /**
- * Testing number for the affiliate team's WhatsApp — swap for the real
- * affiliate-program admin number (or siteConfig.whatsappE164) before this
- * goes live for real applicants.
+ * The affiliate team's WhatsApp. Uses the business number from site config
+ * rather than a personal one — this file is public, and a number hardcoded
+ * here ends up in the repository, the page source, and every search engine
+ * that indexes it.
  */
-const AFFILIATE_WHATSAPP_E164 = "6282211278857";
+const AFFILIATE_WHATSAPP_E164 = siteConfig.whatsappE164;
 
 /**
  * Public affiliate sign-up.
