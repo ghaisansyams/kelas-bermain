@@ -29,6 +29,7 @@ export function TemplateCanvas({
   selected,
   onSelect,
   onMove,
+  onResize,
 }: {
   config: TemplateConfig;
   backgroundUrl?: string;
@@ -38,15 +39,32 @@ export function TemplateCanvas({
   onSelect?: (key: FieldKey) => void;
   /** Receives new x/y as percentages of the page. */
   onMove?: (key: FieldKey, x: number, y: number) => void;
+  /** Receives a new font size, dragged from the corner handle. */
+  onResize?: (key: FieldKey, fontSize: number) => void;
 }) {
   const page = PAGE_SIZE[orientation];
   const boxRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<FieldKey | null>(null);
+  /** Font-size drag: where it started, and the size it started from. */
+  const resizing = useRef<{ key: FieldKey; startY: number; startSize: number } | null>(null);
 
   const handlePointerMove = useCallback(
     (event: PointerEvent) => {
-      const key = dragging.current;
+      // Resizing takes priority: the handle sits on top of the field, so a
+      // drag that started there must not also move it.
+      const resize = resizing.current;
       const box = boxRef.current;
+      if (resize && box && onResize) {
+        // Dragging down grows the text. One page-height of travel spans
+        // roughly the full usable size range, so the feel is the same at any
+        // preview width.
+        const delta = ((event.clientY - resize.startY) / box.getBoundingClientRect().height) * 120;
+        const next = Math.min(120, Math.max(6, Math.round(resize.startSize + delta)));
+        onResize(resize.key, next);
+        return;
+      }
+
+      const key = dragging.current;
       if (!key || !box || !onMove) return;
 
       const rect = box.getBoundingClientRect();
@@ -55,22 +73,23 @@ export function TemplateCanvas({
       const y = Math.min(100, Math.max(0, ((event.clientY - rect.top) / rect.height) * 100));
       onMove(key, Math.round(x * 10) / 10, Math.round(y * 10) / 10);
     },
-    [onMove],
+    [onMove, onResize],
   );
 
   const stopDrag = useCallback(() => {
     dragging.current = null;
+    resizing.current = null;
   }, []);
 
   useEffect(() => {
-    if (!onMove) return;
+    if (!onMove && !onResize) return;
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopDrag);
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", stopDrag);
     };
-  }, [handlePointerMove, stopDrag, onMove]);
+  }, [handlePointerMove, stopDrag, onMove, onResize]);
 
   const editable = Boolean(onMove);
   const values: Record<FieldKey, string> = {
@@ -146,6 +165,35 @@ export function TemplateCanvas({
             }}
           >
             {fieldText(field, values[key])}
+
+            {editable && isSelected && onResize ? (
+              <span
+                role="slider"
+                tabIndex={0}
+                aria-label={`Ubah ukuran huruf ${FIELD_LABEL[key]}`}
+                aria-valuenow={field.fontSize}
+                aria-valuemin={6}
+                aria-valuemax={120}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  resizing.current = {
+                    key,
+                    startY: event.clientY,
+                    startSize: field.fontSize,
+                  };
+                }}
+                onKeyDown={(event) => {
+                  const step = event.shiftKey ? 4 : 1;
+                  if (event.key === "ArrowUp") onResize(key, Math.min(120, field.fontSize + step));
+                  else if (event.key === "ArrowDown") onResize(key, Math.max(6, field.fontSize - step));
+                  else return;
+                  event.preventDefault();
+                }}
+                className="absolute -bottom-3 -right-3 size-6 cursor-ns-resize rounded-full border-2 border-white bg-brand shadow-lift"
+                style={{ touchAction: "none" }}
+              />
+            ) : null}
           </div>
         );
       })}

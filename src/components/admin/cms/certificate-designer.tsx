@@ -73,13 +73,16 @@ export function CertificateDesigner({
             selected={selected}
             onSelect={setSelected}
             onMove={(key, x, y) => patch(key, { x, y })}
+            onResize={(key, fontSize) => patch(key, { fontSize })}
           />
 
           <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted">
             <MousePointer2 className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            Seret nama atau nomor langsung di atas desain untuk memindahkannya. Bisa juga pakai
-            tombol panah setelah diklik — tahan Shift untuk langkah lebih besar. Contoh memakai
-            data dummy; saat sertifikat asli dibuat, isinya diambil dari data peserta.
+            Seret nama atau nomor langsung di atas desain untuk memindahkannya. Setelah diklik,
+            muncul bulatan merah di sudut kanan bawah — seret ke bawah untuk memperbesar huruf,
+            ke atas untuk mengecilkan. Tombol panah juga bekerja untuk keduanya; tahan Shift
+            untuk langkah lebih besar. Contoh memakai data dummy; saat sertifikat asli dibuat,
+            isinya diambil dari data peserta.
           </p>
 
           <div className="flex flex-wrap gap-1.5">
