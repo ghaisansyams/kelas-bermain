@@ -120,6 +120,22 @@ if (certInput) {
   }
 }
 
+// 5c. Draft preview must be refused to anyone who is not a signed-in admin.
+const previewRes = await page.goto(`${BASE}/preview?path=/`, { waitUntil: "networkidle0" });
+record(
+  "Pratinjau: ditolak tanpa login admin",
+  page.url().includes("/admin/login") || previewRes.status() >= 400,
+  page.url(),
+);
+
+// 5d. Gallery is now a Drive link, so check the link is actually there.
+await go("/galeri");
+const galleryBody = await page.$eval("body", (el) => el.innerText);
+const driveHref = await page.$$eval("a", (els) =>
+  els.some((e) => e.href.includes("drive.google.com")),
+);
+record("Galeri: tautan Google Drive ada", driveHref, /galeri/i.test(galleryBody) ? "" : "teks galeri tidak ditemukan");
+
 // 6. Ticket checker.
 await go("/tiket");
 record("Tiket: halaman termuat", Boolean(await page.$("input")));
