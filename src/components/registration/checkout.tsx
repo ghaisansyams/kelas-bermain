@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CircleCheckBig,
   Clock3,
   ExternalLink,
+  Loader2,
+  MessageCircle,
   RotateCw,
   ShieldAlert,
+  Upload,
   XCircle,
 } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
@@ -21,6 +24,8 @@ import {
 import { formatDate } from "@/lib/utils/date";
 import { BankTransferPanel } from "@/components/registration/bank-transfer";
 import { formatRupiah } from "@/lib/utils/format";
+import { submitProof, uploadPaymentProof } from "@/lib/services/payment-proof";
+import { paymentProofWhatsappUrl } from "@/lib/config/whatsapp";
 
 /**
  * Read-only registration/payment status, looked up by the opaque access
@@ -36,6 +41,9 @@ import { formatRupiah } from "@/lib/utils/format";
 export function Checkout({ accessToken }: { accessToken: string }) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<RegistrationStatusView | null>(null);
+  const [markingProof, setMarkingProof] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -182,7 +190,100 @@ export function Checkout({ accessToken }: { accessToken: string }) {
     );
   }
 
+  /** Uploads the screenshot, then records the claim in one step. */
+  async function handleProofFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file || markingProof) return;
+
+    setProofError(null);
+    setMarkingProof(true);
+    const result = await uploadPaymentProof(accessToken, file);
+    setMarkingProof(false);
+    if (proofInputRef.current) proofInputRef.current.value = "";
+
+    if (!result.ok) {
+      setProofError(result.error);
+      return;
+    }
+    await load();
+  }
+
+  /** Records the claim without a file, for proof sent over WhatsApp. */
+  async function handleProofSent() {
+    if (markingProof) return;
+    setProofError(null);
+    setMarkingProof(true);
+    const result = await submitProof(accessToken);
+    setMarkingProof(false);
+    // Reload either way: if the call failed the page should show the real
+    // state rather than pretending the claim landed.
+    if (!result.ok) {
+      setProofError(result.error);
+      return;
+    }
+    await load();
+  }
+
+  const proofWhatsappUrl = paymentProofWhatsappUrl({
+    registrationNumber: view.registrationNumber,
+    companionName: view.customerFullName,
+    childName: view.childFullName,
+  });
+
   const rejected = view.paymentStatus === "FAILED";
+  const waiting = view.paymentStatus === "WAITING_VERIFICATION";
+
+  if (waiting) {
+    return (
+      <div className="space-y-6">
+        {/* Amber, never green. The money has not been confirmed received —
+            saying "berhasil" here would be a promise the system cannot keep,
+            and a parent who believes it stops watching for our message. */}
+        <div className="rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
+          <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-sun text-ink">
+            <Clock3 className="size-8" aria-hidden />
+          </span>
+          <h2 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">
+            Terima kasih sudah mendaftar
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
+            Bukti transfermu sudah kami terima dan sedang diperiksa tim Kelas Bermain.
+            Konfirmasinya kami kirim lewat WhatsApp, biasanya pada jam kerja.
+          </p>
+          <p className="mx-auto mt-4 inline-block rounded-xl border border-sun/30 bg-surface px-4 py-2 text-sm font-semibold text-ink">
+            Nomor pendaftaran:{" "}
+            <span className="font-mono font-bold">{view.registrationNumber}</span>
+          </p>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            Simpan nomor itu. Kapan pun kamu ingin tahu statusnya, cek lewat menu Cek Tiket.
+          </p>
+        </div>
+
+        {summary}
+
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <Link
+            href="/cek-tiket"
+            className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
+          >
+            Cek Status Tiket
+          </Link>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className={buttonStyles({
+              variant: "secondary",
+              size: "lg",
+              className: "w-full sm:w-auto",
+            })}
+          >
+            <RotateCw className="size-4" aria-hidden />
+            Muat Ulang Status
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -205,6 +306,85 @@ export function Checkout({ accessToken }: { accessToken: string }) {
         eventTitle={event?.title ?? "Kelas Bermain"}
         childName={view.childFullName}
       />
+
+      {/* Two ways in: upload the screenshot here, or send it over WhatsApp
+          where the team already works. Either way this only records that proof
+          was handed in — it can never mark the payment settled, which stays an
+          admin decision. */}
+      <div className="rounded-card border border-brand/25 bg-brand-soft/35 p-5 sm:p-6">
+        <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
+          <Upload className="size-4 text-brand" aria-hidden />
+          Sudah transfer? Kirim buktinya
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Unggah foto atau tangkapan layar bukti transfer langsung di sini, atau kirim lewat
+          WhatsApp kalau lebih mudah. Nomor pendaftaranmu sudah kami siapkan di pesannya.
+        </p>
+
+        <div className="mt-4 rounded-xl border border-dashed border-brand/40 bg-surface p-4">
+          <label
+            htmlFor="paymentProof"
+            className="text-sm font-bold text-ink"
+          >
+            Unggah bukti transfer
+          </label>
+          <input
+            ref={proofInputRef}
+            id="paymentProof"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            disabled={markingProof}
+            onChange={(e) => void handleProofFile(e.target.files)}
+            className="mt-2 block w-full text-sm text-ink-soft file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-pill file:border-0 file:bg-brand file:px-4 file:text-sm file:font-bold file:text-white disabled:opacity-60"
+          />
+          <p className="mt-2 text-xs text-muted">
+            JPG, PNG, WEBP, atau PDF. Maksimal 5 MB. Hanya tim Kelas Bermain yang bisa
+            melihat berkas ini.
+          </p>
+          {proofError ? (
+            <p role="alert" className="mt-2 text-xs font-semibold text-brand-ink">
+              {proofError}
+            </p>
+          ) : null}
+        </div>
+
+        <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted">
+          Atau lewat WhatsApp
+        </p>
+
+        <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
+          <a
+            href={proofWhatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => void handleProofSent()}
+            className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
+          >
+            <MessageCircle className="size-4" aria-hidden />
+            Kirim Bukti via WhatsApp
+          </a>
+          <button
+            type="button"
+            onClick={() => void handleProofSent()}
+            disabled={markingProof}
+            className={buttonStyles({
+              variant: "secondary",
+              size: "lg",
+              className: "w-full sm:w-auto",
+            })}
+          >
+            {markingProof ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            Saya Sudah Kirim Bukti
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          Setelah menekan salah satunya, status berubah jadi menunggu pemeriksaan. Tim kami
+          yang memastikan dananya masuk sebelum pendaftaran dinyatakan lunas.
+        </p>
+      </div>
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <h3 className="text-base font-extrabold text-ink">Status saat ini</h3>
