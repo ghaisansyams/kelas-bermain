@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { setCustomerStatusAction } from "@/app/admin/customers/actions";
 import { Card, PageHeader, StatCard } from "@/components/admin/admin-ui";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   PAYMENT_LABEL,
   REGISTRATION_LABEL,
@@ -22,7 +24,7 @@ export default async function CustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
 
@@ -101,6 +103,34 @@ export default async function CustomerDetailPage({
       <PageHeader
         title={customer.full_name}
         description={`${customer.customer_number} · ${customer.whatsapp}`}
+        action={
+          session.role === "SUPER_ADMIN" ? (
+            <ConfirmDialog
+              action={setCustomerStatusAction}
+              hidden={{
+                customerId: customer.id,
+                next: customer.status === "active" ? "inactive" : "active",
+              }}
+              trigger={customer.status === "active" ? "Nonaktifkan" : "Aktifkan kembali"}
+              size="md"
+              tone={customer.status === "active" ? "danger" : "brand"}
+              title={
+                customer.status === "active" ? "Nonaktifkan peserta?" : "Aktifkan peserta?"
+              }
+              description={
+                customer.status === "active"
+                  ? "Data dan seluruh riwayatnya tetap tersimpan — peserta ini hanya ditandai tidak aktif dan bisa disaring keluar dari daftar. Bisa diaktifkan lagi kapan saja."
+                  : "Peserta ini akan ditandai aktif kembali."
+              }
+              summary={[
+                { label: "Kode", value: customer.customer_number },
+                { label: "Nama", value: customer.full_name },
+                { label: "Riwayat pendaftaran", value: String(registrations.length) },
+              ]}
+              confirmLabel={customer.status === "active" ? "Nonaktifkan" : "Aktifkan"}
+            />
+          ) : undefined
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

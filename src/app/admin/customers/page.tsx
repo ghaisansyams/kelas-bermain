@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, PageHeader } from "@/components/admin/admin-ui";
+import { Card, Notice, PageHeader } from "@/components/admin/admin-ui";
 import {
   EmptyRow,
   FilterBar,
@@ -11,20 +11,35 @@ import {
   Td,
   Th,
 } from "@/components/admin/data-table";
+import { deleteCustomerAction } from "@/app/admin/customers/actions";
+import { DeleteDialog } from "@/components/admin/delete-dialog";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
+
+/** Outcome messages. Uses `msg` because `status` is already the list filter. */
+const STATUS_NOTICE: Record<string, { tone: "success" | "error" | "info"; text: string }> = {
+  deleted: { tone: "success", text: "Data dihapus permanen." },
+  "has-registrations": {
+    tone: "error",
+    text: "Tidak jadi dihapus: data ini punya riwayat pendaftaran. Menghapusnya akan memutus catatan pembayaran dan kehadiran.",
+  },
+  deactivated: { tone: "success", text: "Data dinonaktifkan." },
+  activated: { tone: "success", text: "Data diaktifkan kembali." },
+  error: { tone: "error", text: "Aksi gagal dijalankan." },
+};
+
 const PAGE_SIZE = 20;
 
 export default async function AdminCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; msg?: string }>;
 }) {
-  await requireAdmin();
-  const { q, status, page: pageParam } = await searchParams;
+  const session = await requireAdmin();
+  const { q, status, page: pageParam, msg } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
   const supabase = await createSupabaseServerClient();
 
@@ -40,6 +55,17 @@ export default async function AdminCustomersPage({
   if (status) query = query.eq("status", status);
 
   const { data, count, error } = await query;
+
+  // One extra query instead of one per row: which of these customers already
+  // have registrations, and therefore cannot be removed.
+  const ids = ((data ?? []) as { id: string }[]).map((row) => row.id);
+  const { data: regRows } = ids.length
+    ? await supabase.from("registrations").select("customer_id").in("customer_id", ids)
+    : { data: [] };
+  const registrationCount = new Map<string, number>();
+  for (const row of (regRows ?? []) as { customer_id: string }[]) {
+    registrationCount.set(row.customer_id, (registrationCount.get(row.customer_id) ?? 0) + 1);
+  }
   const rows = (data ?? []) as {
     id: string;
     customer_number: string;
@@ -55,6 +81,10 @@ export default async function AdminCustomersPage({
   return (
     <div className="space-y-5">
       <PageHeader title="Peserta" description="Master data pendamping / orang tua." />
+
+      {msg && STATUS_NOTICE[msg] ? (
+        <Notice tone={STATUS_NOTICE[msg].tone}>{STATUS_NOTICE[msg].text}</Notice>
+      ) : null}
 
       <FilterBar action="/admin/customers">
         <SearchField value={q} />
@@ -87,7 +117,7 @@ export default async function AdminCustomersPage({
                 <Th>Domisili</Th>
                 <Th>Status</Th>
                 <Th>Terdaftar</Th>
-                <Th>Aksi</Th>
+                <Th className="w-[12rem]">Aksi</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -107,12 +137,40 @@ export default async function AdminCustomersPage({
                     </Td>
                     <Td>{formatDate(row.created_at)}</Td>
                     <Td>
-                      <Link
-                        href={`/admin/customers/${row.id}`}
-                        className="font-semibold text-brand hover:underline"
-                      >
-                        Detail
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/customers/${row.id}`}
+                          className="whitespace-nowrap font-semibold text-brand hover:underline"
+                        >
+                          Detail
+                        </Link>
+                        {session.role === "SUPER_ADMIN" ? (
+                          <DeleteDialog
+                            action={deleteCustomerAction}
+                            hidden={{ customerId: row.id, code: row.customer_number }}
+                            code={row.customer_number}
+                            title="Hapus data peserta?"
+                            summary={[
+                              { label: "Kode", value: row.customer_number },
+                              { label: "Nama", value: row.full_name },
+                              { label: "WhatsApp", value: row.whatsapp },
+                              {
+                                label: "Riwayat pendaftaran",
+                                value: `${registrationCount.get(row.id) ?? 0}`,
+                              },
+                            ]}
+                            consequences={[
+                              "Data pendamping ini",
+                              "Semua data anak yang terdaftar atas namanya",
+                            ]}
+                            blockedReason={
+                              (registrationCount.get(row.id) ?? 0) > 0
+                                ? `Peserta ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Buka Detail peserta ini untuk menonaktifkannya — datanya tetap tersimpan utuh.`
+                                : undefined
+                            }
+                          />
+                        ) : null}
+                      </div>
                     </Td>
                   </tr>
                 ))
