@@ -179,8 +179,8 @@ export const GUIDE: GuideChapter[] = [
         body: "Buat dulu akunnya di Supabase → Authentication → Users, lalu masukkan emailnya di menu Pengguna. Pembuatan akun sengaja tidak dilakukan dari sini karena butuh kunci yang tidak pernah dipegang aplikasi ini.",
       },
       {
-        title: "Menghapus data peserta",
-        body: "Peserta yang punya riwayat pendaftaran tidak bisa dihapus — menghapusnya akan memutus catatan pembayaran. Nonaktifkan saja lewat halaman Detail; datanya tetap utuh dan bisa diaktifkan lagi.",
+        title: "Menghapus data pendamping",
+        body: "Pendamping yang punya riwayat pendaftaran tidak bisa dihapus — menghapusnya akan memutus catatan pembayaran. Nonaktifkan saja lewat halaman Detail; datanya tetap utuh dan bisa diaktifkan lagi.",
         href: "/admin/customers",
       },
       {

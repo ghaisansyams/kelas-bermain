@@ -80,7 +80,7 @@ export default async function AdminCustomersPage({
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Peserta" description="Master data pendamping / orang tua." />
+      <PageHeader title="Pendamping" description="Data orang tua atau wali yang mendaftarkan anak. Anaknya sendiri ada di menu Anak." />
 
       {msg && STATUS_NOTICE[msg] ? (
         <Notice tone={STATUS_NOTICE[msg].tone}>{STATUS_NOTICE[msg].text}</Notice>
@@ -149,7 +149,7 @@ export default async function AdminCustomersPage({
                             action={deleteCustomerAction}
                             hidden={{ customerId: row.id, code: row.customer_number }}
                             code={row.customer_number}
-                            title="Hapus data peserta?"
+                            title="Hapus data pendamping?"
                             summary={[
                               { label: "Kode", value: row.customer_number },
                               { label: "Nama", value: row.full_name },
@@ -165,7 +165,7 @@ export default async function AdminCustomersPage({
                             ]}
                             blockedReason={
                               (registrationCount.get(row.id) ?? 0) > 0
-                                ? `Peserta ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Buka Detail peserta ini untuk menonaktifkannya — datanya tetap tersimpan utuh.`
+                                ? `Pendamping ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Buka Detail pendamping ini untuk menonaktifkannya — datanya tetap tersimpan utuh.`
                                 : undefined
                             }
                           />

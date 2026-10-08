@@ -82,7 +82,7 @@ export default async function AdminAttendancePage({
       </FilterBar>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total peserta" value={String(rows.length)} hint={eventTitle} />
+        <StatCard label="Total anak" value={String(rows.length)} hint={eventTitle} />
         <StatCard label="Hadir" value={String(present)} />
         <StatCard label="Belum check-in" value={String(waiting)} />
         <StatCard label="Tingkat kehadiran" value={`${rate}%`} />
@@ -107,7 +107,7 @@ export default async function AdminAttendancePage({
           </thead>
           <tbody className="divide-y divide-line">
             {rows.length === 0 ? (
-              <EmptyRow colSpan={7}>Belum ada peserta untuk event ini.</EmptyRow>
+              <EmptyRow colSpan={7}>Belum ada anak terdaftar untuk event ini.</EmptyRow>
             ) : (
               rows.map((row) => {
                 const attendance = ATTENDANCE_LABEL[row.attendance_status] ?? {

@@ -110,7 +110,7 @@ export default async function AdminCertificatesPage({
       </FilterBar>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Peserta" value={String(rows.length)} hint={eventTitle} />
+        <StatCard label="Anak" value={String(rows.length)} hint={eventTitle} />
         <StatCard label="Sertifikat terbit" value={String(issued)} />
         <StatCard label="Siap diterbitkan" value={String(ready)} />
       </div>
@@ -125,7 +125,7 @@ export default async function AdminCertificatesPage({
             hidden={{ eventId: selected }}
             trigger={`Terbitkan ${ready} sertifikat`}
             title="Terbitkan sertifikat massal"
-            description="Setiap peserta hadir yang belum punya sertifikat akan mendapat satu nomor. Peserta yang sudah punya dilewati."
+            description="Setiap anak yang tercatat hadir dan belum punya sertifikat akan mendapat satu nomor. Yang sudah punya dilewati."
             summary={[
               { label: "Event", value: eventTitle },
               { label: "Akan diterbitkan", value: String(ready) },
@@ -153,7 +153,7 @@ export default async function AdminCertificatesPage({
           </thead>
           <tbody className="divide-y divide-line">
             {rows.length === 0 ? (
-              <EmptyRow colSpan={6}>Belum ada peserta untuk event ini.</EmptyRow>
+              <EmptyRow colSpan={6}>Belum ada anak terdaftar untuk event ini.</EmptyRow>
             ) : (
               rows.map((row) => {
                 const cert = row.certificates?.find((item) => item.status === "issued");
@@ -185,7 +185,7 @@ export default async function AdminCertificatesPage({
                           hidden={{ number: cert.number, eventId: selected }}
                           trigger="Batalkan"
                           title="Batalkan sertifikat"
-                          description="Nomor tetap tercatat dan tidak akan dipakai ulang. Peserta bisa diterbitkan sertifikat baru setelah ini."
+                          description="Nomor tetap tercatat dan tidak akan dipakai ulang. Anak ini bisa diterbitkan sertifikat baru setelah ini."
                           summary={[
                             { label: "Nomor", value: cert.number },
                             { label: "Anak", value: row.children?.full_name ?? "—" },

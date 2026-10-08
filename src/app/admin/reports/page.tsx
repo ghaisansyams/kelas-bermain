@@ -106,7 +106,7 @@ export default async function AdminReportsPage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Peserta hadir" value={String(report.present)} />
+        <StatCard label="Anak hadir" value={String(report.present)} />
         <StatCard label="Tingkat kehadiran" value={`${report.attendanceRate}%`} />
         <StatCard label="Sertifikat terbit" value={String(report.certificates)} />
       </div>

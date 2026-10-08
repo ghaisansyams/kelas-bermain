@@ -32,7 +32,7 @@ const NAV_GROUPS: { title: string; items: { href: string; label: string; icon: t
   {
     title: "Operasional",
     items: [
-      { href: "/admin/customers", label: "Peserta", icon: Users },
+      { href: "/admin/customers", label: "Pendamping", icon: Users },
       { href: "/admin/children", label: "Anak", icon: Baby },
       { href: "/admin/events", label: "Event", icon: CalendarDays },
       { href: "/admin/registrations", label: "Registrasi", icon: ClipboardList },

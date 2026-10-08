@@ -115,12 +115,12 @@ export default async function CustomerDetailPage({
               size="md"
               tone={customer.status === "active" ? "danger" : "brand"}
               title={
-                customer.status === "active" ? "Nonaktifkan peserta?" : "Aktifkan peserta?"
+                customer.status === "active" ? "Nonaktifkan pendamping?" : "Aktifkan pendamping?"
               }
               description={
                 customer.status === "active"
                   ? "Data dan seluruh riwayatnya tetap tersimpan — peserta ini hanya ditandai tidak aktif dan bisa disaring keluar dari daftar. Bisa diaktifkan lagi kapan saja."
-                  : "Peserta ini akan ditandai aktif kembali."
+                  : "Pendamping ini akan ditandai aktif kembali."
               }
               summary={[
                 { label: "Kode", value: customer.customer_number },

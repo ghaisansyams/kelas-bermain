@@ -169,7 +169,7 @@ export function EventForm({
       </Card>
 
       <Card>
-        <h2 className="text-base font-extrabold text-ink">Peserta & biaya</h2>
+        <h2 className="text-base font-extrabold text-ink">Kuota & biaya</h2>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           <Field label="Usia minimum" htmlFor="ageMin">
             <TextInput id="ageMin" name="ageMin" type="number" defaultValue={String(initial.ageMin)} />

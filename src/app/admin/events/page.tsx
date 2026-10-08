@@ -97,7 +97,7 @@ export default async function AdminEventsPage({
               <Th>Judul</Th>
               <Th>Kategori</Th>
               <Th>Tanggal</Th>
-              <Th>Peserta</Th>
+              <Th>Terdaftar</Th>
               <Th>Status</Th>
               <Th>Aksi</Th>
             </tr>
