@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Award,
+  BookOpen,
   Baby,
   BarChart3,
   CalendarCheck,
@@ -12,7 +13,6 @@ import {
   LayoutDashboard,
   LogOut,
   PanelsTopLeft,
-  Navigation as NavIcon,
   Receipt,
   Settings,
   Ticket,
@@ -46,8 +46,7 @@ const NAV_GROUPS: { title: string; items: { href: string; label: string; icon: t
   {
     title: "Website",
     items: [
-      { href: "/admin/cms/home", label: "CMS — Home", icon: PanelsTopLeft },
-      { href: "/admin/cms/navigation", label: "CMS — Navigasi", icon: NavIcon },
+      { href: "/admin/cms", label: "CMS Website", icon: PanelsTopLeft },
       { href: "/admin/media", label: "Media Library", icon: ImageIcon },
     ],
   },
@@ -61,6 +60,7 @@ const NAV_GROUPS: { title: string; items: { href: string; label: string; icon: t
   {
     title: "Sistem",
     items: [
+      { href: "/admin/panduan", label: "Panduan", icon: BookOpen },
       { href: "/admin/users", label: "Pengguna", icon: UserCog },
       { href: "/admin/settings", label: "Pengaturan Diskon", icon: Settings },
       { href: "/admin/activity-log", label: "Activity Log", icon: History },
