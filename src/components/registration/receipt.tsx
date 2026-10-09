@@ -7,6 +7,7 @@ import {
   CreditCard,
   ExternalLink,
   Info,
+  MessageCircle,
   Printer,
   Ticket,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import type { EventView } from "@/lib/types";
 import { certificatesEnabled } from "@/lib/features";
 import { formatDate, formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
+import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
 
 /**
  * "Selesai" step content. The registration/payment rows are already
@@ -36,6 +38,15 @@ export function RegistrationReceipt({
   const lead = batch.registrations[0];
   const isFree = batch.paymentMethod === "NONE";
   const isThirdParty = batch.paymentMethod === "THIRD_PARTY";
+
+  // Built on the client only: this renders on the server first, where there
+  // is no origin to build an absolute link from.
+  const statusUrl =
+    typeof window === "undefined"
+      ? undefined
+      : isFree
+        ? `${window.location.origin}/cek-tiket`
+        : `${window.location.origin}/payment/${lead.accessToken}`;
 
   function addToCalendar() {
     const stamp = (value: string) => value.replace(/-/g, "");
@@ -138,18 +149,40 @@ export function RegistrationReceipt({
             registration up later, so the way to use it sits right beneath
             it rather than somewhere further down the page. */}
         <div className="no-print mt-5">
-          <Link
-            href="/cek-tiket"
-            className={buttonStyles({
-              variant: "secondary",
-              size: "lg",
-              className: "w-full sm:w-auto",
-            })}
-          >
-            <Ticket className="size-4" aria-hidden />
-            Cek Status di Cek Tiket
-          </Link>
-          <p className="mt-2.5 text-xs leading-relaxed text-muted">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-center">
+            {/* The chat normally opens by itself on confirm. Some browsers
+                refuse that tab, so the same link is here as well rather than
+                leaving the parent with no way to reach the team. */}
+            <a
+              href={registrationWhatsappUrl({
+                registrationNumber: lead.registrationNumber,
+                companionName: parentName || "Orang tua",
+                childrenCount: batch.registrations.length,
+                eventName: event.title,
+                formattedTotal: isFree ? "Gratis" : formatRupiah(batch.totalAmount),
+                statusUrl,
+                needsPayment: !isFree,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
+            >
+              <MessageCircle className="size-4" aria-hidden />
+              Konfirmasi via WhatsApp
+            </a>
+            <Link
+              href="/cek-tiket"
+              className={buttonStyles({
+                variant: "secondary",
+                size: "lg",
+                className: "w-full sm:w-auto",
+              })}
+            >
+              <Ticket className="size-4" aria-hidden />
+              Cek Status di Cek Tiket
+            </Link>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
             Simpan nomor pendaftaran di atas. Masukkan nomor tersebut di halaman Cek Tiket
             untuk melihat status terbaru pendaftaran Anda.
           </p>
