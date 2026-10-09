@@ -203,29 +203,11 @@ export default async function AdminPaymentsPage({
                       <Td>{formatRupiah(Number(row.amount))}</Td>
                       <Td>{row.method}</Td>
                       <Td>
-                        {row.proof_url ? (
-                          proofLinks.get(row.proof_url) ? (
-                            <a
-                              href={proofLinks.get(row.proof_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs font-bold text-brand hover:underline"
-                            >
-                              Lihat bukti
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted">Berkas tidak terbaca</span>
-                          )
-                        ) : row.proof_submitted_at ? (
-                          <span className="text-xs text-ink-soft">Lewat WhatsApp</span>
-                        ) : (
-                          <span className="text-xs text-muted">—</span>
-                        )}
-                        {row.proof_submitted_at ? (
-                          <span className="mt-1 block text-xs text-muted">
-                            {formatDate(row.proof_submitted_at)}
-                          </span>
-                        ) : null}
+                        <ProofCell
+                          url={row.proof_url ? proofLinks.get(row.proof_url) : undefined}
+                          path={row.proof_url}
+                          submittedAt={row.proof_submitted_at}
+                        />
                       </Td>
                       <Td>
                         <StatusBadge tone={label.tone}>{label.text}</StatusBadge>
@@ -309,6 +291,62 @@ export default async function AdminPaymentsPage({
           />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The proof, as a picture. An admin is deciding whether a transfer happened,
+ * and a link they have to open in another tab for every row turns a minute
+ * of verifying into ten. A PDF has no thumbnail to show, so that one stays
+ * a link.
+ */
+function ProofCell({
+  url,
+  path,
+  submittedAt,
+}: {
+  url?: string;
+  path: string | null;
+  submittedAt: string | null;
+}) {
+  const isPdf = Boolean(path?.toLowerCase().endsWith(".pdf"));
+
+  return (
+    <div className="space-y-1">
+      {path && url ? (
+        isPdf ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-bold text-brand hover:underline"
+          >
+            Buka PDF
+          </a>
+        ) : (
+          <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
+            {/* Unoptimised on purpose: the URL is signed and expires, so
+                Next's image cache would be holding a key that stops working. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt="Bukti transfer yang dikirim pendaftar"
+              className="h-16 w-16 rounded-lg border border-line object-cover transition-transform hover:scale-105"
+            />
+            <span className="mt-1 block text-xs font-bold text-brand">Perbesar</span>
+          </a>
+        )
+      ) : path ? (
+        <span className="text-xs text-muted">Berkas tidak terbaca</span>
+      ) : submittedAt ? (
+        <span className="text-xs text-ink-soft">Lewat WhatsApp</span>
+      ) : (
+        <span className="text-xs text-muted">—</span>
+      )}
+      {submittedAt ? (
+        <span className="block text-xs text-muted">{formatDate(submittedAt)}</span>
+      ) : null}
     </div>
   );
 }
