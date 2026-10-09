@@ -18,28 +18,54 @@ export interface RegistrationHandoff {
   childrenCount: number;
   eventName: string;
   formattedTotal: string;
+  /** Absolute link to the page that carries "Kirim Bukti Pembayaran". */
+  statusUrl?: string;
+  /** A free class has nothing to transfer, so it is not asked to. */
+  needsPayment?: boolean;
 }
 
 /**
- * The message a parent sends after confirming, pre-filled so the team gets
- * everything it needs in the first line instead of asking for it.
+ * The message a parent sends the moment they confirm, pre-filled so the team
+ * gets everything it needs in the first message instead of asking for it
+ * across four replies.
+ *
+ * The status link is in the message on purpose. WhatsApp is where this
+ * conversation lives, so the way back to the proof upload has to live there
+ * too — a parent who closes the tab otherwise has no route back.
  */
 export function registrationWhatsappUrl(info: RegistrationHandoff): string {
-  const message = [
-    "Halo Kelas Bermain, saya sudah melakukan pendaftaran.",
+  const lines = [
+    "Halo Kelas Bermain,",
     "",
-    `Nomor Pendaftaran: ${info.registrationNumber}`,
-    `Nama Pendamping: ${info.companionName}`,
-    `Jumlah Anak: ${info.childrenCount}`,
-    `Event: ${info.eventName}`,
-    `Total Pembayaran: ${info.formattedTotal}`,
+    "Saya ingin mengonfirmasi pendaftaran dengan rincian berikut.",
     "",
-    "Mohon informasi pembayaran selanjutnya.",
-    "",
-    "Terima kasih.",
-  ].join("\n");
+    `Nomor Pendaftaran : ${info.registrationNumber}`,
+    `Nama Pendamping   : ${info.companionName}`,
+    `Jumlah Anak       : ${info.childrenCount}`,
+    `Kegiatan          : ${info.eventName}`,
+    `Total Biaya       : ${info.formattedTotal}`,
+  ];
 
-  return `https://wa.me/${WHATSAPP_REGISTRATION_NUMBER}?text=${encodeURIComponent(message)}`;
+  if (info.statusUrl) {
+    lines.push(
+      "",
+      info.needsPayment
+        ? "Halaman pembayaran dan pengiriman bukti transfer:"
+        : "Halaman status pendaftaran saya:",
+      info.statusUrl,
+    );
+  }
+
+  lines.push(
+    "",
+    info.needsPayment
+      ? "Mohon informasi mengenai langkah pembayaran selanjutnya."
+      : "Mohon konfirmasi ketersediaan tempat untuk pendaftaran ini.",
+    "",
+    "Terima kasih atas perhatiannya.",
+  );
+
+  return `https://wa.me/${WHATSAPP_REGISTRATION_NUMBER}?text=${encodeURIComponent(lines.join("\n"))}`;
 }
 
 /** Sending proof of transfer for a registration that already exists. */
