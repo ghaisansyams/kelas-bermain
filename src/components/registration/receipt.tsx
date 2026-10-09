@@ -3,12 +3,12 @@
 import Link from "next/link";
 import {
   CalendarPlus,
-  CircleCheckBig,
   Clock,
   CreditCard,
   ExternalLink,
   Info,
   Printer,
+  Ticket,
 } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import type { RegistrationBatch } from "@/lib/services/registration";
@@ -65,46 +65,36 @@ export function RegistrationReceipt({
     URL.revokeObjectURL(url);
   }
 
-  // A green tick reads as "paid" to a parent, and nothing is paid yet. Until
-  // an admin verifies the transfer this stays amber and says thank you —
-  // settled is a state only the ERP may declare. Free classes have nothing to
-  // settle, so those do get the tick.
-  const settled = isFree;
+  // Nothing here is finished yet, so nothing here is green. A tick reads as
+  // "done" to a parent, and the team has not confirmed anything — a paid
+  // class still needs the transfer verified, and a free one still needs the
+  // seat confirmed. Settled is a state only the ERP may declare, and the
+  // parent watches for it on Cek Tiket.
+  const headline = isFree
+    ? "Mohon Tunggu Konfirmasi Pendaftaran"
+    : "Mohon Tunggu Konfirmasi Pembayaran";
+
+  const standfirst = isFree
+    ? "Registrasi Anda telah berhasil kami terima. Tim Kelas Bermain akan mengonfirmasi ketersediaan tempat, dan status terbarunya dapat Anda pantau melalui halaman Cek Tiket."
+    : isThirdParty
+      ? "Registrasi Anda telah berhasil kami terima. Pembayaran diselesaikan di platform mitra, dan status terbarunya dapat Anda pantau melalui halaman Cek Tiket."
+      : "Registrasi Anda telah berhasil kami terima. Mohon menunggu konfirmasi pembayaran dari tim Kelas Bermain. Status terbarunya dapat Anda pantau kapan saja melalui halaman Cek Tiket.";
 
   return (
     <div className="space-y-6">
-      <div
-        className={`print-area rounded-card border p-6 text-center sm:p-8 ${
-          settled ? "border-pine/25 bg-pine-soft/60" : "border-sun/40 bg-sun-soft/60"
-        }`}
-      >
-        <span
-          className={`mx-auto flex size-16 items-center justify-center rounded-full text-white motion-safe:animate-fade-up ${
-            settled ? "bg-pine" : "bg-sun-dark"
-          }`}
-        >
-          {settled ? (
-            <CircleCheckBig className="size-8" aria-hidden />
-          ) : (
-            <Clock className="size-8" aria-hidden />
-          )}
+      <div className="print-area rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
+        <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-sun-dark text-white motion-safe:animate-fade-up">
+          <Clock className="size-8" aria-hidden />
         </span>
-        <h2 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">
-          {settled ? "Registrasi Berhasil!" : "Terima kasih sudah mendaftar"}
-        </h2>
+        <p className="mt-4 inline-flex items-center gap-1.5 rounded-pill bg-sun-dark/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-sun-dark">
+          Menunggu Konfirmasi
+        </p>
+        <h2 className="mt-3 text-2xl font-extrabold text-ink sm:text-3xl">{headline}</h2>
         <p className="mx-auto mt-3 max-w-md text-[0.9375rem] leading-relaxed text-ink-soft">
-          {isFree
-            ? "Tempat sudah kami simpan. Detail kegiatan dikirimkan ke kontak yang kamu berikan."
-            : isThirdParty
-              ? "Data pendaftaranmu tercatat. Pembayaran diselesaikan di platform mitra."
-              : "Data pendaftaranmu sudah kami terima. Tempatnya terkunci setelah pembayaran diverifikasi tim Kelas Bermain."}
+          {standfirst}
         </p>
 
-        <dl
-          className={`mx-auto mt-6 max-w-md space-y-3 rounded-2xl border bg-surface p-4 text-left text-sm ${
-            settled ? "border-pine/20" : "border-sun/30"
-          }`}
-        >
+        <dl className="mx-auto mt-6 max-w-md space-y-3 rounded-2xl border border-sun/30 bg-surface p-4 text-left text-sm">
           <Line label="Kelas" value={event.title} />
           <Line label="Tanggal" value={formatDateRange(event.startDate, event.endDate)} />
           <Line
@@ -120,7 +110,7 @@ export function RegistrationReceipt({
                 ? "Tidak diperlukan"
                 : isThirdParty
                   ? "Menunggu konfirmasi mitra"
-                  : "Menunggu pembayaran"
+                  : "Menunggu konfirmasi"
             }
           />
           {!isFree ? (
@@ -132,9 +122,7 @@ export function RegistrationReceipt({
           {batch.registrations.map((registration, index) => (
             <div
               key={registration.id}
-              className={`rounded-2xl border bg-surface p-4 text-left ${
-                settled ? "border-pine/20" : "border-sun/30"
-              }`}
+              className="rounded-2xl border border-sun/30 bg-surface p-4 text-left"
             >
               <p className="text-xs font-bold uppercase tracking-wider text-muted">
                 Nomor Pendaftaran · Anak {index + 1}
@@ -144,6 +132,27 @@ export function RegistrationReceipt({
               </p>
             </div>
           ))}
+        </div>
+
+        {/* The number above is the only thing a parent needs to look the
+            registration up later, so the way to use it sits right beneath
+            it rather than somewhere further down the page. */}
+        <div className="no-print mt-5">
+          <Link
+            href="/cek-tiket"
+            className={buttonStyles({
+              variant: "secondary",
+              size: "lg",
+              className: "w-full sm:w-auto",
+            })}
+          >
+            <Ticket className="size-4" aria-hidden />
+            Cek Status di Cek Tiket
+          </Link>
+          <p className="mt-2.5 text-xs leading-relaxed text-muted">
+            Simpan nomor pendaftaran di atas. Masukkan nomor tersebut di halaman Cek Tiket
+            untuk melihat status terbaru pendaftaran Anda.
+          </p>
         </div>
       </div>
 
