@@ -400,6 +400,11 @@ export function RegistrationWizard({
     setFormError(null);
     setSubmitting(true);
 
+    // Claimed here, while this is still the click the parent made. A tab
+    // opened after the await is a popup, and browsers block it — so the tab
+    // is reserved now and pointed somewhere once the registration exists.
+    const handoff = window.open("", "_blank");
+
     // What the parent picked outranks the channel we inferred from the URL,
     // except when they scanned a QR — that is a fact, not a recollection.
     const attributed: RegistrationSource = source === "qr" ? "qr" : heardFrom || source;
@@ -437,6 +442,7 @@ export function RegistrationWizard({
 
     setSubmitting(false);
     if (!result.ok) {
+      handoff?.close();
       setFormError(result.error);
       return;
     }
@@ -453,6 +459,29 @@ export function RegistrationWizard({
     // The registration exists now; a leftover draft would re-offer data the
     // parent has already submitted.
     clearDraft(event.id);
+
+    // Straight into WhatsApp, carrying the link back to this registration.
+    // The page behind it still advances, so closing the chat does not strand
+    // anyone — and if the browser refused the tab, the button on the next
+    // step is the same link.
+    const lead = result.batch.registrations[0];
+    if (lead) {
+      const origin = window.location.origin;
+      const url = registrationWhatsappUrl({
+        registrationNumber: lead.registrationNumber,
+        companionName: groups[0]?.companion.fullName || "Orang tua",
+        childrenCount: totalChildren,
+        eventName: event.title,
+        formattedTotal: isFree ? "Gratis" : formatRupiah(result.batch.totalAmount),
+        statusUrl: isFree ? `${origin}/cek-tiket` : `${origin}/payment/${lead.accessToken}`,
+        needsPayment: !isFree,
+      });
+      if (handoff) handoff.location.href = url;
+      else window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      handoff?.close();
+    }
+
     setBatch(result.batch);
     setStepKey(isFree || isThirdParty ? "done" : "payment");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -512,6 +541,11 @@ export function RegistrationWizard({
                 childrenCount: totalChildren,
                 eventName: event.title,
                 formattedTotal: formatRupiah(batch.totalAmount),
+                statusUrl:
+                  typeof window === "undefined"
+                    ? undefined
+                    : `${window.location.origin}/payment/${lead.accessToken}`,
+                needsPayment: true,
               })}
               target="_blank"
               rel="noopener noreferrer"
