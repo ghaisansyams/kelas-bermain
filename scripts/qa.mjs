@@ -73,9 +73,28 @@ const h1 = await page.$eval("h1", (el) => el.textContent.trim()).catch(() => "")
 record("Event detail: judul ada", h1.length > 0, h1);
 
 // 4. Registration wizard loads and step 1 validates.
-await go("/register/decorate-mini-cake-oktober-2026");
-const hasForm = await page.$("#companion-fullName-0");
-record("Registrasi: form pendamping ada", Boolean(hasForm));
+//
+// The slug is found, not hardcoded: a class closes its form as its date
+// approaches, so a fixed slug starts failing on a particular calendar day
+// rather than when something is actually broken.
+await go("/event");
+const eventSlugs = await page.$$eval('a[href^="/event/"]', (els) => [
+  ...new Set(els.map((el) => el.getAttribute("href").replace("/event/", ""))),
+]);
+let openSlug = null;
+for (const candidate of eventSlugs) {
+  await go(`/register/${candidate}`);
+  if (await page.$("#companion-fullName-0")) {
+    openSlug = candidate;
+    break;
+  }
+}
+const hasForm = openSlug ? await page.$("#companion-fullName-0") : null;
+record(
+  "Registrasi: form pendamping ada",
+  Boolean(hasForm),
+  openSlug ? `event ${openSlug}` : "tidak ada event yang masih buka",
+);
 if (hasForm) {
   const buttons = await page.$$eval("button", (els) =>
     els.map((e) => e.textContent.trim()).filter(Boolean),

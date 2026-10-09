@@ -58,15 +58,34 @@ try {
     headless: true,
   });
 
-  // Find a bookable event rather than hardcoding a slug that may be archived.
+  // Find an event whose form is actually open. The first card is not good
+  // enough: a class closes registration as its date approaches, so a
+  // hardcoded or first-found slug starts failing on a particular day rather
+  // than when something is broken.
   const finder = await browser.newPage();
   await finder.goto(`${BASE}/event`, { waitUntil: "networkidle0" });
-  const slug = await finder.evaluate(() => {
-    const link = [...document.querySelectorAll('a[href^="/event/"]')][0];
-    return link ? link.getAttribute("href").replace("/event/", "") : null;
-  });
+  const candidates = await finder.evaluate(() =>
+    [...new Set(
+      [...document.querySelectorAll('a[href^="/event/"]')].map((link) =>
+        link.getAttribute("href").replace("/event/", ""),
+      ),
+    )],
+  );
+
+  let slug = null;
+  for (const candidate of candidates) {
+    await finder.goto(`${BASE}/register/${candidate}`, { waitUntil: "networkidle0" });
+    const open = await finder.evaluate(() =>
+      Boolean(document.querySelector("#companion-fullName-0")),
+    );
+    if (open) {
+      slug = candidate;
+      break;
+    }
+  }
   await finder.close();
-  if (!slug) throw new Error("tidak ada event untuk diuji");
+  if (!slug) throw new Error("tidak ada event yang pendaftarannya masih terbuka");
+  console.log(`(menguji event: ${slug})\n`);
 
   const page = await browser.newPage();
   const consoleErrors = [];
@@ -126,10 +145,17 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 1200));
 
   const confirmText = await page.evaluate(() => document.body.innerText);
+  // A free class has no payment step, so its button says something else.
+  // Both labels are correct; the old vague one is not.
+  const label = confirmText.includes("Lanjut ke Pembayaran")
+    ? "Lanjut ke Pembayaran"
+    : confirmText.includes("Daftar Sekarang")
+      ? "Daftar Sekarang"
+      : null;
+  record("Konfirmasi: tombol menyebut langkah berikutnya", Boolean(label), label ?? "tidak ada");
   record(
-    "Konfirmasi: tombol berbunyi 'Lanjut ke Pembayaran'",
-    confirmText.includes("Lanjut ke Pembayaran"),
-    confirmText.includes("Lanjut ke Pembayaran") ? "" : "label lama masih dipakai",
+    "Konfirmasi: label lama sudah tidak dipakai",
+    !confirmText.includes("Konfirmasi & Lanjut Pembayaran"),
   );
   record(
     "Konfirmasi: belum ada klaim pembayaran berhasil",
