@@ -11,7 +11,8 @@
     "qa": "node scripts/qa.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "qa:registration": "node scripts/qa-registration.mjs"
+    "qa:registration": "node scripts/qa-registration.mjs",
+    "instagram:scrape": "node scripts/instagram-scrape.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
