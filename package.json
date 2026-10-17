@@ -12,9 +12,13 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "qa:registration": "node scripts/qa-registration.mjs",
-    "instagram:scrape": "node scripts/instagram-scrape.mjs"
+    "instagram:scrape": "node scripts/instagram-scrape.mjs",
+    "db:start": "node scripts/db.mjs start",
+    "db:stop": "node scripts/db.mjs stop",
+    "db:reset": "node scripts/db.mjs reset"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "clsx": "^2.1.1",
@@ -31,8 +35,10 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "embedded-postgres": "^17.10.0-beta.17",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
+    "prisma": "^6.19.3",
     "puppeteer-core": "^23.11.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5"

@@ -1,0 +1,22 @@
+// Skema Prisma untuk Kelas Bermain.
+//
+// Migrasi dari Supabase ke Postgres sendiri. Modelnya diisi dengan
+// introspeksi dari database yang sekarang hidup (prisma db pull), bukan
+// disalin tangan dari 5.651 baris SQL — salah ketik satu kolom di sini
+// berarti data pindah dengan diam-diam rusak.
+//
+// Yang hilang bersama Supabase dan harus dibangun ulang di lapisan aplikasi:
+//   · Auth        -> session cookie sendiri, hash argon2 di admin_users
+//   · RLS         -> pemeriksaan hak akses di server action, bukan di baris
+//   · Storage     -> disk/objek, mengikuti keputusan hosting
+//   · 90 fungsi SECURITY DEFINER -> sebagian tetap fungsi Postgres (yang
+//     menjaga keutuhan transaksi), sebagian pindah jadi transaksi Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
