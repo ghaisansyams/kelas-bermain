@@ -13,3 +13,6 @@ next-env.d.ts
 
 # Postgres lokal (npm run db:start)
 .postgres-data/
+
+# Cache CLI Supabase
+supabase/.temp/

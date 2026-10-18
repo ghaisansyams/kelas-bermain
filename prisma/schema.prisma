@@ -1,16 +1,15 @@
-// Skema Prisma untuk Kelas Bermain.
+// Skema Kelas Bermain di Postgres sendiri.
 //
-// Migrasi dari Supabase ke Postgres sendiri. Modelnya diisi dengan
-// introspeksi dari database yang sekarang hidup (prisma db pull), bukan
-// disalin tangan dari 5.651 baris SQL — salah ketik satu kolom di sini
-// berarti data pindah dengan diam-diam rusak.
+// Diambil dengan introspeksi dari database Supabase yang hidup, lalu
+// disaring: 35 tabel internal Supabase Auth dibuang, dan `auth.users`
+// dipindahkan apa adanya ke skema public sebagai `users`. Id-nya tetap uuid
+// yang sama, jadi 24 foreign key dari tabel aplikasi tetap sah dan datanya
+// bisa disalin satu lawan satu.
 //
-// Yang hilang bersama Supabase dan harus dibangun ulang di lapisan aplikasi:
-//   · Auth        -> session cookie sendiri, hash argon2 di admin_users
-//   · RLS         -> pemeriksaan hak akses di server action, bukan di baris
-//   · Storage     -> disk/objek, mengikuti keputusan hosting
-//   · 90 fungsi SECURITY DEFINER -> sebagian tetap fungsi Postgres (yang
-//     menjaga keutuhan transaksi), sebagian pindah jadi transaksi Prisma
+// Yang hilang bersama Supabase dan dibangun ulang di lapisan aplikasi:
+//   · RLS      -> pemeriksaan hak akses di server action
+//   · Storage  -> mengikuti keputusan hosting
+//   · Auth     -> tabel sessions di bawah + hash argon2 di users
 
 generator client {
   provider = "prisma-client-js"
@@ -19,4 +18,425 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// Sesi admin. Pengganti Supabase Auth: satu baris per login, dirujuk oleh
+/// cookie httpOnly. Dihapus saat logout atau lewat masa berlaku.
+model sessions {
+  id         String   @id @db.Uuid
+  user_id    String   @db.Uuid
+  expires_at DateTime @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  user_agent String?
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+model users {
+  sessions                    sessions[]
+  id                          String                   @id @db.Uuid
+  email                       String?                  @db.VarChar(255)
+  encrypted_password          String?                  @db.VarChar(255)
+  created_at                  DateTime?                @db.Timestamptz(6)
+  updated_at                  DateTime?                @db.Timestamptz(6)
+  activity_logs               activity_logs[]
+  admin_users                 admin_users?
+  certificate_templates       certificate_templates[]
+  cms_collections             cms_collections[]
+  cms_sections                cms_sections[]
+  cms_versions                cms_versions[]
+  financial_transactions      financial_transactions[]
+  media                       media[]
+  payments                    payments[]
+  site_settings               site_settings[]
+  vouchers                    vouchers[]
+
+}
+model activity_logs {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?  @db.Uuid
+  action     String
+  entity     String
+  entity_id  String?
+  old_value  Json?
+  new_value  Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "activity_logs_created_idx")
+}
+model admin_users {
+  user_id    String   @id @db.Uuid
+  full_name  String   @default("")
+  role       String   @default("STAFF")
+  status     String   @default("ACTIVE")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+}
+model affiliates {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliate_number    String    @unique @default(dbgenerated("('KB-AFF-'::text || lpad((nextval('affiliate_number_seq'::regclass))::text, 5, '0'::text))"))
+  code                String?   @unique
+  full_name           String
+  whatsapp            String
+  email               String?
+  domicile            String    @default("")
+  bank_name           String
+  bank_account_number String
+  bank_account_name   String
+  reason              String?
+  status              String    @default("PENDING")
+  applied_at          DateTime  @default(now()) @db.Timestamptz(6)
+  verified_at         DateTime? @db.Timestamptz(6)
+  verified_by         String?
+  notes               String?
+
+  @@index([whatsapp])
+}
+model attendance_records {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_id String        @unique(map: "attendance_registration_idx") @db.Uuid
+  event_id        String
+  child_id        String        @db.Uuid
+  status          String        @default("NOT_ATTENDED")
+  checked_in_at   DateTime?     @db.Timestamptz(6)
+  method          String        @default("form")
+  recorded_by     String?
+  children        children      @relation(fields: [child_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  registrations   registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([event_id], map: "attendance_event_idx")
+  @@index([status], map: "attendance_status_idx")
+}
+model certificate_templates {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  description    String   @default("")
+  background_url String   @default("")
+  logo_url       String   @default("")
+  orientation    String   @default("LANDSCAPE")
+  config         Json     @default("{\"elements\": []}")
+  status         String   @default("DRAFT")
+  is_default     Boolean  @default(false)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  created_by     String?  @db.Uuid
+  users          users?   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status])
+}
+model certificates {
+  number           String        @id
+  registration_id  String        @db.Uuid
+  child_id         String        @db.Uuid
+  event_id         String
+  participant_name String
+  event_title      String
+  event_date       DateTime      @db.Date
+  organizer        String        @default("Kelas Bermain")
+  template         String        @default("classic")
+  issued_at        DateTime      @default(now()) @db.Timestamptz(6)
+  status           String        @default("issued")
+  signatory_name   String        @default("")
+  signatory_role   String        @default("")
+  children         children      @relation(fields: [child_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  registrations    registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([event_id], map: "certificates_event_idx")
+  @@index([registration_id], map: "certificates_registration_idx")
+}
+model children {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  child_number       String               @unique @default(dbgenerated("('KB-CHD-'::text || lpad((nextval('child_number_seq'::regclass))::text, 5, '0'::text))"))
+  customer_id        String               @db.Uuid
+  full_name          String
+  nickname           String
+  gender             String               @default("")
+  date_of_birth      DateTime?            @db.Date
+  age_years          Int?
+  age_months         Int?
+  age_recorded_at    DateTime?            @db.Timestamptz(6)
+  school             String               @default("")
+  grade              String               @default("—")
+  special_notes      String?
+  emergency_contact  String               @default("—")
+  status             String               @default("active")
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  attendance_records attendance_records[]
+  certificates       certificates[]
+  customers          customers            @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  registrations      registrations[]
+
+  @@index([customer_id], map: "children_customer_idx")
+}
+model cms_collections {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collection_key String
+  item_key       String
+  draft          Json      @default("{}")
+  published      Json?
+  sort_order     Int       @default(0)
+  is_visible     Boolean   @default(true)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_by     String?   @db.Uuid
+  published_at   DateTime? @db.Timestamptz(6)
+  archived       Boolean   @default(false)
+  users          users?    @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([collection_key, item_key])
+  @@index([collection_key, sort_order], map: "cms_collections_key_idx")
+}
+model cms_sections {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  page_key     String
+  section_key  String
+  draft        Json      @default("{}")
+  published    Json?
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_by   String?   @db.Uuid
+  published_at DateTime? @db.Timestamptz(6)
+  sort_order   Int       @default(0)
+  is_visible   Boolean   @default(true)
+  label        String    @default("")
+  section_type String    @default("")
+  archived     Boolean   @default(false)
+  presentation Json      @default("{}")
+  users        users?    @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([page_key, section_key])
+  @@index([page_key, sort_order], map: "cms_sections_order_idx")
+  @@index([page_key], map: "cms_sections_page_idx")
+}
+model cms_versions {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope      String
+  scope_key  String
+  snapshot   Json
+  note       String   @default("")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  created_by String?  @db.Uuid
+  users      users?   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([scope, scope_key, created_at(sort: Desc)], map: "cms_versions_scope_idx")
+}
+model customers {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_number String          @unique @default(dbgenerated("('KB-CUS-'::text || lpad((nextval('customer_number_seq'::regclass))::text, 5, '0'::text))"))
+  full_name       String
+  email           String          @default("")
+  whatsapp        String
+  domicile        String          @default("")
+  address         String          @default("")
+  city            String          @default("")
+  occupation      String          @default("—")
+  source          String
+  status          String          @default("active")
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  children        children[]
+  payments        payments[]
+  registrations   registrations[]
+
+  @@index([whatsapp])
+}
+model events {
+  id                 String   @id
+  slug               String   @unique
+  title              String
+  tagline            String   @default("")
+  summary            String   @default("")
+  description        Json     @default("[]")
+  about_event        Json?
+  category           String
+  cover              Json
+  poster             Json?
+  start_date         DateTime @db.Date
+  end_date           DateTime @db.Date
+  time_start         String   @default("09:00")
+  time_end           String   @default("12:00")
+  timezone           String   @default("WIB")
+  location           Json     @default("{}")
+  organizer          String   @default("Kelas Bermain")
+  age_min            Int      @default(3)
+  age_max            Int      @default(15)
+  capacity           Int      @default(0)
+  registered         Int      @default(0)
+  registration       Json     @default("{}")
+  agenda             Json     @default("[]")
+  speaker_ids        Json     @default("[]")
+  facilities         Json     @default("[]")
+  requirements       Json     @default("[]")
+  certificate        Json     @default("{}")
+  video              Json?
+  featured           Boolean  @default(false)
+  status             String   @default("DRAFT")
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+  show_on_event_page Boolean  @default(true)
+  show_in_history    Boolean  @default(true)
+
+  @@index([category])
+  @@index([start_date])
+  @@index([status])
+}
+model financial_transactions {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transaction_number String   @unique @default(dbgenerated("next_yearly_number('finance'::text, 'FT'::text, (EXTRACT(year FROM now()))::integer)"))
+  type               String
+  category           String   @default("EVENT_REGISTRATION")
+  reference_type     String?
+  reference_id       String?  @db.Uuid
+  description        String   @default("")
+  amount             Decimal  @default(0) @db.Decimal
+  transaction_date   DateTime @default(now()) @db.Timestamptz(6)
+  payment_method     String?
+  status             String   @default("CONFIRMED")
+  created_by         String?  @db.Uuid
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  users              users?   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([transaction_date(sort: Desc)], map: "financial_transactions_date_idx")
+  @@index([reference_type, reference_id], map: "financial_transactions_ref_idx")
+  @@index([type])
+}
+model media {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  file_name    String
+  storage_path String   @unique
+  public_url   String
+  alt_text     String   @default("")
+  mime_type    String   @default("")
+  file_size    BigInt   @default(0)
+  folder       String   @default("general")
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  created_by   String?  @db.Uuid
+  users        users?   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "media_created_idx")
+  @@index([folder])
+}
+model navigation_items {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label           String
+  href            String   @unique
+  sort_order      Int      @default(0)
+  is_visible      Boolean  @default(true)
+  open_in_new_tab Boolean  @default(false)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([sort_order], map: "navigation_items_order_idx")
+}
+model number_counters {
+  scope String
+  year  Int
+  value Int    @default(0)
+
+  @@id([scope, year])
+}
+model payments {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payment_number     String        @unique @default(dbgenerated("next_yearly_number('payment'::text, 'KB-PAY'::text, (EXTRACT(year FROM now()))::integer)"))
+  registration_id    String        @db.Uuid
+  customer_id        String        @db.Uuid
+  event_id           String
+  amount             Decimal       @default(0) @db.Decimal
+  method             String
+  status             String        @default("PENDING")
+  provider           String        @default("Manual Transfer")
+  reference          String?
+  proof_url          String?
+  created_at         DateTime      @default(now()) @db.Timestamptz(6)
+  paid_at            DateTime?     @db.Timestamptz(6)
+  expires_at         DateTime?     @db.Timestamptz(6)
+  invoice_number     String?
+  verified_at        DateTime?     @db.Timestamptz(6)
+  verified_by        String?       @db.Uuid
+  notes              String?
+  refund_reason      String?
+  proof_submitted_at DateTime?     @db.Timestamptz(6)
+  rejected_at        DateTime?     @db.Timestamptz(6)
+  rejection_reason   String?
+  customers          customers     @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  registrations      registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users?        @relation(fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "payments_created_idx")
+  @@index([event_id], map: "payments_event_idx")
+  @@index([registration_id], map: "payments_registration_idx")
+  @@index([status])
+}
+model registrations {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_number String                @unique @default(dbgenerated("next_yearly_number('registration'::text, 'KB-REG'::text, (EXTRACT(year FROM now()))::integer)"))
+  access_token        String                @unique(map: "registrations_access_token_idx") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id         String                @db.Uuid
+  child_id            String                @db.Uuid
+  event_id            String
+  registration_date   DateTime              @default(now()) @db.Timestamptz(6)
+  status              String                @default("REGISTERED")
+  payment_status      String                @default("PENDING")
+  attendance_status   String                @default("NOT_ATTENDED")
+  certificate_status  String                @default("NOT_ELIGIBLE")
+  payment_method      String                @default("NONE")
+  amount              Decimal               @default(0) @db.Decimal
+  source              String
+  qr_source           String?
+  affiliate_code      String?
+  age_override        Boolean               @default(false)
+  notes               String?
+  attendance_records  attendance_records?
+  certificates        certificates[]
+  payments            payments[]
+  children            children              @relation(fields: [child_id], references: [id], onUpdate: NoAction)
+  customers           customers             @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  voucher_redemptions voucher_redemptions[]
+
+  @@index([child_id], map: "registrations_child_idx")
+  @@index([customer_id], map: "registrations_customer_idx")
+  @@index([registration_date(sort: Desc)], map: "registrations_date_idx")
+  @@index([event_id], map: "registrations_event_idx")
+  @@index([payment_status])
+}
+model site_settings {
+  key        String   @id
+  value      Json     @default("{}")
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_by String?  @db.Uuid
+  users      users?   @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+}
+model voucher_redemptions {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_code    String
+  registration_id String        @db.Uuid
+  amount          Decimal       @default(0) @db.Decimal(12, 2)
+  redeemed_at     DateTime      @default(now()) @db.Timestamptz(6)
+  registrations   registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vouchers        vouchers      @relation(fields: [voucher_code], references: [code], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([voucher_code, registration_id])
+  @@index([voucher_code], map: "voucher_redemptions_code_idx")
+}
+model vouchers {
+  code                String                @id
+  description         String                @default("")
+  type                String
+  value               Decimal               @db.Decimal(12, 2)
+  max_discount        Decimal?              @db.Decimal(12, 2)
+  max_uses            Int?
+  used_count          Int                   @default(0)
+  min_children        Int                   @default(1)
+  event_id            String?
+  valid_from          DateTime?             @db.Date
+  valid_until         DateTime?             @db.Date
+  status              String                @default("ACTIVE")
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  created_by          String?               @db.Uuid
+  voucher_redemptions voucher_redemptions[]
+  users               users?                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status])
 }
