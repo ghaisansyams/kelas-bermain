@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getUpcomingEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 interface RecentRegistration {
   registration_number: string;
-  registration_date: string;
+  registration_date: Date;
   status: string;
   payment_status: string;
   customers: { full_name: string } | null;
@@ -19,36 +19,55 @@ interface RecentRegistration {
 
 export default async function AdminDashboardPage() {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
-  const todayIso = new Date().toISOString().slice(0, 10);
 
-  const [customers, children, registrations, todayRegistrations, pendingPayments, paidPayments, recent, events] =
-    await Promise.all([
-      supabase.from("customers").select("id", { count: "exact", head: true }),
-      supabase.from("children").select("id", { count: "exact", head: true }),
-      supabase.from("registrations").select("id", { count: "exact", head: true }),
-      supabase
-        .from("registrations")
-        .select("id", { count: "exact", head: true })
-        .gte("registration_date", `${todayIso}T00:00:00`),
-      supabase.from("payments").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
-      supabase.from("payments").select("amount").eq("status", "PAID"),
-      supabase
-        .from("registrations")
-        .select(
-          "registration_number, registration_date, status, payment_status, customers(full_name), children(full_name)",
-        )
-        .order("registration_date", { ascending: false })
-        .limit(5),
-      getUpcomingEvents(5),
+  // "Hari ini" menurut Jakarta, bukan UTC. Batas UTC jatuh pukul 07.00 WIB,
+  // jadi pendaftaran pukul 02.00 pagi tercatat sebagai kemarin.
+  const wibDate = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const startOfToday = new Date(`${wibDate}T00:00:00+07:00`);
+
+  let failed = false;
+  let customers = 0;
+  let children = 0;
+  let registrations = 0;
+  let todayRegistrations = 0;
+  let pendingPayments = 0;
+  let paidTotal = 0;
+  let recentRows: RecentRegistration[] = [];
+  const events = await getUpcomingEvents(5);
+
+  try {
+    const [c, ch, r, today, pending, paid, recent] = await Promise.all([
+      db.customers.count(),
+      db.children.count(),
+      db.registrations.count(),
+      db.registrations.count({ where: { registration_date: { gte: startOfToday } } }),
+      // Menunggu dicek ikut dihitung: itu pembayaran yang butuh tindakan admin,
+      // dan tanpa ini angkanya tidak naik tepat saat ada pekerjaan menunggu.
+      db.payments.count({ where: { status: { in: ["PENDING", "WAITING_VERIFICATION"] } } }),
+      db.payments.aggregate({ _sum: { amount: true }, where: { status: "PAID" } }),
+      db.registrations.findMany({
+        select: {
+          registration_number: true,
+          registration_date: true,
+          status: true,
+          payment_status: true,
+          customers: { select: { full_name: true } },
+          children: { select: { full_name: true } },
+        },
+        orderBy: { registration_date: "desc" },
+        take: 5,
+      }),
     ]);
-
-  const failed = customers.error ?? registrations.error ?? null;
-  const paidTotal = (paidPayments.data ?? []).reduce(
-    (sum, row) => sum + Number((row as { amount: number }).amount ?? 0),
-    0,
-  );
-  const recentRows = (recent.data ?? []) as unknown as RecentRegistration[];
+    customers = c;
+    children = ch;
+    registrations = r;
+    todayRegistrations = today;
+    pendingPayments = pending;
+    paidTotal = Number(paid._sum.amount ?? 0);
+    recentRows = recent;
+  } catch {
+    failed = true;
+  }
 
   return (
     <div className="space-y-6">
@@ -60,11 +79,11 @@ export default async function AdminDashboardPage() {
       {failed ? <Notice tone="error">Sebagian data gagal dimuat. Muat ulang halaman.</Notice> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Pendamping" value={String(customers.count ?? 0)} />
-        <StatCard label="Anak" value={String(children.count ?? 0)} />
-        <StatCard label="Registrasi" value={String(registrations.count ?? 0)} />
-        <StatCard label="Registrasi hari ini" value={String(todayRegistrations.count ?? 0)} />
-        <StatCard label="Pembayaran pending" value={String(pendingPayments.count ?? 0)} />
+        <StatCard label="Pendamping" value={String(customers)} />
+        <StatCard label="Anak" value={String(children)} />
+        <StatCard label="Registrasi" value={String(registrations)} />
+        <StatCard label="Registrasi hari ini" value={String(todayRegistrations)} />
+        <StatCard label="Pembayaran pending" value={String(pendingPayments)} />
         <StatCard
           label="Pembayaran lunas"
           value={formatRupiah(paidTotal)}

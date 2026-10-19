@@ -1,7 +1,7 @@
 import { Card, PageHeader } from "@/components/admin/admin-ui";
 import { EmptyRow, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -49,15 +49,32 @@ function describe(value: Record<string, unknown> | null): string {
 
 export default async function AdminActivityLogPage() {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
+  let rows: LogRow[] = [];
+  let error = false;
 
-  const { data, error } = await supabase
-    .from("activity_logs")
-    .select("id, action, entity, entity_id, old_value, new_value, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  const rows = (data ?? []) as LogRow[];
+  try {
+    const list = await db.activity_logs.findMany({
+      select: {
+        id: true,
+        action: true,
+        entity: true,
+        entity_id: true,
+        old_value: true,
+        new_value: true,
+        created_at: true,
+      },
+      orderBy: { created_at: "desc" },
+      take: 100,
+    });
+    rows = list.map((row) => ({
+      ...row,
+      old_value: row.old_value as Record<string, unknown> | null,
+      new_value: row.new_value as Record<string, unknown> | null,
+      created_at: row.created_at.toISOString(),
+    }));
+  } catch {
+    error = true;
+  }
 
   return (
     <div className="space-y-5">
