@@ -7,26 +7,27 @@
  * — Firefox, bukan Chromium, karena macOS di mesin ini terlalu tua untuk
  * build Chrome yang sekarang.
  *
- * Kenapa harus dijalankan dari laptop, bukan dari Vercel: Instagram memblokir
- * permintaan dari IP datacenter, dan menjalankan browser di serverless bukan
- * ide yang sehat. Jadi alurnya: skrip ini menulis ke Supabase, lalu situs
- * membacanya dari sana. Tidak perlu deploy ulang — halaman Update menyegarkan
- * dirinya tiap jam.
+ * Kenapa harus dijalankan dari laptop, bukan dari server: Instagram memblokir
+ * permintaan dari IP datacenter, dan menjalankan browser di produksi bukan
+ * ide yang sehat. Jadi alurnya: skrip ini menulis langsung ke Postgres, lalu
+ * situs membacanya dari sana. Tidak perlu deploy ulang — halaman Update
+ * menyegarkan dirinya tiap jam.
  *
  * Kenapa gambarnya diunduh ulang: URL CDN Instagram ditandatangani dan mati
  * dalam hitungan minggu. Kalau yang disimpan URL-nya, halaman Update akan
- * penuh gambar rusak bulan depan. Jadi gambarnya dipindahkan ke Supabase
- * Storage dan yang disimpan URL milik sendiri.
+ * penuh gambar rusak bulan depan. Jadi gambarnya dipindahkan ke UPLOAD_DIR
+ * (bawaan public/uploads) dan yang disimpan alamat /uploads/... milik sendiri.
+ *
+ * Postingan masuk sebagai DRAF, sama seperti jalur Apify produksi
+ * (lib/services/instagram-sync.ts) — admin menekan Terbitkan di CMS sebelum
+ * tampil ke publik. Skrip ini cadangan gratis kalau kuota Apify habis; kalau
+ * Apify masih berjalan, biarkan cron yang bekerja dan jangan jalankan ini.
  *
  * Pemakaian:
  *   npm run instagram:scrape -- --dry    # lihat hasilnya, tidak menulis
- *   npm run instagram:scrape             # tulis ke Supabase
+ *   npm run instagram:scrape             # tulis ke Postgres
  *
- * Butuh di .env.local:
- *   NEXT_PUBLIC_SUPABASE_URL
- *   NEXT_PUBLIC_SUPABASE_ANON_KEY
- *   SUPABASE_ADMIN_EMAIL      — akun admin yang biasa dipakai login ke /admin
- *   SUPABASE_ADMIN_PASSWORD
+ * Butuh DATABASE_URL di .env (dibaca Prisma CLI dan skrip migrasi lain).
  *
  * Catatan: ini mengambil konten dari akun Instagram milik sendiri. Instagram
  * tidak mengizinkan pengambilan data otomatis di ketentuan layanannya, dan
@@ -35,14 +36,16 @@
  * menghapus apa pun yang sudah ada.
  */
 
-import { readFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import puppeteer from "puppeteer-core";
+import pg from "pg";
 
 const USERNAME = process.env.INSTAGRAM_USERNAME?.replace(/^@/, "") || "kelasbermain.id";
 const LIMIT = Number(process.env.INSTAGRAM_LIMIT || 12);
 const BUCKET = "website";
 const COLLECTION = "updates";
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "public/uploads";
 const DRY = process.argv.includes("--dry");
 
 const FIREFOX =
@@ -231,88 +234,71 @@ async function scrape() {
 }
 
 // ------------------------------------------------------------------
-// Menulis ke Supabase
+// Menulis ke Postgres
 // ------------------------------------------------------------------
 
 async function publish(posts) {
-  const url = readEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  const email = readEnv("SUPABASE_ADMIN_EMAIL");
-  const password = readEnv("SUPABASE_ADMIN_PASSWORD");
+  const databaseUrl = readEnv("DATABASE_URL");
+  if (!databaseUrl) throw new Error("DATABASE_URL belum diisi di .env.");
 
-  if (!url || !anonKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL / ANON_KEY belum diisi di .env.local.");
-  if (!email || !password) {
-    throw new Error(
-      "SUPABASE_ADMIN_EMAIL dan SUPABASE_ADMIN_PASSWORD belum diisi di .env.local.\n" +
-        "Pakai akun admin yang sama dengan yang dipakai login ke /admin.",
-    );
-  }
-
-  // Login sebagai admin biasa, bukan service role. Skrip ini hanya boleh
-  // melakukan apa yang admin boleh lakukan lewat antarmuka.
-  const supabase = createClient(url, anonKey, { auth: { persistSession: false } });
-  const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-  if (authError) throw new Error(`Gagal login sebagai admin: ${authError.message}`);
+  const client = new pg.Client({ connectionString: databaseUrl });
+  await client.connect();
 
   let uploaded = 0;
   let reused = 0;
 
-  for (const post of posts) {
-    const path = `instagram/${post.shortcode}.jpg`;
-    const { data: existing } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  try {
+    for (const post of posts) {
+      const relative = `${BUCKET}/instagram/${post.shortcode}.jpg`;
+      const filePath = join(UPLOAD_DIR, relative);
+      const publicUrl = `/uploads/${relative}`;
 
-    // Hanya unduh sekali. Postingan lama tidak berubah gambarnya, dan
-    // mengunduh ulang tiap sinkron itu sia-sia.
-    const head = await fetch(existing.publicUrl, { method: "HEAD" }).catch(() => null);
-    if (head?.ok) {
-      reused += 1;
-    } else {
-      const response = await fetch(post.imageUrl);
-      if (!response.ok) {
-        console.warn(`  ! gambar ${post.shortcode} gagal diunduh (HTTP ${response.status}), dilewati`);
-        continue;
+      // Hanya unduh sekali. Postingan lama tidak berubah gambarnya, dan
+      // mengunduh ulang tiap sinkron itu sia-sia.
+      if (existsSync(filePath)) {
+        reused += 1;
+      } else {
+        const response = await fetch(post.imageUrl);
+        if (!response.ok) {
+          console.warn(`  ! gambar ${post.shortcode} gagal diunduh (HTTP ${response.status}), dilewati`);
+          continue;
+        }
+        mkdirSync(dirname(filePath), { recursive: true });
+        writeFileSync(filePath, Buffer.from(await response.arrayBuffer()));
+        uploaded += 1;
       }
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
-      if (error) {
-        console.warn(`  ! gambar ${post.shortcode} gagal diunggah: ${error.message}`);
-        continue;
-      }
-      uploaded += 1;
-    }
 
-    const content = {
-      slug: post.slug,
-      title: post.title,
-      excerpt: post.excerpt,
-      imageUrl: existing.publicUrl,
-      postUrl: post.permalink,
-      publishedAt: post.publishedAt,
-      category: post.category,
-    };
+      const content = {
+        slug: post.slug,
+        title: post.title,
+        excerpt: post.excerpt,
+        imageUrl: publicUrl,
+        postUrl: post.permalink,
+        publishedAt: post.publishedAt,
+        category: post.category,
+      };
 
-    const { error } = await supabase
-      .from("cms_collections")
-      .upsert(
-        {
-          collection_key: COLLECTION,
-          item_key: `ig-${post.shortcode}`,
-          draft: content,
-          published: content,
-          published_at: new Date().toISOString(),
+      // Draf saja — sama seperti jalur Apify produksi. Admin yang menekan
+      // Terbitkan di CMS, supaya satu salah unggah di Instagram tidak
+      // langsung jadi halaman di situs tanpa ada yang memeriksa.
+      await client.query(
+        `insert into cms_collections (collection_key, item_key, draft, sort_order, is_visible)
+         values ($1, $2, $3, $4, true)
+         on conflict (collection_key, item_key) do update
+           set draft = excluded.draft, sort_order = excluded.sort_order`,
+        [
+          COLLECTION,
+          `ig-${post.shortcode}`,
+          JSON.stringify(content),
           // Terbaru di atas. Tanggal dibalik supaya urutannya stabil.
-          sort_order: -Number(post.publishedAt.replace(/-/g, "")),
-          is_visible: true,
-        },
-        { onConflict: "collection_key,item_key" },
+          -Number(post.publishedAt.replace(/-/g, "")),
+        ],
       );
-
-    if (error) throw new Error(`Gagal menyimpan ${post.shortcode}: ${error.message}`);
+    }
+  } finally {
+    await client.end();
   }
 
-  await supabase.auth.signOut();
   return { uploaded, reused };
 }
 
@@ -330,6 +316,6 @@ if (DRY) {
 const { uploaded, reused } = await publish(posts);
 
 console.log(`\nSelesai.`);
-console.log(`  ${posts.length} postingan disimpan ke halaman Update`);
+console.log(`  ${posts.length} postingan disimpan sebagai draf — buka /admin/cms untuk menerbitkannya`);
 console.log(`  ${uploaded} gambar baru diunggah, ${reused} dipakai ulang`);
 console.log(`\nHalaman Update menyegarkan dirinya tiap jam, jadi tidak perlu deploy ulang.`);
