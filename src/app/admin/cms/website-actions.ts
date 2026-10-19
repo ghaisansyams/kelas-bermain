@@ -7,7 +7,9 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { findCollection, findPage, findSection, type FieldDef } from "@/lib/cms/schema";
 import { findTemplate, TEMPLATE_PAGE_KEY } from "@/lib/cms/section-templates";
 import { findThemePreset } from "@/lib/cms/theme-presets";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Prisma } from "@prisma/client";
+import { asAdmin } from "@/lib/admin/actor";
+import { db } from "@/lib/db";
 
 /**
  * Every CMS write goes through here. Authorisation is re-checked server-side
@@ -18,6 +20,18 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function back(tab: string, status: string): never {
   redirect(`/admin/cms?tab=${tab}&status=${status}`);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Pembaruan yang tidak menemukan baris bukan keberhasilan. Supabase membalas
+ * UPDATE tanpa baris cocok dengan "tidak ada galat", jadi admin melihat
+ * "tersimpan" padahal tidak ada yang berubah — kunci bagian yang salah, atau
+ * bagian yang sudah dihapus, tampak sukses. Nol baris dihitung gagal.
+ */
+function changed(result: { count: number }) {
+  if (result.count === 0) throw new Error("no rows matched");
 }
 
 /** Reads a form against a field list, so only known fields are ever stored. */
@@ -65,7 +79,7 @@ function revalidatePublic() {
 /* ------------------------------------------------------------------ */
 
 export async function saveSectionDraftAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "");
   const sectionKey = String(formData.get("sectionKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
@@ -77,14 +91,22 @@ export async function saveSectionDraftAction(formData: FormData) {
   const problem = validate(content, section.fields);
   if (problem) redirect(`/admin/cms?tab=${tab}&status=invalid&message=${encodeURIComponent(problem)}`);
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ draft: content, updated_at: new Date().toISOString() })
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey);
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: sectionKey },
+        data: {
+          draft: content as Prisma.InputJsonValue,
+          updated_at: new Date(),
+          updated_by: session.userId,
+        },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("CMS_UPDATE", "cms_sections", `${pageKey}.${sectionKey}`, null, content);
   revalidatePath("/admin/cms");
@@ -98,14 +120,18 @@ export async function setSectionVisibilityAction(formData: FormData) {
   const tab = String(formData.get("tab") ?? pageKey);
   const visible = String(formData.get("visible")) === "true";
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ is_visible: visible })
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey);
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: sectionKey },
+        data: { is_visible: visible },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity(
     visible ? "SECTION_SHOW" : "SECTION_HIDE",
@@ -127,14 +153,12 @@ export async function moveSectionAction(formData: FormData) {
   const tab = String(formData.get("tab") ?? pageKey);
   const direction = String(formData.get("direction") ?? "up");
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("cms_sections")
-    .select("section_key, sort_order")
-    .eq("page_key", pageKey)
-    .order("sort_order");
+  const rows = await db.cms_sections.findMany({
+    where: { page_key: pageKey },
+    orderBy: { sort_order: "asc" },
+    select: { section_key: true, sort_order: true },
+  });
 
-  const rows = (data ?? []) as { section_key: string; sort_order: number }[];
   const index = rows.findIndex((row) => row.section_key === sectionKey);
   const swapWith = direction === "up" ? index - 1 : index + 1;
   if (index === -1 || swapWith < 0 || swapWith >= rows.length) back(tab, "error");
@@ -142,16 +166,24 @@ export async function moveSectionAction(formData: FormData) {
   const current = rows[index];
   const other = rows[swapWith];
 
-  await supabase
-    .from("cms_sections")
-    .update({ sort_order: other.sort_order })
-    .eq("page_key", pageKey)
-    .eq("section_key", current.section_key);
-  await supabase
-    .from("cms_sections")
-    .update({ sort_order: current.sort_order })
-    .eq("page_key", pageKey)
-    .eq("section_key", other.section_key);
+  // Satu transaksi: dua UPDATE terpisah yang berhenti di tengah menyisakan dua
+  // bagian dengan urutan yang sama, dan urutannya tidak lagi unik.
+  let failed = false;
+  try {
+    await db.$transaction([
+      db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: current.section_key },
+        data: { sort_order: other.sort_order },
+      }),
+      db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: other.section_key },
+        data: { sort_order: current.sort_order },
+      }),
+    ]);
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("CMS_UPDATE", "cms_sections", `${pageKey}.${sectionKey}`, null, {
     direction,
@@ -162,18 +194,23 @@ export async function moveSectionAction(formData: FormData) {
 }
 
 export async function publishPageAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
   if (!findPage(pageKey)) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_publish_page", {
-    p_page_key: pageKey,
-    p_note: "",
-  });
-
-  if (error) back(tab, "error");
+  // Fungsi database menyalin draf ke tayang dan menyimpan snapshot versi dalam
+  // satu transaksi, dan memeriksa is_admin() sendiri.
+  let failed = false;
+  try {
+    await asAdmin(
+      session,
+      (tx) => tx.$executeRaw`select admin_publish_page(${pageKey}, ${""})`,
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   revalidatePublic();
   revalidatePath("/admin/cms");
@@ -185,7 +222,7 @@ export async function publishPageAction(formData: FormData) {
 /* ------------------------------------------------------------------ */
 
 export async function saveCollectionItemAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const collectionKey = String(formData.get("collectionKey") ?? "");
   const tab = String(formData.get("tab") ?? "home");
   const itemKey = String(formData.get("itemKey") ?? "").trim();
@@ -197,35 +234,37 @@ export async function saveCollectionItemAction(formData: FormData) {
   const problem = validate(content, collection.fields);
   if (problem) redirect(`/admin/cms?tab=${tab}&status=invalid&message=${encodeURIComponent(problem)}`);
 
-  const supabase = await createSupabaseServerClient();
+  const draft = content as Prisma.InputJsonValue;
 
-  if (itemKey) {
-    const { error } = await supabase
-      .from("cms_collections")
-      .update({ draft: content, updated_at: new Date().toISOString() })
-      .eq("collection_key", collectionKey)
-      .eq("item_key", itemKey);
-    if (error) back(tab, "error");
-    await logActivity("CMS_UPDATE", "cms_collections", `${collectionKey}.${itemKey}`, null, content);
-  } else {
-    // New items go to the end of the list.
-    const { data } = await supabase
-      .from("cms_collections")
-      .select("sort_order")
-      .eq("collection_key", collectionKey)
-      .order("sort_order", { ascending: false })
-      .limit(1);
-    const last = ((data ?? [])[0] as { sort_order: number } | undefined)?.sort_order ?? 0;
-    const newKey = `item-${Date.now().toString(36)}`;
+  try {
+    if (itemKey) {
+      await db.cms_collections.update({
+        where: { collection_key_item_key: { collection_key: collectionKey, item_key: itemKey } },
+        data: { draft, updated_at: new Date(), updated_by: session.userId },
+      });
+      await logActivity("CMS_UPDATE", "cms_collections", `${collectionKey}.${itemKey}`, null, content);
+    } else {
+      // New items go to the end of the list.
+      const last = await db.cms_collections.findFirst({
+        where: { collection_key: collectionKey },
+        orderBy: { sort_order: "desc" },
+        select: { sort_order: true },
+      });
+      const newKey = `item-${Date.now().toString(36)}`;
 
-    const { error } = await supabase.from("cms_collections").insert({
-      collection_key: collectionKey,
-      item_key: newKey,
-      draft: content,
-      sort_order: last + 10,
-    });
-    if (error) back(tab, "error");
-    await logActivity("CMS_CREATE", "cms_collections", `${collectionKey}.${newKey}`, null, content);
+      await db.cms_collections.create({
+        data: {
+          collection_key: collectionKey,
+          item_key: newKey,
+          draft,
+          sort_order: (last?.sort_order ?? 0) + 10,
+          updated_by: session.userId,
+        },
+      });
+      await logActivity("CMS_CREATE", "cms_collections", `${collectionKey}.${newKey}`, null, content);
+    }
+  } catch {
+    back(tab, "error");
   }
 
   revalidatePath("/admin/cms");
@@ -238,14 +277,13 @@ export async function deleteCollectionItemAction(formData: FormData) {
   const itemKey = String(formData.get("itemKey") ?? "");
   const tab = String(formData.get("tab") ?? "home");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_collections")
-    .delete()
-    .eq("collection_key", collectionKey)
-    .eq("item_key", itemKey);
-
-  if (error) back(tab, "error");
+  try {
+    await db.cms_collections.deleteMany({
+      where: { collection_key: collectionKey, item_key: itemKey },
+    });
+  } catch {
+    back(tab, "error");
+  }
 
   await logActivity("CMS_DELETE", "cms_collections", `${collectionKey}.${itemKey}`, { itemKey }, null);
   revalidatePublic();
@@ -260,14 +298,12 @@ export async function moveCollectionItemAction(formData: FormData) {
   const tab = String(formData.get("tab") ?? "home");
   const direction = String(formData.get("direction") ?? "up");
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("cms_collections")
-    .select("item_key, sort_order")
-    .eq("collection_key", collectionKey)
-    .order("sort_order");
+  const rows = await db.cms_collections.findMany({
+    where: { collection_key: collectionKey },
+    orderBy: { sort_order: "asc" },
+    select: { item_key: true, sort_order: true },
+  });
 
-  const rows = (data ?? []) as { item_key: string; sort_order: number }[];
   const index = rows.findIndex((row) => row.item_key === itemKey);
   const swapWith = direction === "up" ? index - 1 : index + 1;
   if (index === -1 || swapWith < 0 || swapWith >= rows.length) back(tab, "error");
@@ -275,16 +311,16 @@ export async function moveCollectionItemAction(formData: FormData) {
   const current = rows[index];
   const other = rows[swapWith];
 
-  await supabase
-    .from("cms_collections")
-    .update({ sort_order: other.sort_order })
-    .eq("collection_key", collectionKey)
-    .eq("item_key", current.item_key);
-  await supabase
-    .from("cms_collections")
-    .update({ sort_order: current.sort_order })
-    .eq("collection_key", collectionKey)
-    .eq("item_key", other.item_key);
+  await db.$transaction([
+    db.cms_collections.update({
+      where: { collection_key_item_key: { collection_key: collectionKey, item_key: current.item_key } },
+      data: { sort_order: other.sort_order },
+    }),
+    db.cms_collections.update({
+      where: { collection_key_item_key: { collection_key: collectionKey, item_key: other.item_key } },
+      data: { sort_order: current.sort_order },
+    }),
+  ]);
 
   revalidatePublic();
   revalidatePath("/admin/cms");
@@ -298,29 +334,62 @@ export async function setCollectionItemVisibilityAction(formData: FormData) {
   const tab = String(formData.get("tab") ?? "home");
   const visible = String(formData.get("visible")) === "true";
 
-  const supabase = await createSupabaseServerClient();
-  await supabase
-    .from("cms_collections")
-    .update({ is_visible: visible })
-    .eq("collection_key", collectionKey)
-    .eq("item_key", itemKey);
+  await db.cms_collections.updateMany({
+    where: { collection_key: collectionKey, item_key: itemKey },
+    data: { is_visible: visible },
+  });
 
   revalidatePublic();
   revalidatePath("/admin/cms");
   back(tab, visible ? "shown" : "hidden");
 }
 
+/**
+ * Menerbitkan semua draf di sebuah koleksi. Snapshot isi yang sedang tayang
+ * disimpan dulu ke cms_versions supaya bisa dipulihkan, lalu draf disalin ke
+ * `published` — hanya untuk baris yang drafnya memang berbeda.
+ */
 export async function publishCollectionAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const collectionKey = String(formData.get("collectionKey") ?? "");
   const tab = String(formData.get("tab") ?? "home");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_publish_collection", {
-    p_collection_key: collectionKey,
-  });
+  try {
+    const rows = await db.cms_collections.findMany({ where: { collection_key: collectionKey } });
+    const changed = rows.filter(
+      (row) => JSON.stringify(row.draft ?? null) !== JSON.stringify(row.published ?? null),
+    );
 
-  if (error) back(tab, "error");
+    await db.$transaction([
+      db.cms_versions.create({
+        data: {
+          scope: "collection",
+          scope_key: collectionKey,
+          snapshot: rows.map((row) => ({
+            itemKey: row.item_key,
+            published: row.published,
+            sortOrder: row.sort_order,
+            isVisible: row.is_visible,
+          })) as Prisma.InputJsonValue,
+          created_by: session.userId,
+        },
+      }),
+      ...changed.map((row) =>
+        db.cms_collections.update({
+          where: { id: row.id },
+          data: {
+            published: row.draft as Prisma.InputJsonValue,
+            published_at: new Date(),
+            updated_by: session.userId,
+          },
+        }),
+      ),
+    ]);
+
+    await logActivity("CMS_PUBLISH", "cms_collections", collectionKey, null, { items: changed.length });
+  } catch {
+    back(tab, "error");
+  }
 
   revalidatePublic();
   revalidatePath("/admin/cms");
@@ -329,13 +398,21 @@ export async function publishCollectionAction(formData: FormData) {
 
 /** Restores the content a page or collection had before an earlier publish. */
 export async function restoreVersionAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const versionId = String(formData.get("versionId") ?? "");
   const tab = String(formData.get("tab") ?? "home");
+  if (!UUID.test(versionId)) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_restore_version", { p_version_id: versionId });
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await asAdmin(
+      session,
+      (tx) => tx.$executeRaw`select admin_restore_version(${versionId}::uuid)`,
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   revalidatePublic();
   revalidatePath("/admin/cms");
@@ -353,7 +430,7 @@ export async function restoreVersionAction(formData: FormData) {
  * means slides the team already published are not lost.
  */
 export async function saveHeroSlidesAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const tab = String(formData.get("tab") ?? "home");
   const raw = String(formData.get("hero_slides.json") ?? "[]");
 
@@ -370,14 +447,22 @@ export async function saveHeroSlidesAction(formData: FormData) {
     (slide) => typeof slide?.image === "string" && slide.image.trim(),
   );
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ draft: { slides: cleaned }, updated_at: new Date().toISOString() })
-    .eq("page_key", "home")
-    .eq("section_key", "hero_slides");
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: "home", section_key: "hero_slides" },
+        data: {
+          draft: { slides: cleaned } as Prisma.InputJsonValue,
+          updated_at: new Date(),
+          updated_by: session.userId,
+        },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("CMS_UPDATE", "cms_sections", "home.hero_slides", null, {
     slides: cleaned.length,
@@ -407,9 +492,13 @@ export async function setEventPlacementAction(formData: FormData) {
     show_in_history: flag("showInHistory"),
   };
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("events").update(placement).eq("id", eventId);
-  if (error) back("events", "error");
+  let failed = false;
+  try {
+    await db.events.update({ where: { id: eventId }, data: placement });
+  } catch {
+    failed = true;
+  }
+  if (failed) back("events", "error");
 
   await logActivity(
     placement.featured ? "EVENT_FEATURED" : "EVENT_UNFEATURED",
@@ -438,6 +527,7 @@ export async function saveCertificateTemplateAction(formData: FormData) {
   const templateId = String(formData.get("templateId") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) back("certificates", "invalid");
+  if (templateId && !UUID.test(templateId)) back("certificates", "error");
 
   let config: unknown;
   try {
@@ -455,46 +545,54 @@ export async function saveCertificateTemplateAction(formData: FormData) {
     orientation: String(formData.get("orientation") ?? "LANDSCAPE") === "PORTRAIT"
       ? "PORTRAIT"
       : "LANDSCAPE",
-    config: config as never,
+    config: config as Prisma.InputJsonValue,
     status: ["DRAFT", "PUBLISHED", "ARCHIVED"].includes(statusRaw) ? statusRaw : "DRAFT",
-    updated_at: new Date().toISOString(),
+    updated_at: new Date(),
   };
 
-  const supabase = await createSupabaseServerClient();
-
-  if (templateId) {
-    const { error } = await supabase
-      .from("certificate_templates")
-      .update(payload)
-      .eq("id", templateId);
-    if (error) back("certificates", "error");
-    await logActivity("CERTIFICATE_TEMPLATE_UPDATE", "certificate_templates", templateId, null, {
-      name,
-      status: payload.status,
-    });
-  } else {
-    const { error } = await supabase.from("certificate_templates").insert(payload);
-    if (error) back("certificates", "error");
-    await logActivity("CERTIFICATE_TEMPLATE_CREATE", "certificate_templates", name, null, {
-      name,
-      status: payload.status,
-    });
+  let failed = false;
+  try {
+    if (templateId) {
+      await db.certificate_templates.update({ where: { id: templateId }, data: payload });
+    } else {
+      await db.certificate_templates.create({ data: payload });
+    }
+  } catch {
+    failed = true;
   }
+  if (failed) back("certificates", "error");
+
+  await logActivity(
+    templateId ? "CERTIFICATE_TEMPLATE_UPDATE" : "CERTIFICATE_TEMPLATE_CREATE",
+    "certificate_templates",
+    templateId || name,
+    null,
+    { name, status: payload.status },
+  );
 
   revalidatePath("/admin/cms");
   back("certificates", "published");
 }
 
 export async function setDefaultCertificateTemplateAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const templateId = String(formData.get("templateId") ?? "");
-  if (!templateId) back("certificates", "error");
+  if (!UUID.test(templateId)) back("certificates", "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_set_default_certificate_template", {
-    p_template_id: templateId,
-  });
-  if (error) back("certificates", "error");
+  // Fungsi database yang melepas bawaan lama dan memasang yang baru dalam satu
+  // transaksi: tanpa itu ada saat singkat tanpa template bawaan sama sekali,
+  // atau dua sekaligus.
+  let failed = false;
+  try {
+    await asAdmin(
+      session,
+      (tx) =>
+        tx.$executeRaw`select admin_set_default_certificate_template(${templateId}::uuid)`,
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back("certificates", "error");
 
   revalidatePath("/admin/cms");
   revalidatePath("/certificate", "layout");
@@ -504,16 +602,20 @@ export async function setDefaultCertificateTemplateAction(formData: FormData) {
 export async function deleteCertificateTemplateAction(formData: FormData) {
   await requireAdmin();
   const templateId = String(formData.get("templateId") ?? "");
-  if (!templateId) back("certificates", "error");
+  if (!UUID.test(templateId)) back("certificates", "error");
 
-  const supabase = await createSupabaseServerClient();
   // Archive rather than delete: a certificate issued with this design should
   // still be renderable later.
-  const { error } = await supabase
-    .from("certificate_templates")
-    .update({ status: "ARCHIVED", is_default: false })
-    .eq("id", templateId);
-  if (error) back("certificates", "error");
+  let failed = false;
+  try {
+    await db.certificate_templates.update({
+      where: { id: templateId },
+      data: { status: "ARCHIVED", is_default: false },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back("certificates", "error");
 
   await logActivity("CERTIFICATE_TEMPLATE_ARCHIVE", "certificate_templates", templateId, null, {
     status: "ARCHIVED",
@@ -524,20 +626,24 @@ export async function deleteCertificateTemplateAction(formData: FormData) {
 
 /** Clears every theme override, putting the site back to its shipped look. */
 export async function resetThemeAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const tab = String(formData.get("tab") ?? "global");
   const empty = Object.fromEntries(
     (findSection("global", "theme")?.fields ?? []).map((field) => [field.key, ""]),
   );
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ draft: empty, updated_at: new Date().toISOString() })
-    .eq("page_key", "global")
-    .eq("section_key", "theme");
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: "global", section_key: "theme" },
+        data: { draft: empty, updated_at: new Date(), updated_by: session.userId },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("CMS_UPDATE", "cms_sections", "global.theme", null, { reset: true });
   revalidatePath("/admin/cms");
@@ -554,7 +660,7 @@ export async function resetThemeAction(formData: FormData) {
  * is what makes dragging safe (§6).
  */
 export async function reorderSectionsAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
   const keys = String(formData.get("order") ?? "")
@@ -564,13 +670,16 @@ export async function reorderSectionsAction(formData: FormData) {
 
   if (!pageKey || keys.length === 0) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_reorder_sections", {
-    p_page_key: pageKey,
-    p_section_keys: keys,
-  });
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await asAdmin(
+      session,
+      (tx) => tx.$executeRaw`select admin_reorder_sections(${pageKey}, ${keys}::text[])`,
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   revalidatePublic();
   revalidatePath("/admin/cms");
@@ -581,43 +690,38 @@ export async function reorderSectionsAction(formData: FormData) {
  *  a duplicated "Yang Diasah" shares the same items rather than cloning rows
  *  that are supposed to exist once (§7). */
 export async function duplicateSectionAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "");
   const sectionKey = String(formData.get("sectionKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("cms_sections")
-    .select("draft, label, sort_order, section_type, presentation")
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey)
-    .maybeSingle();
-
-  if (!data) back(tab, "error");
-  const row = data as unknown as {
-    draft: Record<string, unknown> | null;
-    label: string;
-    sort_order: number;
-    section_type: string;
-    presentation: Record<string, unknown>;
-  };
+  const row = await db.cms_sections.findUnique({
+    where: { page_key_section_key: { page_key: pageKey, section_key: sectionKey } },
+    select: { draft: true, label: true, sort_order: true, section_type: true, presentation: true },
+  });
+  if (!row) back(tab, "error");
 
   const newKey = `${sectionKey}-copy-${Date.now().toString(36)}`;
-  const { error } = await supabase.from("cms_sections").insert({
-    page_key: pageKey,
-    section_key: newKey,
-    label: `${row.label || sectionKey} (salinan)`,
-    section_type: row.section_type || sectionKey,
-    // Draft only: a copy is never live until the admin publishes it.
-    draft: row.draft ?? {},
-    published: null,
-    presentation: row.presentation ?? {},
-    sort_order: row.sort_order + 5,
-    is_visible: true,
-  });
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await db.cms_sections.create({
+      data: {
+        page_key: pageKey,
+        section_key: newKey,
+        label: `${row.label || sectionKey} (salinan)`,
+        section_type: row.section_type || sectionKey,
+        // Draft only: a copy is never live until the admin publishes it.
+        draft: (row.draft ?? {}) as Prisma.InputJsonValue,
+        presentation: (row.presentation ?? {}) as Prisma.InputJsonValue,
+        sort_order: row.sort_order + 5,
+        is_visible: true,
+        updated_by: session.userId,
+      },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_DUPLICATE", "cms_sections", `${pageKey}.${newKey}`, null, {
     from: sectionKey,
@@ -628,7 +732,7 @@ export async function duplicateSectionAction(formData: FormData) {
 
 /** Adds a section from a template, as a draft. */
 export async function addSectionAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "home");
   const tab = String(formData.get("tab") ?? pageKey);
   const type = String(formData.get("sectionType") ?? "");
@@ -636,29 +740,31 @@ export async function addSectionAction(formData: FormData) {
   const template = findTemplate(type);
   if (!template) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("cms_sections")
-    .select("sort_order")
-    .eq("page_key", pageKey)
-    .order("sort_order", { ascending: false })
-    .limit(1);
-
-  const last = ((data ?? [])[0] as { sort_order: number } | undefined)?.sort_order ?? 0;
+  const last = await db.cms_sections.findFirst({
+    where: { page_key: pageKey },
+    orderBy: { sort_order: "desc" },
+    select: { sort_order: true },
+  });
   const newKey = `${type}-${Date.now().toString(36)}`;
 
-  const { error } = await supabase.from("cms_sections").insert({
-    page_key: pageKey,
-    section_key: newKey,
-    label: template.label,
-    section_type: type,
-    draft: template.defaults,
-    published: null,
-    sort_order: last + 10,
-    is_visible: true,
-  });
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await db.cms_sections.create({
+      data: {
+        page_key: pageKey,
+        section_key: newKey,
+        label: template.label,
+        section_type: type,
+        draft: template.defaults as Prisma.InputJsonValue,
+        sort_order: (last?.sort_order ?? 0) + 10,
+        is_visible: true,
+        updated_by: session.userId,
+      },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_CREATE", "cms_sections", `${pageKey}.${newKey}`, null, { type });
   revalidatePath("/admin/cms");
@@ -672,14 +778,18 @@ export async function archiveSectionAction(formData: FormData) {
   const sectionKey = String(formData.get("sectionKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ archived: true, is_visible: false })
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey);
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: sectionKey },
+        data: { archived: true, is_visible: false },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_DELETE", "cms_sections", `${pageKey}.${sectionKey}`, null, {
     archived: true,
@@ -691,7 +801,7 @@ export async function archiveSectionAction(formData: FormData) {
 
 /** Presentation presets. Only values from the known preset lists are stored. */
 export async function saveSectionPresentationAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "");
   const sectionKey = String(formData.get("sectionKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
@@ -722,14 +832,18 @@ export async function saveSectionPresentationAction(formData: FormData) {
     overlay: pick("overlay", ["none", "light", "dark"], "none"),
   };
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ presentation, updated_at: new Date().toISOString() })
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey);
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: pageKey, section_key: sectionKey },
+        data: { presentation, updated_at: new Date(), updated_by: session.userId },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_UPDATE", "cms_sections", `${pageKey}.${sectionKey}`, null, presentation);
   revalidatePath("/admin/cms");
@@ -745,21 +859,29 @@ export async function saveSectionPresentationAction(formData: FormData) {
  * the admin publishes, so trying a preset is never a public event (§38).
  */
 export async function applyThemePresetAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const tab = String(formData.get("tab") ?? "global");
   const presetId = String(formData.get("presetId") ?? "");
 
   const preset = findThemePreset(presetId);
   if (!preset) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("cms_sections")
-    .update({ draft: preset.values, updated_at: new Date().toISOString() })
-    .eq("page_key", "global")
-    .eq("section_key", "theme");
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    changed(
+      await db.cms_sections.updateMany({
+        where: { page_key: "global", section_key: "theme" },
+        data: {
+          draft: preset.values as Prisma.InputJsonValue,
+          updated_at: new Date(),
+          updated_by: session.userId,
+        },
+      }),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("THEME_UPDATE", "cms_sections", "global.theme", null, {
     preset: preset.id,
@@ -780,40 +902,37 @@ export async function applyThemePresetAction(formData: FormData) {
  * no extra migration (§39).
  */
 export async function saveAsTemplateAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "home");
   const sectionKey = String(formData.get("sectionKey") ?? "");
   const tab = String(formData.get("tab") ?? pageKey);
   const name = String(formData.get("templateName") ?? "").trim();
   if (!sectionKey || !name) back(tab, "invalid");
 
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("cms_sections")
-    .select("draft, section_type, presentation")
-    .eq("page_key", pageKey)
-    .eq("section_key", sectionKey)
-    .maybeSingle();
-
-  if (!data) back(tab, "error");
-  const row = data as unknown as {
-    draft: Record<string, unknown> | null;
-    section_type: string;
-    presentation: Record<string, unknown> | null;
-  };
-
-  const { error } = await supabase.from("cms_sections").insert({
-    page_key: TEMPLATE_PAGE_KEY,
-    section_key: `tpl-${Date.now().toString(36)}`,
-    label: name,
-    section_type: row.section_type,
-    draft: row.draft ?? {},
-    published: null,
-    presentation: row.presentation ?? {},
-    is_visible: false,
+  const row = await db.cms_sections.findUnique({
+    where: { page_key_section_key: { page_key: pageKey, section_key: sectionKey } },
+    select: { draft: true, section_type: true, presentation: true },
   });
+  if (!row) back(tab, "error");
 
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await db.cms_sections.create({
+      data: {
+        page_key: TEMPLATE_PAGE_KEY,
+        section_key: `tpl-${Date.now().toString(36)}`,
+        label: name,
+        section_type: row.section_type,
+        draft: (row.draft ?? {}) as Prisma.InputJsonValue,
+        presentation: (row.presentation ?? {}) as Prisma.InputJsonValue,
+        is_visible: false,
+        updated_by: session.userId,
+      },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_CREATE", "cms_sections", `${TEMPLATE_PAGE_KEY}.${name}`, null, {
     from: `${pageKey}.${sectionKey}`,
@@ -824,50 +943,44 @@ export async function saveAsTemplateAction(formData: FormData) {
 
 /** Adds a section from a saved template. */
 export async function addSavedTemplateAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const pageKey = String(formData.get("pageKey") ?? "home");
   const tab = String(formData.get("tab") ?? pageKey);
   const templateKey = String(formData.get("templateKey") ?? "");
   if (!templateKey) back(tab, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const [{ data: template }, { data: lastRows }] = await Promise.all([
-    supabase
-      .from("cms_sections")
-      .select("draft, label, section_type, presentation")
-      .eq("page_key", TEMPLATE_PAGE_KEY)
-      .eq("section_key", templateKey)
-      .maybeSingle(),
-    supabase
-      .from("cms_sections")
-      .select("sort_order")
-      .eq("page_key", pageKey)
-      .order("sort_order", { ascending: false })
-      .limit(1),
+  const [row, last] = await Promise.all([
+    db.cms_sections.findUnique({
+      where: { page_key_section_key: { page_key: TEMPLATE_PAGE_KEY, section_key: templateKey } },
+      select: { draft: true, label: true, section_type: true, presentation: true },
+    }),
+    db.cms_sections.findFirst({
+      where: { page_key: pageKey },
+      orderBy: { sort_order: "desc" },
+      select: { sort_order: true },
+    }),
   ]);
+  if (!row) back(tab, "error");
 
-  if (!template) back(tab, "error");
-  const row = template as unknown as {
-    draft: Record<string, unknown> | null;
-    label: string;
-    section_type: string;
-    presentation: Record<string, unknown> | null;
-  };
-  const last = ((lastRows ?? [])[0] as { sort_order: number } | undefined)?.sort_order ?? 0;
-
-  const { error } = await supabase.from("cms_sections").insert({
-    page_key: pageKey,
-    section_key: `${row.section_type}-${Date.now().toString(36)}`,
-    label: row.label,
-    section_type: row.section_type,
-    draft: row.draft ?? {},
-    published: null,
-    presentation: row.presentation ?? {},
-    sort_order: last + 10,
-    is_visible: true,
-  });
-
-  if (error) back(tab, "error");
+  let failed = false;
+  try {
+    await db.cms_sections.create({
+      data: {
+        page_key: pageKey,
+        section_key: `${row.section_type}-${Date.now().toString(36)}`,
+        label: row.label,
+        section_type: row.section_type,
+        draft: (row.draft ?? {}) as Prisma.InputJsonValue,
+        presentation: (row.presentation ?? {}) as Prisma.InputJsonValue,
+        sort_order: (last?.sort_order ?? 0) + 10,
+        is_visible: true,
+        updated_by: session.userId,
+      },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back(tab, "error");
 
   await logActivity("SECTION_CREATE", "cms_sections", `${pageKey}.from-template`, null, {
     template: row.label,
@@ -900,15 +1013,17 @@ export async function saveGalleryDriveAction(formData: FormData) {
     updatedAt: String(formData.get("updatedAt") ?? "").trim(),
   };
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("site_settings")
-    .upsert(
-      { key: "gallery_drive", value, updated_at: new Date().toISOString() },
-      { onConflict: "key" },
-    );
-
-  if (error) back("global", "error");
+  let failed = false;
+  try {
+    await db.site_settings.upsert({
+      where: { key: "gallery_drive" },
+      create: { key: "gallery_drive", value },
+      update: { value, updated_at: new Date() },
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) back("global", "error");
 
   await logActivity("CMS_UPDATE", "site_settings", "gallery_drive", null, value);
   revalidatePath("/galeri");

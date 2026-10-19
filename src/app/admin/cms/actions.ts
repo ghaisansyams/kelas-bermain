@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { logActivity } from "@/lib/admin/activity";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 
 /**
  * CMS writes. Every action re-checks the admin session server-side — hiding a
@@ -65,89 +67,112 @@ function readSection(formData: FormData, section: SectionKey): Record<string, st
   return content;
 }
 
-async function logActivity(
-  action: string,
-  entity: string,
-  entityId: string,
-  newValue: unknown,
-) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  await supabase.from("activity_logs").insert({
-    user_id: user?.id ?? null,
-    action,
-    entity,
-    entity_id: entityId,
-    new_value: newValue as never,
-  });
-}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Saves the working copy. The public site keeps showing the published one. */
+/** Tautan menu: jalur situs atau http(s). Bukan javascript: atau data:. */
+const SAFE_HREF = /^(\/|https?:\/\/|mailto:|tel:)/i;
+
+/**
+ * Menyimpan salinan kerja. Situs publik tetap menampilkan yang sudah terbit.
+ *
+ * Semua bagian ditulis dalam SATU transaksi. Dulu tiap bagian disimpan satu per
+ * satu, jadi galat di bagian kedua meninggalkan bagian pertama sudah tersimpan
+ * dan sisanya tidak — halaman depan setengah diperbarui.
+ */
 export async function saveHomeDraftAction(formData: FormData) {
-  await requireAdmin();
-  const supabase = await createSupabaseServerClient();
-
-  for (const section of Object.keys(HOME_FIELDS) as SectionKey[]) {
-    const content = readSection(formData, section);
-    const { error } = await supabase
-      .from("cms_sections")
-      .update({ draft: content, updated_at: new Date().toISOString() })
-      .eq("page_key", "home")
-      .eq("section_key", section);
-
-    if (error) redirect("/admin/cms/home?status=error");
-    await logActivity("SAVE_DRAFT", "cms_sections", `home.${section}`, content);
-  }
-
+  const session = await requireAdmin();
   const slides = readHeroSlides(formData);
-  if (slides) {
-    const { error } = await supabase
-      .from("cms_sections")
-      .update({ draft: slides, updated_at: new Date().toISOString() })
-      .eq("page_key", "home")
-      .eq("section_key", "hero_slides");
-    if (error) redirect("/admin/cms/home?status=error");
-    await logActivity("SAVE_DRAFT", "cms_sections", "home.hero_slides", slides);
+  const sections = (Object.keys(HOME_FIELDS) as SectionKey[]).map((section) => ({
+    section,
+    content: readSection(formData, section),
+  }));
+
+  let failed = false;
+  try {
+    await db.$transaction([
+      ...sections.map(({ section, content }) =>
+        db.cms_sections.updateMany({
+          where: { page_key: "home", section_key: section },
+          data: {
+            draft: content as Prisma.InputJsonValue,
+            updated_at: new Date(),
+            updated_by: session.userId,
+          },
+        }),
+      ),
+      ...(slides
+        ? [
+            db.cms_sections.updateMany({
+              where: { page_key: "home", section_key: "hero_slides" },
+              data: {
+                draft: slides as Prisma.InputJsonValue,
+                updated_at: new Date(),
+                updated_by: session.userId,
+              },
+            }),
+          ]
+        : []),
+    ]);
+  } catch {
+    failed = true;
   }
+  if (failed) redirect("/admin/cms/home?status=error");
+
+  for (const { section, content } of sections) {
+    await logActivity("SAVE_DRAFT", "cms_sections", `home.${section}`, null, content);
+  }
+  if (slides) await logActivity("SAVE_DRAFT", "cms_sections", "home.hero_slides", null, slides);
 
   redirect("/admin/cms/home?status=draft-saved");
 }
 
 /** Copies draft → published, then revalidates the public home page. */
 export async function publishHomeAction(formData: FormData) {
-  await requireAdmin();
-  const supabase = await createSupabaseServerClient();
-
-  for (const section of Object.keys(HOME_FIELDS) as SectionKey[]) {
-    const content = readSection(formData, section);
-    const { error } = await supabase
-      .from("cms_sections")
-      .update({
-        draft: content,
-        published: content,
-        updated_at: new Date().toISOString(),
-        published_at: new Date().toISOString(),
-      })
-      .eq("page_key", "home")
-      .eq("section_key", section);
-
-    if (error) redirect("/admin/cms/home?status=error");
-    await logActivity("PUBLISH", "cms_sections", `home.${section}`, content);
-  }
-
+  const session = await requireAdmin();
   const slides = readHeroSlides(formData);
-  if (slides) {
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("cms_sections")
-      .update({ draft: slides, published: slides, updated_at: now, published_at: now })
-      .eq("page_key", "home")
-      .eq("section_key", "hero_slides");
-    if (error) redirect("/admin/cms/home?status=error");
-    await logActivity("PUBLISH", "cms_sections", "home.hero_slides", slides);
+  const sections = (Object.keys(HOME_FIELDS) as SectionKey[]).map((section) => ({
+    section,
+    content: readSection(formData, section),
+  }));
+
+  const now = new Date();
+  const publish = (content: unknown) => ({
+    draft: content as Prisma.InputJsonValue,
+    published: content as Prisma.InputJsonValue,
+    updated_at: now,
+    published_at: now,
+    updated_by: session.userId,
+  });
+
+  // Satu transaksi, sama alasannya dengan menyimpan draf: halaman depan yang
+  // terbit setengah — judul baru, slide lama — lebih buruk daripada yang gagal.
+  let failed = false;
+  try {
+    await db.$transaction([
+      ...sections.map(({ section, content }) =>
+        db.cms_sections.updateMany({
+          where: { page_key: "home", section_key: section },
+          data: publish(content),
+        }),
+      ),
+      ...(slides
+        ? [
+            db.cms_sections.updateMany({
+              where: { page_key: "home", section_key: "hero_slides" },
+              data: publish(slides),
+            }),
+          ]
+        : []),
+    ]);
+  } catch {
+    failed = true;
   }
+  if (failed) redirect("/admin/cms/home?status=error");
+
+  for (const { section, content } of sections) {
+    await logActivity("PUBLISH", "cms_sections", `home.${section}`, null, content);
+  }
+  if (slides) await logActivity("PUBLISH", "cms_sections", "home.hero_slides", null, slides);
 
   revalidatePath("/");
   redirect("/admin/cms/home?status=published");
@@ -155,32 +180,51 @@ export async function publishHomeAction(formData: FormData) {
 
 export async function saveNavigationAction(formData: FormData) {
   await requireAdmin();
-  const supabase = await createSupabaseServerClient();
 
   const ids = formData.getAll("id").map(String);
+  const updates: { id: string; label: string; href: string; data: Prisma.navigation_itemsUpdateInput }[] = [];
+
   for (const id of ids) {
+    if (!UUID.test(id)) continue;
+
     const label = String(formData.get(`label.${id}`) ?? "").trim();
     const href = String(formData.get(`href.${id}`) ?? "").trim();
     const sortOrder = Number(formData.get(`order.${id}`) ?? 0);
-    const isVisible = formData.get(`visible.${id}`) === "on";
-    const openInNewTab = formData.get(`newtab.${id}`) === "on";
-
     if (!label || !href) continue;
 
-    const { error } = await supabase
-      .from("navigation_items")
-      .update({
+    // Menu tampil di setiap halaman publik. Tautan javascript: atau data:
+    // yang diketik di sini akan jalan di browser pengunjung.
+    if (!SAFE_HREF.test(href)) redirect("/admin/cms/navigation?status=error");
+
+    updates.push({
+      id,
+      label,
+      href,
+      data: {
         label,
         href,
         sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
-        is_visible: isVisible,
-        open_in_new_tab: openInNewTab,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+        is_visible: formData.get(`visible.${id}`) === "on",
+        open_in_new_tab: formData.get(`newtab.${id}`) === "on",
+        updated_at: new Date(),
+      },
+    });
+  }
 
-    if (error) redirect("/admin/cms/navigation?status=error");
-    await logActivity("UPDATE", "navigation_items", id, { label, href, isVisible });
+  let failed = false;
+  try {
+    // Seluruh menu diperbarui bersama: menu yang tersimpan separuh bisa
+    // kehilangan tautan di tengah daftar.
+    await db.$transaction(
+      updates.map((item) => db.navigation_items.update({ where: { id: item.id }, data: item.data })),
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) redirect("/admin/cms/navigation?status=error");
+
+  for (const item of updates) {
+    await logActivity("UPDATE", "navigation_items", item.id, null, { label: item.label, href: item.href });
   }
 
   // The navbar lives in the public layout, so every page needs refreshing.
