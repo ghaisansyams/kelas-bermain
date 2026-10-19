@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { buildReport, defaultRange, toCsv } from "@/lib/services/report";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { buildReport, sanitiseRange, toCsv } from "@/lib/services/report";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,15 +13,16 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   await requireAdmin();
   const url = new URL(request.url);
-  const fallback = defaultRange();
-  const range = {
-    from: url.searchParams.get("from") ?? fallback.from,
-    to: url.searchParams.get("to") ?? fallback.to,
-  };
+  const range = sanitiseRange({
+    from: url.searchParams.get("from"),
+    to: url.searchParams.get("to"),
+  });
   const type = url.searchParams.get("type") ?? "events";
-  const until = `${range.to}T23:59:59.999Z`;
+  // Rentang dibaca menurut Jakarta, sama dengan halaman laporannya — kalau
+  // batasnya beda, ekspor dan layar menghitung baris yang berbeda.
+  const from = new Date(`${range.from}T00:00:00+07:00`);
+  const until = new Date(`${range.to}T23:59:59.999+07:00`);
 
-  const supabase = await createSupabaseServerClient();
   const events = await getEvents();
   const titles = new Map(
     events.map((item) => [item.id, { title: item.title, startDate: item.startDate }]),
@@ -30,26 +31,21 @@ export async function GET(request: Request) {
   let rows: (string | number)[][];
 
   if (type === "registrations") {
-    const { data } = await supabase
-      .from("registrations")
-      .select(
-        "registration_number, event_id, status, payment_status, attendance_status, certificate_status, created_at, children(full_name), customers(full_name, whatsapp)",
-      )
-      .gte("created_at", range.from)
-      .lte("created_at", until)
-      .order("created_at");
-
-    type RegRow = {
-      registration_number: string;
-      event_id: string;
-      status: string;
-      payment_status: string;
-      attendance_status: string;
-      certificate_status: string;
-      created_at: string;
-      children: { full_name: string } | null;
-      customers: { full_name: string; whatsapp: string } | null;
-    };
+    const data = await db.registrations.findMany({
+      where: { registration_date: { gte: from, lte: until } },
+      select: {
+        registration_number: true,
+        event_id: true,
+        status: true,
+        payment_status: true,
+        attendance_status: true,
+        certificate_status: true,
+        registration_date: true,
+        children: { select: { full_name: true } },
+        customers: { select: { full_name: true, whatsapp: true } },
+      },
+      orderBy: { registration_date: "asc" },
+    });
 
     rows = [
       [
@@ -64,7 +60,7 @@ export async function GET(request: Request) {
         "Sertifikat",
         "Dibuat",
       ],
-      ...((data ?? []) as unknown as RegRow[]).map((row) => [
+      ...data.map((row) => [
         row.registration_number,
         titles.get(row.event_id)?.title ?? row.event_id,
         row.children?.full_name ?? "",
@@ -74,30 +70,25 @@ export async function GET(request: Request) {
         row.payment_status,
         row.attendance_status,
         row.certificate_status,
-        row.created_at,
+        row.registration_date.toISOString(),
       ]),
     ];
   } else if (type === "payments") {
-    const { data } = await supabase
-      .from("payments")
-      .select(
-        "invoice_number, event_id, amount, status, method, paid_at, verified_at, created_at, registrations(registration_number)",
-      )
-      .gte("created_at", range.from)
-      .lte("created_at", until)
-      .order("created_at");
-
-    type PayRow = {
-      invoice_number: string | null;
-      event_id: string;
-      amount: number;
-      status: string;
-      method: string | null;
-      paid_at: string | null;
-      verified_at: string | null;
-      created_at: string;
-      registrations: { registration_number: string } | null;
-    };
+    const data = await db.payments.findMany({
+      where: { created_at: { gte: from, lte: until } },
+      select: {
+        invoice_number: true,
+        event_id: true,
+        amount: true,
+        status: true,
+        method: true,
+        paid_at: true,
+        verified_at: true,
+        created_at: true,
+        registrations: { select: { registration_number: true } },
+      },
+      orderBy: { created_at: "asc" },
+    });
 
     rows = [
       [
@@ -111,20 +102,20 @@ export async function GET(request: Request) {
         "Diverifikasi",
         "Dibuat",
       ],
-      ...((data ?? []) as unknown as PayRow[]).map((row) => [
+      ...data.map((row) => [
         row.invoice_number ?? "",
         row.registrations?.registration_number ?? "",
         titles.get(row.event_id)?.title ?? row.event_id,
-        row.amount,
+        Number(row.amount),
         row.status,
         row.method ?? "",
-        row.paid_at ?? "",
-        row.verified_at ?? "",
-        row.created_at,
+        row.paid_at?.toISOString() ?? "",
+        row.verified_at?.toISOString() ?? "",
+        row.created_at.toISOString(),
       ]),
     ];
   } else {
-    const report = await buildReport(supabase, range, titles);
+    const report = await buildReport(range, titles);
     rows = [
       [
         "Event",

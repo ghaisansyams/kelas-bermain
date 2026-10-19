@@ -4,8 +4,7 @@ import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui"
 import { EmptyRow, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { buildReport, defaultRange } from "@/lib/services/report";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { buildReport, sanitiseRange } from "@/lib/services/report";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -18,14 +17,13 @@ export default async function AdminReportsPage({
 }) {
   await requireAdmin();
   const { from, to } = await searchParams;
-  const fallback = defaultRange();
-  const range = { from: from ?? fallback.from, to: to ?? fallback.to };
+  const range = sanitiseRange({ from, to });
 
-  const [events, supabase] = await Promise.all([getEvents(), createSupabaseServerClient()]);
+  const events = await getEvents();
   const titles = new Map(
     events.map((item) => [item.id, { title: item.title, startDate: item.startDate }]),
   );
-  const report = await buildReport(supabase, range, titles);
+  const report = await buildReport(range, titles);
   const query = `from=${range.from}&to=${range.to}`;
 
   return (

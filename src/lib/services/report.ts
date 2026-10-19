@@ -1,10 +1,12 @@
 /**
- * Report aggregation. Lives in the service layer like every other DB read, so
- * the admin pages and the CSV export compute the same numbers from the same
- * query — a report that disagrees with the screen is worse than no report.
+ * Agregasi laporan. Ada di lapisan layanan seperti pembacaan database lain,
+ * supaya halaman admin dan ekspor CSV menghitung angka yang sama dari kueri
+ * yang sama — laporan yang berbeda dari layar lebih buruk daripada tidak ada.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import "server-only";
+
+import { db } from "@/lib/db";
 
 export interface ReportRange {
   from: string;
@@ -42,32 +44,30 @@ export interface ReportSummary {
   events: EventReportRow[];
 }
 
-interface RegistrationRow {
-  id: string;
-  event_id: string;
-  status: string;
-  payment_status: string;
-  attendance_status: string;
-  certificate_status: string;
-  created_at: string;
-}
-
-interface PaymentRow {
-  event_id: string;
-  amount: number;
-  status: string;
-}
-
-interface TransactionRow {
-  amount: number;
-  type: string;
-}
-
 /** Default range: the current month, which is what the team reports on. */
 export function defaultRange(now: Date = new Date()): ReportRange {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return { from: toIso(from), to: toIso(to) };
+}
+
+/**
+ * Rentang dari URL bukan masukan tepercaya. Tanggal yang tidak berbentuk
+ * YYYY-MM-DD menghasilkan Invalid Date, yang membuat kueri database melempar
+ * galat — ekspor CSV berakhir dengan halaman 500, bukan laporan bulan ini.
+ */
+export function sanitiseRange(
+  input: { from?: string | null; to?: string | null },
+  fallback: ReportRange = defaultRange(),
+): ReportRange {
+  const valid = (value?: string | null) =>
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(new Date(`${value}T00:00:00+07:00`).getTime());
+  return {
+    from: valid(input.from) ? (input.from as string) : fallback.from,
+    to: valid(input.to) ? (input.to as string) : fallback.to,
+  };
 }
 
 export function toIso(date: Date): string {
@@ -77,46 +77,66 @@ export function toIso(date: Date): string {
 }
 
 export async function buildReport(
-  supabase: SupabaseClient,
   range: ReportRange,
   eventTitles: Map<string, { title: string; startDate: string }>,
 ): Promise<ReportSummary> {
-  // `to` is inclusive for the admin, so the query reaches the end of that day.
-  const until = `${range.to}T23:59:59.999Z`;
-
-  const [registrationsRes, paymentsRes, transactionsRes] = await Promise.all([
-    supabase
-      .from("registrations")
-      .select(
-        "id, event_id, status, payment_status, attendance_status, certificate_status, created_at",
-      )
-      .gte("created_at", range.from)
-      .lte("created_at", until),
-    supabase
-      .from("payments")
-      .select("event_id, amount, status")
-      .gte("created_at", range.from)
-      .lte("created_at", until),
-    supabase
-      .from("financial_transactions")
-      .select("amount, type")
-      .gte("occurred_at", range.from)
-      .lte("occurred_at", until),
-  ]);
+  // Rentang dibaca menurut Jakarta. `to` inklusif untuk admin, jadi kueri
+  // mencapai akhir hari itu. Dulu batasnya UTC, yang jatuh pukul 07.00 WIB:
+  // pendaftaran pukul 02.00 pagi tanggal 1 terhitung bulan sebelumnya.
+  const from = new Date(`${range.from}T00:00:00+07:00`);
+  const until = new Date(`${range.to}T23:59:59.999+07:00`);
 
   const missing: string[] = [];
-  if (registrationsRes.error) missing.push("registrations");
-  if (paymentsRes.error) missing.push("payments");
-  if (transactionsRes.error) missing.push("financial_transactions");
 
-  const registrations = (registrationsRes.data ?? []) as unknown as RegistrationRow[];
-  const payments = (paymentsRes.data ?? []) as unknown as PaymentRow[];
-  const transactions = (transactionsRes.data ?? []) as unknown as TransactionRow[];
+  // Setiap sumber dibaca sendiri-sendiri: satu tabel yang gagal dibaca harus
+  // tercatat di `missing`, bukan membuat seluruh laporan gagal — dan nol dari
+  // tabel yang gagal tidak boleh dikira "tidak ada aktivitas".
+  const [registrations, payments, transactions] = await Promise.all([
+    db.registrations
+      .findMany({
+        where: { registration_date: { gte: from, lte: until } },
+        select: {
+          event_id: true,
+          status: true,
+          payment_status: true,
+          attendance_status: true,
+          certificate_status: true,
+        },
+      })
+      .catch(() => {
+        missing.push("registrations");
+        return [];
+      }),
+    db.payments
+      .findMany({
+        where: { created_at: { gte: from, lte: until } },
+        select: { event_id: true, amount: true, status: true },
+      })
+      .catch(() => {
+        missing.push("payments");
+        return [];
+      }),
+    db.financial_transactions
+      .findMany({
+        // Kolom ini transaction_date. Kode lama menanyakan `occurred_at`, yang
+        // tidak pernah ada, jadi pemasukan dan refund selalu terbaca nol.
+        where: { transaction_date: { gte: from, lte: until } },
+        select: { amount: true, type: true },
+      })
+      .catch(() => {
+        missing.push("financial_transactions");
+        return [];
+      }),
+  ]);
+
+  // Belum lunas = belum dibayar atau sedang menunggu dicek. Kode lama menghitung
+  // status "UNPAID", yang bukan status sungguhan, sehingga angkanya selalu nol.
+  const UNSETTLED = ["PENDING", "WAITING_VERIFICATION"];
 
   const active = registrations.filter((row) => row.status !== "CANCELLED");
   const paidRegistrations = active.filter((row) => row.payment_status === "PAID").length;
   const pendingRegistrations = active.filter((row) =>
-    ["UNPAID", "WAITING_VERIFICATION"].includes(row.payment_status),
+    UNSETTLED.includes(row.payment_status),
   ).length;
   const present = active.filter((row) => row.attendance_status === "PRESENT").length;
   const certificates = active.filter((row) => row.certificate_status === "ISSUED").length;
@@ -159,7 +179,7 @@ export async function buildReport(
     }
     target.registrations += 1;
     if (row.payment_status === "PAID") target.paid += 1;
-    if (["UNPAID", "WAITING_VERIFICATION"].includes(row.payment_status)) target.pending += 1;
+    if (UNSETTLED.includes(row.payment_status)) target.pending += 1;
     if (row.attendance_status === "PRESENT") target.present += 1;
     if (row.certificate_status === "ISSUED") target.certificates += 1;
   }
@@ -190,13 +210,26 @@ export async function buildReport(
   };
 }
 
-/** Minimal RFC-4180 escaping: quote anything containing a comma, quote or newline. */
+/**
+ * Spreadsheet app membaca sel yang diawali = + - @ sebagai rumus. Nama
+ * pendamping dan anak diketik bebas oleh publik, lalu diekspor ke berkas yang
+ * dibuka admin di Excel: nama seperti `=HYPERLINK("http://...")` akan jalan
+ * sebagai rumus di komputer admin. Sel teks yang diawali karakter itu diberi
+ * tanda petik di depan supaya dibaca sebagai teks. Angka tidak disentuh —
+ * refund memang bernilai negatif, dan itu angka sah, bukan rumus.
+ */
+function neutralise(cell: string | number): string {
+  if (typeof cell === "number") return String(cell);
+  return /^[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell;
+}
+
+/** Pelolosan RFC-4180 minimal: kutip apa pun yang berisi koma, kutip, atau baris baru. */
 export function toCsv(rows: (string | number)[][]): string {
   return rows
     .map((row) =>
       row
         .map((cell) => {
-          const value = String(cell);
+          const value = neutralise(cell);
           return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
         })
         .join(","),
