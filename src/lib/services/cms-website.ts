@@ -1,14 +1,22 @@
 /**
  * CMS read layer for the public site (website builder content).
  *
- * Reads published, visible content only, through the SECURITY DEFINER
- * functions in supabase/cms-website-schema.sql — drafts never leave the
- * admin. Every getter falls back to the copy the site shipped with, so an
- * empty table, a missing env var or a database hiccup degrades to today's
- * text instead of a blank page.
+ * Reads published, visible content only — drafts never leave the admin.
+ * Every getter falls back to the copy the site shipped with, so an empty
+ * table or a database hiccup degrades to today's text instead of a blank
+ * page.
+ *
+ * Reads go through Prisma now rather than the SECURITY DEFINER functions
+ * this used to call. Those functions were what kept drafts away from the
+ * public with RLS underneath; here the same rule lives in the two where
+ * clauses below, and this module is server-only so a browser can never
+ * reach past them.
  */
 
-import { getSupabase } from "@/lib/supabase/client";
+import "server-only";
+
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 import { pillars as fallbackPillars, siteConfig, mainNav } from "@/data/site";
 
 export type SectionContent = Record<string, unknown>;
@@ -43,25 +51,21 @@ function warnFallback(what: string, reason: string) {
 
 export async function getPageContent(pageKey: string): Promise<PageContent> {
   try {
-    const { data, error } = await getSupabase().rpc("get_cms_page", { p_page_key: pageKey });
-    if (error || !Array.isArray(data)) {
-      warnFallback(`page "${pageKey}"`, error?.message ?? "no rows");
-      return EMPTY_PAGE;
-    }
+    const rows = await db.cms_sections.findMany({
+      // Published, visible and not archived — the rule the old SQL function
+      // enforced. A draft reaching this list is a draft on the live site.
+      where: { page_key: pageKey, published: { not: Prisma.DbNull }, is_visible: true, archived: false },
+      select: { section_key: true, published: true, presentation: true },
+      orderBy: [{ sort_order: "asc" }, { section_key: "asc" }],
+    });
 
-    const rows = data as {
-      section_key: string;
-      content: SectionContent;
-      sort_order: number;
-      presentation?: SectionContent;
-    }[];
     const sections: Record<string, SectionContent> = {};
     const presentation: Record<string, SectionContent> = {};
     const order: string[] = [];
     for (const row of rows) {
-      if (!row.content) continue;
-      sections[row.section_key] = row.content;
-      presentation[row.section_key] = row.presentation ?? {};
+      if (!row.published) continue;
+      sections[row.section_key] = row.published as SectionContent;
+      presentation[row.section_key] = (row.presentation ?? {}) as SectionContent;
       order.push(row.section_key);
     }
     return { sections, order, presentation };
@@ -73,16 +77,24 @@ export async function getPageContent(pageKey: string): Promise<PageContent> {
 
 export async function getCollectionItems(collectionKey: string): Promise<CollectionItem[]> {
   try {
-    const { data, error } = await getSupabase().rpc("get_cms_collection", {
-      p_collection_key: collectionKey,
+    const rows = await db.cms_collections.findMany({
+      where: {
+        collection_key: collectionKey,
+        published: { not: Prisma.DbNull },
+        is_visible: true,
+        archived: false,
+      },
+      select: { item_key: true, published: true, sort_order: true },
+      orderBy: [{ sort_order: "asc" }, { item_key: "asc" }],
     });
-    if (error || !Array.isArray(data)) {
-      warnFallback(`collection "${collectionKey}"`, error?.message ?? "no rows");
-      return [];
-    }
-    return (data as { item_key: string; content: SectionContent; sort_order: number }[])
-      .filter((row) => row.content)
-      .map((row) => ({ key: row.item_key, content: row.content, sortOrder: row.sort_order }));
+
+    return rows
+      .filter((row) => row.published)
+      .map((row) => ({
+        key: row.item_key,
+        content: row.published as SectionContent,
+        sortOrder: row.sort_order,
+      }));
   } catch (error) {
     warnFallback(`collection "${collectionKey}"`, String(error));
     return [];
