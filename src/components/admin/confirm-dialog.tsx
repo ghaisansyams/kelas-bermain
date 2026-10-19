@@ -31,7 +31,14 @@ export function ConfirmDialog({
   summary: { label: string; value: string }[];
   confirmLabel: string;
   tone?: "brand" | "danger";
-  reasonField?: { name: string; label: string; placeholder: string };
+  reasonField?: {
+    name: string;
+    label: string;
+    placeholder: string;
+    /** "password" menyembunyikan ketikan; bawaannya teks biasa. */
+    type?: "text" | "password";
+    minLength?: number;
+  };
   /** "md" matches the other buttons in a page header. */
   size?: "sm" | "md";
   icon?: ReactNode;
@@ -92,6 +99,9 @@ export function ConfirmDialog({
                     {reasonField.label}
                     <input
                       name={reasonField.name}
+                      type={reasonField.type ?? "text"}
+                      minLength={reasonField.minLength}
+                      autoComplete={reasonField.type === "password" ? "new-password" : "off"}
                       required
                       placeholder={reasonField.placeholder}
                       className="mt-1.5 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[0.9375rem] text-ink"

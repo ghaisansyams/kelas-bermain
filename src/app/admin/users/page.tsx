@@ -1,9 +1,14 @@
-import { grantAccessAction, revokeAccessAction, updateUserAction } from "@/app/admin/users/actions";
+import {
+  grantAccessAction,
+  resetPasswordAction,
+  revokeAccessAction,
+  updateUserAction,
+} from "@/app/admin/users/actions";
 import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyRow, StatusBadge, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +18,8 @@ interface UserRow {
   full_name: string;
   role: "SUPER_ADMIN" | "ADMIN" | "STAFF";
   status: "ACTIVE" | "INACTIVE";
-  created_at: string;
-  last_sign_in_at: string | null;
+  created_at: Date;
+  last_sign_in_at: Date | null;
 }
 
 const ROLE_LABEL: Record<string, { text: string; tone: string }> = {
@@ -33,10 +38,15 @@ const NOTICES: Record<string, { tone: "success" | "error" | "info"; text: string
   granted: { tone: "success", text: "Akses admin diberikan." },
   updated: { tone: "success", text: "Pengguna diperbarui." },
   revoked: { tone: "success", text: "Akses admin dicabut. Akun login-nya sendiri tidak dihapus." },
-  "not-found": {
-    tone: "error",
-    text: "Email itu belum punya akun. Buat dulu di Supabase → Authentication → Users, baru beri akses di sini.",
+  "password-reset": {
+    tone: "success",
+    text: "Kata sandi diganti dan semua sesi orang itu diakhiri. Sampaikan kata sandi barunya langsung kepadanya.",
   },
+  "weak-password": {
+    tone: "error",
+    text: "Kata sandi minimal 10 karakter.",
+  },
+  "not-found": { tone: "error", text: "Pengguna tidak ditemukan." },
   self: { tone: "error", text: "Kamu tidak bisa menurunkan atau mencabut aksesmu sendiri." },
   "last-super": {
     tone: "error",
@@ -57,10 +67,42 @@ export default async function AdminUsersPage({
 }) {
   const session = await requireAdmin();
   const { status } = await searchParams;
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("admin_list_users");
+  let rows: UserRow[] = [];
+  let error = false;
 
-  const rows = (data ?? []) as unknown as UserRow[];
+  try {
+    const admins = await db.admin_users.findMany({
+      select: {
+        user_id: true,
+        full_name: true,
+        role: true,
+        status: true,
+        created_at: true,
+        users: {
+          select: {
+            email: true,
+            // Sesi terbaru = kapan terakhir masuk. Sesi yang kedaluwarsa
+            // dihapus saat dipakai, jadi ini paling tidak menunjukkan masuk
+            // terakhir yang masih tercatat.
+            sessions: { select: { created_at: true }, orderBy: { created_at: "desc" }, take: 1 },
+          },
+        },
+      },
+      orderBy: { created_at: "asc" },
+    });
+    rows = admins.map((row) => ({
+      user_id: row.user_id,
+      email: row.users.email ?? "",
+      full_name: row.full_name,
+      role: row.role as UserRow["role"],
+      status: row.status as UserRow["status"],
+      created_at: row.created_at,
+      last_sign_in_at: row.users.sessions[0]?.created_at ?? null,
+    }));
+  } catch {
+    error = true;
+  }
+
   const activeCount = rows.filter((row) => row.status === "ACTIVE").length;
   const superCount = rows.filter(
     (row) => row.role === "SUPER_ADMIN" && row.status === "ACTIVE",
@@ -78,8 +120,7 @@ export default async function AdminUsersPage({
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       {error ? (
         <Notice tone="error">
-          Daftar pengguna belum bisa dibaca. Jalankan supabase/voucher-users-schema.sql di SQL
-          Editor.
+          Daftar pengguna belum bisa dibaca. Coba muat ulang halaman ini.
         </Notice>
       ) : null}
       {!isSuper ? (
@@ -99,11 +140,11 @@ export default async function AdminUsersPage({
         <Card>
           <h2 className="text-sm font-extrabold text-ink">Beri akses admin</h2>
           <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-            Buat dulu akunnya di Supabase → Authentication → Users, lalu masukkan emailnya di sini.
-            Pembuatan akun login sengaja tidak dilakukan dari aplikasi karena itu butuh
-            service-role key, yang tidak pernah dipegang aplikasi ini.
+            Isi email dan kata sandi awal, lalu sampaikan kata sandinya langsung kepada orangnya.
+            Kalau emailnya sudah punya akun, kata sandinya tidak diubah dan kolom itu boleh
+            dikosongkan.
           </p>
-          <form action={grantAccessAction} className="mt-4 grid gap-3 sm:grid-cols-4">
+          <form action={grantAccessAction} className="mt-4 grid gap-3 sm:grid-cols-5">
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink sm:col-span-2">
               Email akun
               <input name="email" type="email" required className={inputClass} />
@@ -113,6 +154,16 @@ export default async function AdminUsersPage({
               <input name="fullName" className={inputClass} />
             </label>
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
+              Kata sandi awal
+              <input
+                name="password"
+                type="password"
+                minLength={10}
+                autoComplete="new-password"
+                className={inputClass}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
               Peran
               <select name="role" defaultValue="STAFF" className={inputClass}>
                 <option value="STAFF">Staff</option>
@@ -120,7 +171,7 @@ export default async function AdminUsersPage({
                 <option value="SUPER_ADMIN">Super Admin</option>
               </select>
             </label>
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-5">
               <button
                 type="submit"
                 className="inline-flex min-h-11 items-center rounded-pill bg-brand px-5 text-sm font-bold text-white"
@@ -169,7 +220,7 @@ export default async function AdminUsersPage({
                   </Td>
                   <Td className="text-xs">
                     {row.last_sign_in_at
-                      ? new Date(row.last_sign_in_at).toLocaleString("id-ID")
+                      ? row.last_sign_in_at.toLocaleString("id-ID")
                       : "Belum pernah"}
                   </Td>
                   {isSuper ? (
@@ -205,13 +256,32 @@ export default async function AdminUsersPage({
                             Simpan
                           </button>
                         </form>
+                        <ConfirmDialog
+                          action={resetPasswordAction}
+                          hidden={{ userId: row.user_id }}
+                          trigger="Ganti kata sandi"
+                          title="Ganti kata sandi"
+                          description="Kata sandi lama langsung tidak berlaku dan semua sesi orang ini diakhiri. Tidak ada email pemulihan, jadi sampaikan kata sandi barunya langsung kepadanya."
+                          summary={[
+                            { label: "Nama", value: row.full_name || "—" },
+                            { label: "Email", value: row.email },
+                          ]}
+                          confirmLabel="Ganti kata sandi"
+                          reasonField={{
+                            name: "password",
+                            label: "Kata sandi baru (minimal 10 karakter)",
+                            placeholder: "••••••••••",
+                            type: "password",
+                            minLength: 10,
+                          }}
+                        />
                         {!isSelf ? (
                           <ConfirmDialog
                             action={revokeAccessAction}
                             hidden={{ userId: row.user_id }}
                             trigger="Cabut akses"
                             title="Cabut akses admin"
-                            description="Orang ini langsung kehilangan akses ke admin. Akun login-nya di Supabase Auth tetap ada dan bisa diberi akses lagi kapan saja."
+                            description="Orang ini langsung kehilangan akses ke admin dan semua sesinya diakhiri. Akun loginnya tetap ada dan bisa diberi akses lagi kapan saja."
                             summary={[
                               { label: "Nama", value: row.full_name || "—" },
                               { label: "Email", value: row.email },
