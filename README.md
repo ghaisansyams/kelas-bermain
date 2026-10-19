@@ -1,27 +1,24 @@
 # Kelas Bermain — Platform Digital
 
-Dua aplikasi dalam satu basis kode, berbagi satu model data:
+Dua aplikasi dalam satu basis kode, berbagi satu basis data:
 
-1. **Situs publik** untuk orang tua — jadwal kelas, pendaftaran lewat QR, pembayaran, check-in, dan verifikasi sertifikat.
-2. **ERP internal** (`/admin`) untuk staf — customer, anak, event, pendaftaran, pembayaran, kehadiran, sertifikat, konten, dan laporan.
+1. **Situs publik** untuk orang tua — jadwal kelas, pendaftaran lewat QR, transfer manual,
+   check-in, dan verifikasi sertifikat.
+2. **ERP internal** (`/admin`) untuk staf — pendamping, anak, event, pendaftaran, pembayaran,
+   kehadiran, sertifikat, voucher, affiliate, CMS situs, dan laporan.
 
 Kelas Bermain adalah aktivitas kreatif dan edukatif untuk anak **3–15 tahun di Jabodetabek**.
 
-> **Status: versi demo dengan data dummy.**
-> Judul kelas, tanggal, lokasi, aktivitas, dan benefit mengikuti unggahan
-> [@kelasbermain.id](https://instagram.com/kelasbermain.id). **Harga masih placeholder.**
-> Pendaftaran, pembayaran, kehadiran, dan sertifikat berjalan di peramban
-> (localStorage) — belum ada basis data produksi. Seluruh akses data lewat
-> lapisan service, jadi penggantian ke Supabase/PostgreSQL tidak menyentuh satu
-> pun komponen UI.
-
 ### Catatan penting
 
-- **Autentikasi ERP masih simulasi.** Akun fixture, kata sandi ditampilkan di
-  layar masuk. Ganti `src/lib/auth/*` sebelum dipakai untuk data asli.
-- **Payment gateway masih simulasi.** Tidak ada uang berpindah.
-- **Tidak ada nomor telepon di teks situs publik**, sesuai notulen. Nomor WhatsApp
-  tetap terlihat karena tercetak di dalam poster Pemadam Cilik.
+- **Basis data Postgres sendiri**, bukan Supabase. Dulu aplikasi ini jalan di atas Supabase
+  (Auth + RLS + fungsi SECURITY DEFINER); sekarang semuanya lewat Prisma ke Postgres biasa,
+  dengan sesi admin dan pemeriksaan hak akses ditulis di aplikasi sendiri
+  (`src/lib/auth/session.ts`, `src/lib/admin/auth.ts`). Lihat bagian **Riwayat migrasi**
+  di bawah kalau menemukan berkas yang masih menyebut Supabase.
+- **Pembayaran transfer manual.** Tidak ada payment gateway. Orang tua transfer lalu
+  mengunggah bukti; admin memverifikasi dan menekan "Konfirmasi Lunas" di `/admin/payments`.
+  Tidak ada jalur kode yang bisa menandai pembayaran lunas tanpa admin.
 - Hampir semua kelas berbayar. Satu event gratis (**Open House**) sengaja ada agar
   alur `FREE` benar-benar teruji, bukan hanya didukung model data.
 
@@ -31,44 +28,49 @@ Kelas Bermain adalah aktivitas kreatif dan edukatif untuk anak **3–15 tahun di
 | --- | --- |
 | Framework | Next.js 15 (App Router, React 19, Server Components) |
 | Bahasa | TypeScript (strict) |
+| Basis data | PostgreSQL, diakses lewat Prisma — tidak ada Supabase, tidak ada RLS |
+| Auth | Sesi sendiri: argon2/bcrypt + cookie httpOnly (`src/lib/auth/session.ts`) |
+| Media | Disk lokal (`UPLOAD_DIR`), dilayani lewat `/uploads/[...path]` |
 | Styling | Tailwind CSS v4 (CSS-first `@theme`) |
 | Ikon | lucide-react + SVG kustom untuk logo & ikon media sosial |
 | Font | Plus Jakarta Sans + Fraunces (via `next/font`, self-hosted saat build) |
-| Gambar | `next/image`, aset lokal di `public/images` |
-| Animasi | CSS murni + `IntersectionObserver` (tanpa pustaka animasi) |
-| Deploy | Vercel (region `sin1`) |
-
-Dependensi runtime sengaja dijaga minimal: `next`, `react`, `react-dom`, `lucide-react`,
-`clsx`, `tailwind-merge`, `qrcode-generator`. Tidak ada pustaka form, state manager,
-chart, atau animasi tambahan — chart dashboard digambar sendiri sebagai SVG/HTML.
+| Gambar | `next/image`, aset lokal + media diunggah |
+| Deploy | Vercel *atau* VPS (lihat catatan Postgres lokal di bawah) |
 
 ## Menjalankan proyek
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # build produksi
-npm run start      # jalankan hasil build
-npm run lint       # ESLint
-npm run typecheck  # tsc --noEmit
+npm run db:start    # Postgres lokal dari node_modules — tanpa Homebrew/Docker
+npx prisma migrate deploy
+npm run dev          # http://localhost:3000
+npm run build        # build produksi
+npm run start         # jalankan hasil build
+npm run lint          # ESLint
+npm run typecheck     # tsc --noEmit
+npm run qa             # smoke test situs publik (Firefox headless)
+npm run qa:registration # smoke test alur pendaftaran
 ```
+
+`npm run db:start` menjalankan Postgres sungguhan lewat paket `embedded-postgres`,
+cocok untuk mesin tanpa Homebrew atau Docker (lihat `scripts/db.mjs`). Di server
+produksi, arahkan `DATABASE_URL` ke Postgres yang sudah ada — skrip ini hanya untuk
+pengembangan lokal.
 
 Node 20+ disarankan (dikembangkan dengan Node 22).
 
 ## Variabel lingkungan
 
-Hanya satu, dan bersifat opsional:
+Lihat `.env.example` untuk daftar lengkap beserta penjelasannya. Yang wajib:
 
-| Nama | Fungsi | Default |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | Basis URL absolut untuk metadata SEO, Open Graph, sitemap, dan canonical | `https://kelas-bermain.vercel.app` |
-| `NEXT_PUBLIC_GALLERY_DRIVE_URL` | URL folder Google Drive yang ditautkan di halaman Galeri | folder produksi di `src/data/gallery.ts` |
-| `ADMIN_SESSION_SECRET` | Kunci tanda tangan cookie sesi ERP | nilai pengembangan yang terdokumentasi — **wajib diisi di produksi** |
+| Nama | Fungsi |
+| --- | --- |
+| `DATABASE_URL` | Koneksi Postgres. Tanpa ini aplikasi tidak bisa membaca atau menulis apa pun. |
 
-Keduanya opsional. `NEXT_PUBLIC_GALLERY_DRIVE_URL` hanya perlu diisi bila folder Drive
-berpindah tanpa ingin mengubah kode.
+Semua yang lain opsional dan punya nilai bawaan yang masuk akal — lihat `.env.example`.
 
-Tidak ada API key, token, atau kredensial apa pun di repositori ini.
+Tidak ada kunci service-role, tidak ada bypass RLS, tidak ada kredensial Supabase
+di repositori ini.
 
 ## Rute
 
@@ -79,36 +81,47 @@ Tidak ada API key, token, atau kredensial apa pun di repositori ini.
 | `/` | Landing: hero, nilai, jadwal terdekat, cara ikut, statistik, kegiatan, galeri, testimoni, media sosial |
 | `/event` | Jadwal kelas + filter status dan kategori |
 | `/event/[slug]` | Detail kelas (satu template untuk semua kelas) |
-| `/register/[eventSlug]` | **Halaman pendaratan QR** — pendaftaran 4 langkah |
-| `/payment/[registrationId]` | Checkout & pembayaran (gerbang simulasi) |
+| `/register/[eventSlug]` | **Halaman pendaratan QR** — pendaftaran 4 langkah, draf tersimpan otomatis |
+| `/payment/[registrationId]` | Status pembayaran + unggah bukti transfer |
 | `/attendance/[eventSlug]` | Check-in kehadiran peserta |
-| `/certificate/[certificateId]` | Verifikasi sertifikat publik |
+| `/cek-tiket` | Cek status pendaftaran lewat nomor pendaftaran + kontak |
+| `/certificate/[certificateId]`, `/sertifikat` | Verifikasi sertifikat publik |
 | `/kegiatan`, `/kegiatan/[slug]` | Dokumentasi kegiatan |
-| `/galeri` | Banner + tautan folder Google Drive |
-| `/sertifikat` | Pencarian sertifikat berdasarkan nomor |
+| `/galeri` | Banner + tautan folder Google Drive (diatur dari CMS) |
+| `/update` | Feed Instagram (disinkronkan lewat Apify, lihat di bawah) |
+| `/affiliate` | Pendaftaran program affiliate |
 
-URL lama (`/event/[slug]/daftar`, `/event/[slug]/attendance`, `/sertifikat/[id]`) tetap
-hidup lewat redirect permanen — materi cetak lama tidak rusak.
+URL lama (`/event/[slug]/daftar`, `/event/[slug]/attendance`, `/sertifikat/[id]`, `/tiket`)
+tetap hidup lewat redirect permanen — materi cetak lama tidak rusak.
 
-### ERP internal
+### ERP internal (`/admin`)
 
 | Rute | Isi |
 | --- | --- |
-| `/admin/login` | Masuk (akun demo ditampilkan di layar) |
-| `/admin/dashboard` | 8 kartu statistik + 4 chart + pendaftaran terbaru |
-| `/admin/customers`, `/admin/customers/[id]` | Orang tua + profil, anak, pendaftaran, pembayaran |
-| `/admin/children`, `/admin/children/[id]` | Anak + profil, kelas, sertifikat |
-| `/admin/events`, `/admin/events/[id]` | Event + ikhtisar, pendaftaran, pembayaran, sertifikat |
-| `/admin/events/[id]/qr` | **Generator QR** — unduh PNG/SVG, cetak, salin tautan, penanda sumber |
-| `/admin/registrations` | Pendaftaran + 5 filter + ekspor CSV |
-| `/admin/payments` | Pembayaran + ubah status manual (untuk konfirmasi pihak ketiga) |
-| `/admin/attendance` | Tandai kehadiran manual + tautan QR check-in |
-| `/admin/certificates` | Sertifikat terbit |
-| `/admin/activities`, `/admin/gallery` | Konten |
-| `/admin/reports` | 6 laporan, tersaring, ekspor CSV |
-| `/admin/settings` | Identitas, peran, status integrasi, skema basis data |
+| `/admin/login` | Masuk — sesi sungguhan, bukan simulasi |
+| `/admin` | Dashboard: statistik + pendaftaran terbaru |
+| `/admin/customers`, `/admin/customers/[id]` | Pendamping + profil, anak, pendaftaran, pembayaran |
+| `/admin/children` | Anak |
+| `/admin/events`, `/admin/events/[id]` | Event |
+| `/admin/registrations` | Pendaftaran + filter + ekspor CSV |
+| `/admin/payments` | Pembayaran, bukti transfer, konfirmasi/tolak/refund |
+| `/admin/finance` | Buku keuangan |
+| `/admin/attendance` | Tandai kehadiran manual |
+| `/admin/certificates` | Terbitkan & kelola sertifikat |
+| `/admin/vouchers` | Voucher diskon |
+| `/admin/affiliates` | Setujui/tolak pendaftar affiliate, lihat statistik |
+| `/admin/cms` | Website builder — bagian halaman, koleksi, navigasi, tema, template sertifikat |
+| `/admin/media` | Pustaka media (unggah, cari, hapus) |
+| `/admin/users` | Kelola admin — buat akun, atur peran, ganti/reset kata sandi |
+| `/admin/reports` | Laporan tersaring + ekspor CSV |
+| `/admin/activity-log` | Jejak audit setiap perubahan |
+| `/admin/panduan` | Panduan pemakaian ERP |
 
-`/admin` dialihkan ke `/admin/dashboard`. Seluruh `/admin/*` dijaga middleware.
+Seluruh `/admin/*` dijaga dua lapis: middleware memeriksa ada-tidaknya cookie sesi
+(ini cepat tapi tidak bisa memvalidasi — berjalan di edge runtime), dan setiap
+halaman/aksi memanggil `requireAdmin()` yang membaca sesi dari database. Middleware
+yang keliru hanya membuat orang terlihat masuk; `requireAdmin()` yang sebenarnya
+menolak.
 
 ## Alur
 
@@ -117,210 +130,157 @@ hidup lewat redirect permanen — materi cetak lama tidak rusak.
 ```
 QR di poster / banner / lokasi
   → /register/<slug>?source=poster
-  → Langkah 1 Orang Tua  → Langkah 2 Anak (bisa lebih dari satu)
-  → Langkah 3 Konfirmasi → Langkah 4 Selesai
-  → Nomor pendaftaran per anak + nomor customer
+  → Data Peserta (bisa Personal atau Group — beberapa pendamping sekaligus)
+  → Konfirmasi → kirim
+  → Server action createRegistration: satu transaksi Postgres —
+    pendamping, anak, pendaftaran, tagihan tersimpan bersama atau tidak sama sekali
+  → Tombol "Lanjut ke Pembayaran" → WhatsApp dengan nomor pendaftaran terisi otomatis
 ```
 
-`?source=` tersimpan pada setiap pendaftaran, sehingga media mana yang menghasilkan
-peserta bisa dilihat di kolom Sumber.
+Harga dan ketersediaan kuota dihitung ulang di server saat kirim — nilai yang
+dikirim browser hanya dipakai untuk dibandingkan, tidak pernah dipercaya begitu
+saja. Draf formulir tersimpan di localStorage perangkat supaya refresh tidak
+menghapus isian.
 
-### Tiga skenario pembayaran
+### Pembayaran — transfer manual
 
-| Tipe | Metode | Yang terjadi |
-| --- | --- | --- |
-| `FREE` | `NONE` | Langsung `CONFIRMED`, tanpa pembayaran |
-| `PAID` | `WEBSITE` | Checkout di situs ini lewat gerbang simulasi → `PAID` |
-| `PAID` | `THIRD_PARTY` | Pendaftaran tercatat `PENDING`, peserta diarahkan ke platform mitra; admin mengonfirmasi manual |
+| Langkah | Siapa |
+| --- | --- |
+| Transfer ke rekening yang tertera | Orang tua |
+| Unggah bukti transfer di `/payment/[id]` | Orang tua |
+| Pembayaran berubah ke `WAITING_VERIFICATION` | Otomatis |
+| Admin memeriksa bukti, menekan Konfirmasi Lunas atau Tolak | Admin, di `/admin/payments` |
+| Pembayaran jadi `PAID` (atau `REJECTED` dengan alasan) + nomor invoice terbit + tercatat di buku keuangan | Satu fungsi database, satu transaksi |
+
+Tidak ada kode di mana pun — di server action, di service, di fungsi database
+manapun — yang bisa menandai pembayaran `PAID` tanpa admin menekan tombol itu.
 
 ### Kehadiran → sertifikat
 
 ```
-/attendance/<slug>  (atau QR check-in dengan ?reg= terisi otomatis)
+/attendance/<slug>
   → verifikasi nomor pendaftaran + kontak orang tua
   → attendanceStatus = PRESENT, certificateStatus = AVAILABLE
-  → "Lihat Sertifikat" → nomor KB-<tahun>-<urutan> diterbitkan
-  → /certificate/<nomor> bisa diverifikasi publik
+  → admin menerbitkan sertifikat di /admin/certificates
+  → /certificate/<nomor> atau /sertifikat bisa diverifikasi publik
 ```
+
+### Instagram → halaman Update
+
+```
+Cron tengah malam (vercel.json, atau crontab di VPS)
+  → /api/cron/instagram (dikunci CRON_SECRET)
+  → Apify menjalankan browser di sisi mereka, mengembalikan postingan terbaru
+  → gambar diunduh ke disk, postingan masuk sebagai DRAF di CMS
+  → admin menekan Terbitkan di /admin/cms
+```
+
+Cadangan gratis kalau kuota Apify habis: `npm run instagram:scrape` menjalankan
+Firefox headless dari laptop (Instagram memblokir IP datacenter, jadi ini tidak
+bisa dijalankan dari server).
 
 ## Struktur proyek
 
 ```
 src/
-  app/                      # Rute App Router + metadata per halaman
+  app/                      # Rute App Router (publik + /admin) + metadata per halaman
   components/
+    admin/                  # Komponen ERP (tabel, dialog konfirmasi, editor CMS)
     brand/                  # Logo & ikon media sosial
     certificate/            # Kartu sertifikat, viewer, formulir verifikasi
-    event/                  # Kartu event, filter, panel registrasi, bagian detail
+    event/                  # Kartu event, filter, panel registrasi
     forms/                  # Field primitif + formulir pendaftaran & kehadiran
     gallery/                # Grid masonry + lightbox
     home/                   # Bagian-bagian landing page
-    kegiatan/               # Kartu & filter kegiatan
-    layout/                 # Header, footer, page header
-    ui/                     # Button, Badge, Container, Skeleton, EmptyState, Reveal
-  data/                     # SELURUH konten dummy (lihat di bawah)
+    layout/                 # Header, footer
+    registration/           # Wizard pendaftaran, checkout, tiket
+    ui/                     # Button, Badge, Container, Skeleton, EmptyState
+  data/                     # Konten statis bawaan (fallback kalau CMS kosong)
   lib/
-    repositories/           # Penyimpanan (localStorage) untuk pendaftaran & sertifikat
-    services/               # Batas antara UI dan sumber data
-    utils/                  # Tanggal, format, penomoran sertifikat, validasi
+    admin/                  # Gerbang hak akses, aktor database, unggah, media
+    auth/                   # Sesi admin (hash, cookie, verifikasi)
+    cms/                    # Skema CMS, template bagian, preset tema
+    config/                 # Lokasi penyimpanan, nomor WhatsApp
+    services/               # Batas antara UI dan basis data — SATU TEMPAT per domain
+    utils/                  # Tanggal, format, validasi
+    db.ts                   # Klien Prisma tunggal (singleton)
     types.ts                # Model domain
-public/images/              # Foto (aset lokal, bukan hotlink)
+  middleware.ts              # Penjaga cepat /admin — bukan gerbang sesungguhnya
+prisma/
+  schema.prisma              # Skema basis data
+  migrations/                 # Riwayat migrasi, termasuk fungsi & trigger yang dibawa dari Supabase
+public/images/                # Foto bawaan (aset lokal)
+public/uploads/                # Media yang diunggah admin + hasil sinkron Instagram
+scripts/                       # Alat pengembangan + migrasi satu kali (lihat di bawah)
 ```
 
 ### Aturan yang dijaga
 
-Komponen **tidak pernah** memuat konten secara langsung. Yang benar:
-
-```tsx
-<EventCard event={event} />        // konten datang dari prop
-```
-
-Yang dihindari:
-
-```tsx
-<div><h1>Creative Leadership 2026</h1></div>   // konten tertanam di komponen
-```
-
-Halaman mengambil data lewat `lib/services/content.ts`, lalu meneruskannya ke komponen
-sebagai prop. Inilah yang membuat penggantian sumber data menjadi pekerjaan satu berkas.
+Komponen **tidak pernah** memuat konten secara langsung. Halaman mengambil data
+lewat `lib/services/*.ts`, lalu meneruskannya ke komponen sebagai prop. Modul
+layanan yang dipanggil dari komponen klien (`"use client"`) ditandai
+`"use server"` dan menjalankan pemeriksaan hak aksesnya sendiri — Prisma tidak
+bisa dan tidak boleh dipanggil langsung dari browser.
 
 ## Arsitektur data
 
 ```
-src/data/            seed — customers, children, registrations, payments,
-                     attendance, certificates, events, activities, gallery
+PostgreSQL (Prisma)
       ↓
-src/lib/repositories/  satu adapter per koleksi (localStorage + seed)
-      ↓
-src/lib/services/      content · customer · registration · payment ·
-                       attendance · certificate · qr · admin
+src/lib/services/      content · registration · payment · attendance ·
+                       certificate · voucher · affiliate · cms · report
       ↓
 komponen UI            hanya menerima props
 ```
 
-Relasi antar-entitas:
-
-```
-Customer (orang tua)
-  ├── Child            customers.id -> children.customer_id
-  └── Registration     customers.id -> registrations.customer_id
-        ├── Event      events.id    -> registrations.event_id
-        ├── Payment    registrations.id -> payments.registration_id
-        ├── Attendance registrations.id -> attendance.registration_id
-        └── Certificate registrations.id -> certificates.registration_id
-```
-
-Data orang tua **tidak diduplikasi** per anak; pendaftaran ulang dengan email yang
-sama memakai kembali baris customer yang ada.
-
-### Mengganti data dummy dengan basis data
-
-Cukup satu berkas: **`src/lib/repositories/index.ts`**. Implementasikan ulang
-`Repository<T>` terhadap klien Supabase/PostgreSQL. Selama bentuk kembaliannya
-tetap mengikuti `src/lib/repositories/types.ts`, tidak ada service maupun komponen
-yang perlu diubah.
-
-Yang juga perlu dipindah ke basis data saat itu:
-
-| Sekarang | Nanti |
-| --- | --- |
-| `lib/utils/numbering.ts` | sequence / identity column, agar nomor tetap unik saat penulisan bersamaan |
-| `lib/services/payment.ts` (`mockGateway`) | implementasi `PaymentGateway` untuk Midtrans/Xendit/Stripe |
-| `lib/auth/*` | penyedia autentikasi sungguhan (Supabase Auth, Auth.js, Clerk) |
-| Unggah galeri | penyimpanan objek (Supabase Storage / S3) |
+Setiap tulisan yang menyentuh uang atau hak akses (konfirmasi pembayaran,
+refund, terbitkan sertifikat, kelola pengguna) memanggil fungsi `admin_*`
+di database lewat `src/lib/admin/actor.ts` (`asAdmin`), yang membungkus
+panggilannya dalam satu transaksi dan mengisi `app.user_id` supaya fungsi
+database tahu siapa yang bertindak — pengganti `auth.uid()` milik Supabase.
+Fungsi itu memeriksa hak akses DI DALAM database, jadi aturannya tetap
+berlaku dua lapis sekalipun satu pemanggil di aplikasi lupa memeriksa.
 
 ### Penomoran
 
 | Entitas | Format | Contoh |
 | --- | --- | --- |
-| Customer | `KB-CUS-<5 digit>` | `KB-CUS-00001` |
+| Pendamping | `KB-CUS-<5 digit>` | `KB-CUS-00001` |
 | Anak | `KB-CHD-<5 digit>` | `KB-CHD-00001` |
 | Pendaftaran | `KB-REG-<tahun>-<5 digit>` | `KB-REG-2026-00001` |
-| Pembayaran | `KB-PAY-<tahun>-<5 digit>` | `KB-PAY-2026-00001` |
+| Invoice | `INV-<tahun>-<5 digit>` | `INV-2026-00001` |
 | Sertifikat | `KB-<tahun>-<5 digit>` | `KB-2026-00125` |
+| Affiliate | kode acak 8 karakter, dibuat trigger database saat disetujui | `KLBMX7Q2` |
 
 ### Peran ERP
 
 | Peran | Akses |
 | --- | --- |
-| `SUPER_ADMIN` | seluruh menu termasuk Pengaturan |
-| `ADMIN` | semua kecuali Pengaturan |
-| `STAFF` | Dashboard, Orang Tua, Anak, Pendaftaran, Kehadiran, Laporan |
+| `SUPER_ADMIN` | seluruh menu, termasuk Pengguna, refund, dan hapus data permanen |
+| `ADMIN` | semua operasional, keuangan, dan website; tidak bisa mengelola pengguna lain |
+| `STAFF` | akses terbatas ke menu operasional sehari-hari |
 
-Menu sidebar difilter per peran, dan halaman yang tidak diizinkan menolak akses —
-bukan sekadar disembunyikan.
+Setiap aksi memeriksa perannya sendiri lewat `requireAdmin()` / `requireRole()` —
+menu yang disembunyikan di tampilan bukan satu-satunya penjaga.
 
-## Siap untuk panel admin
+## Riwayat migrasi: Supabase → Postgres
 
-Belum ada dashboard admin di fase ini — sesuai permintaan. Yang sudah disiapkan:
+Proyek ini awalnya dibangun di atas Supabase (Postgres terkelola + Auth + RLS +
+fungsi SECURITY DEFINER). Semuanya sudah dipindahkan ke Postgres polos dengan
+Prisma; tidak ada lagi ketergantungan pada `@supabase/*` di kode aplikasi.
+Beberapa jejak sengaja dibiarkan karena berguna:
 
-- Setiap entitas punya tipe eksplisit di `lib/types.ts` dan `lib/repositories/types.ts`.
-- `EventRecord` memuat `published`, `capacity`, `registered`, `registration.type`,
-  `registration.price`, `agenda`, dan `certificate` — cukup untuk form CRUD event.
-- `ActivityRecord` dan `GalleryItem` juga memuat `published`/kategori untuk kebutuhan serupa.
-- Pembacaan untuk kebutuhan admin sudah tersedia: `listRegistrations(eventSlug?)`,
-  `listAttendance(eventSlug)`, `listCertificates()` — siap dipakai untuk tabel peserta dan
-  ekspor CSV.
+- `prisma/migrations/*_logika_database/` — 24 fungsi dan 3 trigger yang dulu
+  hidup di Supabase, dibawa apa adanya (bukan ditulis ulang) supaya perilakunya
+  identik dengan yang sudah teruji bertahun-tahun.
+- `scripts/migrate-data.mjs`, `scripts/migrate-storage.mjs`,
+  `scripts/rewrite-media-urls.mjs` — alat migrasi satu kali. Aman dijalankan
+  ulang (idempotent) tapi tidak dipakai aplikasi yang berjalan; boleh dihapus
+  kapan saja setelah cutover selesai dan terbukti stabil.
+- Komentar yang menyebut "dulu di Supabase ini begini..." di beberapa berkas
+  (`src/lib/auth/session.ts`, `src/lib/admin/actor.ts`) — dipertahankan karena
+  menjelaskan KENAPA kodenya berbentuk begitu, bukan sekadar sejarah.
 
-## Catatan konten
-
-- **Tidak ada nomor telepon** yang ditampilkan di seluruh situs — sesuai permintaan rapat.
-  Kontak publik hanya lewat email dan media sosial.
-- Bagian Instagram memakai data statis di `src/data/instagram.ts`. Tidak ada scraping dan
-  tidak ada pemanggilan API Instagram. Komponennya hanya mengonsumsi tipe `SocialPost`,
-  sehingga integrasi resmi nantinya cukup mengganti sumber datanya.
-- Sebagian besar foto adalah **stok berlisensi bebas sebagai placeholder** dan perlu diganti
-  dengan dokumentasi asli Kelas Bermain sebelum situs dipakai sungguhan.
-- Cover **Tentara Cilik** dan **Pemadam Cilik** adalah ilustrasi datar yang dibuat sendiri
-  (tidak ada foto stok yang sesuai dan aman untuk tema ini). Ganti dengan poster asli bila
-  tersedia.
-
-## Kualitas & pengujian
-
-Pada commit ini:
-
-- `npm run lint`, `npm run typecheck`, dan `npm run build` bersih tanpa peringatan.
-- 73 halaman dihasilkan saat build.
-- **41 alur diuji ujung ke ujung di peramban**, mencakup: pendaratan QR beserta
-  penanda sumber, pendaftaran multi-anak, total harga, tiga skenario pembayaran
-  (gratis / website / pihak ketiga), simulasi pembayaran gagal lalu berhasil,
-  penolakan usia di luar rentang kelas, penolakan kontak yang tidak cocok saat
-  check-in, penerbitan sertifikat setelah kehadiran, verifikasi sertifikat publik,
-  penjagaan rute ERP, pembatasan peran STAFF, dashboard, pencarian global,
-  generator QR, seluruh halaman ERP, dan perubahan status pembayaran manual.
-- Salah satu tes membuktikan **situs publik dan ERP memang berbagi data**:
-  pendaftaran yang dibuat lewat situs publik langsung muncul di tabel ERP.
-- Sapuan responsif dan aksesibilitas pada **360 / 390 / 768 / 1280 px** (publik) dan
-  **390 / 768 / 1366 px** (ERP): tidak ada scroll horizontal, gambar rusak, teks
-  alternatif hilang, kontrol tanpa label, maupun hydration error.
-
-## Deploy
-
-Dikonfigurasi untuk Vercel (`vercel.json`, region `sin1`). Build standar Next.js tanpa
-langkah tambahan.
-
-```bash
-vercel --prod
-```
-
-Setelah domain final diketahui, set `NEXT_PUBLIC_SITE_URL` di environment variables Vercel
-agar metadata SEO dan sitemap memakai URL yang benar.
-
-## Batasan versi ini
-
-- **Data tersimpan di peramban.** Pendaftaran, pembayaran, kehadiran, dan sertifikat
-  memakai localStorage, jadi tidak lintas perangkat dan hilang bila data situs
-  dibersihkan. Data seed selalu tersedia sebagai dasar.
-- **Autentikasi ERP simulasi.** Cookie sesi ditandatangani HMAC sehingga tidak bisa
-  dipalsukan dengan mengedit nilainya, tetapi akunnya fixture tanpa kata sandi
-  terenkripsi. Bukan autentikasi produksi.
-- **Payment gateway simulasi.** Tombol "Bayar Sekarang" hanya mengubah status.
-- **Harga setiap kelas masih placeholder** dan wajib diganti dengan angka sebenarnya.
-- Kegiatan dan galeri di ERP masih **baca saja**; form CRUD menunggu backend dan
-  penyimpanan objek.
-- Statistik pemindaian QR belum ada — yang tercatat baru sumber pendaftaran.
-- Tanggal event bersifat statis; halaman yang bergantung tanggal diregenerasi tiap
-  jam (`revalidate = 3600`).
-- Sebagian besar foto adalah stok placeholder. Cover Tentara Cilik dan Pemadam Cilik
-  adalah ilustrasi datar buatan sendiri; poster Pemadam Cilik memakai artwork asli.
-- Alamat email pada footer masih placeholder.
+Kalau menemukan berkas lain yang masih menyebut Supabase di luar daftar ini,
+itu kemungkinan sisa yang belum sempat dibersihkan — aman dihapus setelah
+diperiksa tidak ada yang memanggilnya.
