@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "check-db": "node scripts/check-db.mjs",
     "dev": "next dev",
     "instagram:refresh": "node scripts/instagram-refresh.mjs",
     "lint": "eslint .",

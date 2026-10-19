@@ -168,7 +168,7 @@ manapun — yang bisa menandai pembayaran `PAID` tanpa admin menekan tombol itu.
 ### Instagram → halaman Update
 
 ```
-Cron tengah malam (vercel.json, atau crontab di VPS)
+Cron tengah malam (crontab di server)
   → /api/cron/instagram (dikunci CRON_SECRET)
   → Apify menjalankan browser di sisi mereka, mengembalikan postingan terbaru
   → gambar diunduh ke disk, postingan masuk sebagai DRAF di CMS
