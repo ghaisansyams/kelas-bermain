@@ -45,9 +45,9 @@ export const ALLOWED_MIME = [...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME];
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 /**
- * Video gets its own, larger cap. Supabase's free tier gives 1 GB of
- * storage in total, so a handful of 50 MB clips is already a meaningful
- * share of it — keep videos short, or host them on YouTube instead.
+ * Video gets its own, larger cap. Uploads live on the server's disk, so a
+ * handful of 50 MB clips adds up quickly — keep videos short, or host them on
+ * YouTube instead.
  */
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 

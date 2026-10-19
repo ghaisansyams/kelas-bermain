@@ -176,7 +176,7 @@ export const GUIDE: GuideChapter[] = [
       },
       {
         title: "Menambah pengguna",
-        body: "Buat dulu akunnya di Supabase → Authentication → Users, lalu masukkan emailnya di menu Pengguna. Pembuatan akun sengaja tidak dilakukan dari sini karena butuh kunci yang tidak pernah dipegang aplikasi ini.",
+        body: "Hanya Super Admin yang bisa. Di menu Pengguna, isi email, nama, peran, dan kata sandi awal (minimal 10 karakter), lalu sampaikan kata sandinya langsung kepada orangnya. Tidak ada email pemulihan: kalau seseorang lupa kata sandi, Super Admin menggantinya lewat tombol Ganti kata sandi di baris orang itu, dan semua sesi lamanya otomatis berakhir.",
       },
       {
         title: "Menghapus data pendamping",

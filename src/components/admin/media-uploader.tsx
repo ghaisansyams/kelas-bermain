@@ -15,9 +15,9 @@ import {
 import { uploadMediaFile } from "@/lib/admin/upload";
 
 /**
- * Uploads straight to Supabase Storage with the admin's own session — the
- * storage policies decide whether it's allowed, so no service-role key is
- * involved. Metadata lands in the `media` table afterwards.
+ * Uploads through a server action, which checks the admin session, reads the
+ * file's real type from its bytes and writes it to disk. Metadata lands in the
+ * `media` table afterwards.
  */
 export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
   const router = useRouter();
@@ -107,7 +107,7 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
       <p className="text-xs text-muted">
         Gambar JPG, PNG, WEBP, AVIF, GIF — maksimal {formatFileSize(MAX_FILE_BYTES)}. Video MP4
         atau WEBM — maksimal {formatFileSize(MAX_VIDEO_BYTES)}. Video panjang sebaiknya diunggah
-        ke YouTube saja, karena penyimpanan Supabase terbatas 1 GB.
+        ke YouTube saja, karena ruang penyimpanan server terbatas.
       </p>
 
       {error ? (

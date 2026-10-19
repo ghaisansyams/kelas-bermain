@@ -36,7 +36,7 @@ import { paymentProofWhatsappUrl } from "@/lib/config/whatsapp";
  * only in their own browser but becomes a real fraud path against a shared
  * database: anyone could call the same function and mark their own transfer
  * paid without sending a rupiah. Verifying a transfer is admin's job, done
- * by hand in the Supabase Table Editor once the WhatsApp proof arrives.
+ * on the Pembayaran page once the transfer proof arrives.
  */
 export function Checkout({ accessToken }: { accessToken: string }) {
   const [loading, setLoading] = useState(true);

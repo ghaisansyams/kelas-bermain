@@ -61,7 +61,7 @@ export default async function AdminMediaPage({
     <div className="space-y-6">
       <PageHeader
         title="Media Library"
-        description="Gambar yang diunggah di sini bisa dipakai di CMS, tersimpan di Supabase Storage."
+        description="Gambar yang diunggah di sini bisa dipakai di CMS, tersimpan di server."
         action={
           <Link
             href="/admin/cms"
@@ -140,7 +140,7 @@ export default async function AdminMediaPage({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <Card key={item.id} className="space-y-3 p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element -- admin thumbnail from Supabase Storage */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- admin thumbnail served from /uploads */}
               <img
                 src={item.public_url}
                 alt={item.alt_text || item.file_name}
