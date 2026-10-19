@@ -1,4 +1,9 @@
-import { getSupabase } from "@/lib/supabase/client";
+"use server";
+
+import { db } from "@/lib/db";
+import { getEvents } from "@/lib/services/content";
+import { getPricingConfig } from "@/lib/services/pricing-settings";
+import { lookupVoucher } from "@/lib/services/voucher";
 import type {
   Customer,
   PaymentMethod,
@@ -6,19 +11,23 @@ import type {
   RegistrationSource,
 } from "@/lib/repositories/types";
 import type { EventView } from "@/lib/types";
-import type { PricingResult } from "@/lib/pricing";
+import { calculateRegistrationPrice, type PricingResult } from "@/lib/pricing";
 import { upsertChild, upsertCustomer, type ChildInput, type CustomerInput } from "./customer";
 import { createPayment, type PaymentInstruction } from "./payment";
 
 /**
- * Registration service — the one place a sign-up is created.
+ * Layanan pendaftaran — satu-satunya tempat sebuah pendaftaran dibuat.
  *
- * A submission is one or more `participants` groups, each its own paying
- * guardian with its own children — a PERSONAL registration is simply one
- * group; a GROUP registration (multiple escorts registering together, each
- * with the child/children they're bringing) is several. Everything here
- * calls the SECURITY DEFINER functions in supabase/schema.sql — the tables
- * themselves have no anon access at all.
+ * Satu kiriman berisi satu atau lebih kelompok `participants`, masing-masing
+ * pendamping pembayar dengan anak-anaknya sendiri. Pendaftaran PERSONAL
+ * hanyalah satu kelompok; GROUP adalah beberapa.
+ *
+ * Ini server action, jadi isi permintaannya adalah masukan dari internet:
+ * harga, ketersediaan, dan kuota dihitung ulang dari database di sini, dan
+ * apa pun yang dikirim browser soal itu hanya dipakai untuk dibandingkan —
+ * tidak pernah dipercaya. Dulu fungsi SQL menerima nominal dari klien apa
+ * adanya; sekarang event dengan harga Rp0 yang dikarang di browser tidak
+ * bisa menurunkan tagihan.
  */
 
 export interface RegistrationParticipantGroup {
@@ -60,8 +69,25 @@ export type RegistrationResult =
   | { ok: true; batch: RegistrationBatch }
   | { ok: false; error: string; field?: string };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapRegistration(row: any): Registration {
+function mapRegistration(row: {
+  id: string;
+  registration_number: string;
+  access_token: string;
+  customer_id: string;
+  child_id: string;
+  event_id: string;
+  registration_date: Date;
+  status: string;
+  payment_status: string;
+  attendance_status: string;
+  certificate_status: string;
+  payment_method: string;
+  amount: unknown;
+  source: string;
+  qr_source: string | null;
+  affiliate_code: string | null;
+  notes: string | null;
+}): Registration {
   return {
     id: row.id,
     registrationNumber: row.registration_number,
@@ -69,30 +95,46 @@ function mapRegistration(row: any): Registration {
     customerId: row.customer_id,
     childId: row.child_id,
     eventId: row.event_id,
-    registrationDate: row.registration_date,
-    status: row.status,
-    paymentStatus: row.payment_status,
-    attendanceStatus: row.attendance_status,
-    certificateStatus: row.certificate_status,
-    paymentMethod: row.payment_method,
+    registrationDate: row.registration_date.toISOString(),
+    status: row.status as Registration["status"],
+    paymentStatus: row.payment_status as Registration["paymentStatus"],
+    attendanceStatus: row.attendance_status as Registration["attendanceStatus"],
+    certificateStatus: row.certificate_status as Registration["certificateStatus"],
+    paymentMethod: row.payment_method as PaymentMethod,
     amount: Number(row.amount),
-    source: row.source,
+    source: row.source as RegistrationSource,
     qrSource: row.qr_source ?? undefined,
     affiliateCode: row.affiliate_code ?? undefined,
     notes: row.notes ?? undefined,
   };
 }
 
+/** Penolakan yang disengaja di dalam transaksi; membatalkan semuanya. */
+class RegistrationRefused extends Error {
+  constructor(
+    message: string,
+    readonly field?: string,
+  ) {
+    super(message);
+  }
+}
+
 export async function createRegistration(
   request: RegistrationRequest,
 ): Promise<RegistrationResult> {
-  const { event, participants, source } = request;
-  const supabase = getSupabase();
+  const { participants, source } = request;
 
   const totalChildren = participants.reduce((sum, group) => sum + group.children.length, 0);
   if (totalChildren === 0) {
     return { ok: false, error: "Tambahkan minimal satu data anak." };
   }
+
+  // Event dimuat ulang dari database. Yang dikirim browser hanya dipakai
+  // sebagai penunjuk id — harga dan ketersediaannya tidak dipercaya.
+  const events = await getEvents();
+  const event = events.find((item) => item.id === request.event.id);
+  if (!event) return { ok: false, error: "Kelas ini tidak ditemukan." };
+
   if (event.availability !== "open") {
     return {
       ok: false,
@@ -113,100 +155,145 @@ export async function createRegistration(
   const method: PaymentMethod = isFree ? "NONE" : event.registration.method;
   const unitPrice = isFree ? 0 : (event.registration.price ?? 0);
 
-  const created: Registration[] = [];
-  // Lead customer/registration — the one the aggregate payment is charged
-  // against — is whichever comes from the first participant group. For a
-  // PERSONAL registration that's the only group; for a GROUP one, the first
-  // companion to fill the form is the one coordinating payment.
-  let leadCustomer: Customer | null = null;
+  // Harga dihitung ulang dengan aturan dan voucher dari database. Kalau hasilnya
+  // beda dari yang disetujui orang tua di layar konfirmasi, pendaftaran
+  // ditolak — lebih baik meminta mereka melihat angka baru daripada menagih
+  // nominal yang tidak pernah mereka lihat.
+  const affiliateCode = request.affiliateCode?.trim() || undefined;
+  const affiliate = affiliateCode
+    ? await db.affiliates.findFirst({
+        where: { code: { equals: affiliateCode, mode: "insensitive" }, status: "ACTIVE" },
+        select: { id: true },
+      })
+    : null;
 
-  for (const group of participants) {
-    let customer;
-    try {
-      ({ customer } = await upsertCustomer({ ...group.companion, source }));
-    } catch (cause) {
-      return {
-        ok: false,
-        error: cause instanceof Error ? cause.message : "Gagal menyimpan data pendamping.",
-      };
-    }
-    if (!leadCustomer) leadCustomer = customer;
+  const voucherCode = request.pricing.voucher?.code;
+  const voucher = voucherCode
+    ? await lookupVoucher(voucherCode, totalChildren, event.id)
+    : null;
 
-    for (const child of group.children) {
-      let childRow;
-      try {
-        childRow = await upsertChild(customer.id, child);
-      } catch (cause) {
-        return {
-          ok: false,
-          error: cause instanceof Error ? cause.message : "Gagal menyimpan data anak.",
-          field: "children",
-        };
-      }
+  const pricing = calculateRegistrationPrice({
+    eventPrice: unitPrice,
+    childrenCount: totalChildren,
+    hasActiveAffiliate: Boolean(affiliate),
+    affiliateCode,
+    voucher: voucher?.ok ? voucher.voucher : null,
+    config: await getPricingConfig(),
+  });
 
-      const { data, error } = await supabase.rpc("create_registration", {
-        p_customer_id: customer.id,
-        p_child_id: childRow.id,
-        p_event_id: event.id,
-        p_amount: unitPrice,
-        p_status: isFree ? "CONFIRMED" : "REGISTERED",
-        p_payment_status: isFree ? "NOT_REQUIRED" : "PENDING",
-        p_payment_method: method,
-        p_source: source,
-        p_qr_source: request.qrSource ?? "",
-        p_affiliate_code: request.affiliateCode ?? "",
-        p_age_override: Boolean(child.ageOverride),
+  if (!isFree && pricing.total !== request.pricing.total) {
+    return {
+      ok: false,
+      error:
+        "Total pembayaran berubah sejak kamu membukanya. Muat ulang halaman ini untuk melihat angka terbaru.",
+    };
+  }
+
+  try {
+    return await db.$transaction(async (tx) => {
+      // Baris event dikunci selama transaksi. Tanpa kunci, dua keluarga yang
+      // mendaftar untuk kursi terakhir pada detik yang sama sama-sama lolos
+      // pemeriksaan kuota dan kelas kelebihan peserta.
+      const locked = await tx.$queryRaw<{ capacity: number }[]>`
+        select capacity from events where id = ${event.id} for update`;
+      if (!locked[0]) throw new RegistrationRefused("Kelas ini tidak ditemukan.");
+
+      const taken = await tx.registrations.count({
+        where: { event_id: event.id, status: { not: "CANCELLED" } },
       });
-
-      if (error) {
-        if (error.message?.includes("DUPLICATE_REGISTRATION")) {
-          return {
-            ok: false,
-            error: `${childRow.fullName} sudah terdaftar di kelas ini.`,
-            field: "children",
-          };
-        }
-        return { ok: false, error: "Gagal menyimpan pendaftaran. Coba lagi sebentar lagi." };
+      if (taken + totalChildren > locked[0].capacity) {
+        throw new RegistrationRefused(
+          `Kuota baru saja terisi. Sisa ${Math.max(0, locked[0].capacity - taken)} kursi.`,
+        );
       }
 
-      const row = Array.isArray(data) ? data[0] : data;
-      created.push(mapRegistration(row));
+      const created: Registration[] = [];
+      // Pendamping pertama yang mengisi formulir adalah yang mengoordinasi
+      // pembayaran: tagihan satu paket dibebankan ke pendaftarannya.
+      let leadCustomer: Customer | null = null;
+
+      for (const group of participants) {
+        const { customer } = await upsertCustomer(tx, { ...group.companion, source });
+        if (!leadCustomer) leadCustomer = customer;
+
+        for (const child of group.children) {
+          const childRow = await upsertChild(tx, customer.id, child);
+
+          const duplicate = await tx.registrations.findFirst({
+            where: {
+              customer_id: customer.id,
+              child_id: childRow.id,
+              event_id: event.id,
+              status: { not: "CANCELLED" },
+            },
+            select: { id: true },
+          });
+          if (duplicate) {
+            throw new RegistrationRefused(
+              `${childRow.fullName} sudah terdaftar di kelas ini.`,
+              "children",
+            );
+          }
+
+          const row = await tx.registrations.create({
+            data: {
+              customer_id: customer.id,
+              child_id: childRow.id,
+              event_id: event.id,
+              amount: unitPrice,
+              status: isFree ? "CONFIRMED" : "REGISTERED",
+              payment_status: isFree ? "NOT_REQUIRED" : "PENDING",
+              payment_method: method,
+              source,
+              qr_source: request.qrSource || null,
+              affiliate_code: affiliateCode || null,
+              age_override: Boolean(child.ageOverride),
+            },
+          });
+          created.push(mapRegistration(row));
+        }
+      }
+
+      const totalAmount = isFree ? 0 : pricing.total;
+      let payment: PaymentInstruction | undefined;
+
+      if (!isFree && leadCustomer) {
+        const lead = created[0];
+        const result = await createPayment(
+          tx,
+          {
+            registrationId: lead.id,
+            registrationNumber: lead.registrationNumber,
+            customerId: leadCustomer.id,
+            eventId: event.id,
+            eventTitle: event.title,
+            amount: totalAmount,
+            thirdPartyUrl: event.registration.thirdPartyUrl,
+          },
+          method,
+        );
+        payment = result?.instruction;
+      }
+
+      return {
+        ok: true as const,
+        batch: {
+          customerId: leadCustomer?.id ?? "",
+          customerNumber: leadCustomer?.customerNumber ?? "",
+          registrations: created,
+          payment,
+          totalAmount,
+          paymentMethod: method,
+          pricing,
+        },
+      };
+    });
+  } catch (error) {
+    if (error instanceof RegistrationRefused) {
+      return { ok: false, error: error.message, field: error.field };
     }
+    return { ok: false, error: "Gagal menyimpan pendaftaran. Coba lagi sebentar lagi." };
   }
-
-  const totalAmount = isFree ? 0 : request.pricing.total;
-  let payment: PaymentInstruction | undefined;
-
-  if (!isFree && leadCustomer) {
-    // The batch is charged against the first registration; the rest reference it.
-    const lead = created[0];
-    const result = await createPayment(
-      {
-        registrationId: lead.id,
-        registrationNumber: lead.registrationNumber,
-        customerId: leadCustomer.id,
-        eventId: event.id,
-        eventTitle: event.title,
-        amount: totalAmount,
-        thirdPartyUrl: event.registration.thirdPartyUrl,
-      },
-      method,
-    );
-    payment = result?.instruction;
-  }
-
-  return {
-    ok: true,
-    batch: {
-      customerId: leadCustomer?.id ?? "",
-      customerNumber: leadCustomer?.customerNumber ?? "",
-      registrations: created,
-      payment,
-      totalAmount,
-      paymentMethod: method,
-      pricing: request.pricing,
-    },
-  };
 }
 
 export interface RegistrationStatusView {
@@ -226,32 +313,54 @@ export interface RegistrationStatusView {
   paidAt: string | null;
 }
 
-/** Looked up by the opaque access_token from the URL — never by the sequential number. */
+/** Dicari lewat access_token acak dari URL — tidak pernah lewat nomor berurutan. */
 export async function getRegistrationByToken(
   token: string,
 ): Promise<RegistrationStatusView | null> {
-  const { data, error } = await getSupabase().rpc("get_registration_by_token", {
-    p_token: token,
-  });
-  if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return null;
-  return {
-    registrationNumber: row.registration_number,
-    eventId: row.event_id,
-    status: row.status,
-    paymentStatus: row.payment_status,
-    paymentMethod: row.payment_method,
-    amount: Number(row.amount),
-    childFullName: row.child_full_name,
-    customerFullName: row.customer_full_name,
-    customerWhatsapp: row.customer_whatsapp,
-    paymentId: row.payment_id,
-    paymentExpiresAt: row.payment_expires_at,
-    // Older deployments of get_registration_by_token do not return these
-    // two columns, so an undefined value degrades to "not issued yet"
-    // rather than breaking the status page.
-    invoiceNumber: row.invoice_number ?? null,
-    paidAt: row.paid_at ?? null,
-  };
+  // Token bukan uuid sah akan membuat Postgres melempar error; itu "tidak
+  // ditemukan", bukan kegagalan server.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) return null;
+
+  try {
+    const row = await db.registrations.findFirst({
+      where: { access_token: token },
+      select: {
+        registration_number: true,
+        event_id: true,
+        status: true,
+        payment_status: true,
+        payment_method: true,
+        amount: true,
+        children: { select: { full_name: true } },
+        customers: { select: { full_name: true, whatsapp: true } },
+        payments: {
+          select: { id: true, amount: true, expires_at: true, invoice_number: true, paid_at: true },
+          take: 1,
+        },
+      },
+    });
+    if (!row) return null;
+
+    const payment = row.payments[0] ?? null;
+    return {
+      registrationNumber: row.registration_number,
+      eventId: row.event_id,
+      status: row.status,
+      paymentStatus: row.payment_status,
+      paymentMethod: row.payment_method as PaymentMethod,
+      // Tagihan sebenarnya, bukan harga satuan. Untuk keluarga dengan tiga
+      // anak, kolom amount di pendaftaran hanyalah harga satu anak — dan
+      // halaman ini menyuruh orang tua mentransfer angka yang tertulis di sini.
+      amount: Number(payment?.amount ?? row.amount),
+      childFullName: row.children.full_name,
+      customerFullName: row.customers.full_name,
+      customerWhatsapp: row.customers.whatsapp,
+      paymentId: payment?.id ?? null,
+      paymentExpiresAt: payment?.expires_at ? payment.expires_at.toISOString() : null,
+      invoiceNumber: payment?.invoice_number ?? null,
+      paidAt: payment?.paid_at ? payment.paid_at.toISOString() : null,
+    };
+  } catch {
+    return null;
+  }
 }

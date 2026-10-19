@@ -4,7 +4,7 @@ import { AffiliateApplicationForm } from "@/components/affiliate/affiliate-appli
 import { PageHeader } from "@/components/layout/page-header";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
-import { COMMISSION_PER_PARTICIPANT } from "@/lib/services/affiliate";
+import { COMMISSION_PER_PARTICIPANT } from "@/lib/config/affiliate";
 import { formatRupiah } from "@/lib/utils/format";
 
 export const metadata: Metadata = {

@@ -1,24 +1,20 @@
-import { getSupabase } from "@/lib/supabase/client";
+"use server";
+
+import { db } from "@/lib/db";
 
 /**
- * Affiliate programme.
+ * Program affiliate.
  *
- * `applyAsAffiliate` and `findAffiliateByCode` are the only two things the
- * public microsite ever calls — both go through SECURITY DEFINER functions
- * in supabase/schema.sql, and both are deliberately narrow about what they
- * return (an application never gets its own bank details echoed back; a
- * code lookup never returns bank details, WhatsApp or domicile at all).
+ * `applyAsAffiliate` dan `findAffiliateByCode` adalah satu-satunya dua hal
+ * yang dipanggil situs publik, dan keduanya sengaja sempit soal apa yang
+ * dikembalikan: pendaftaran tidak pernah memantulkan rekening banknya sendiri,
+ * dan pencarian kode tidak pernah mengembalikan rekening, WhatsApp, atau
+ * domisili sama sekali.
  *
- * There is no admin UI, on purpose (PRD: "fokus di microsite saja"). The
- * team reviews applications and flips PENDING -> ACTIVE directly in the
- * Supabase Table Editor — a Postgres trigger (affiliates_assign_code in
- * schema.sql) mints the code automatically the moment they do, so nobody
- * has to invent one or check it isn't already taken. Once a code exists,
- * every registration that used it becomes visible the same way: open the
- * registrations table in Supabase, filter affiliate_code.
+ * Kode dibuat trigger affiliates_assign_code begitu admin mengubah status ke
+ * ACTIVE di halaman Affiliate, jadi tidak ada yang perlu mengarang kode atau
+ * memeriksa apakah sudah dipakai.
  */
-
-export const COMMISSION_PER_PARTICIPANT = 10_000;
 
 export interface AffiliateApplication {
   fullName: string;
@@ -38,19 +34,16 @@ export type AffiliateResult =
 export async function applyAsAffiliate(
   input: AffiliateApplication,
 ): Promise<AffiliateResult> {
-  const { data, error } = await getSupabase().rpc("apply_as_affiliate", {
-    p_full_name: input.fullName.trim(),
-    p_whatsapp: input.whatsapp.trim(),
-    p_email: input.email?.trim().toLowerCase() ?? "",
-    p_domicile: input.domicile.trim(),
-    p_bank_name: input.bankName.trim(),
-    p_bank_account_number: input.bankAccountNumber.replace(/\D/g, ""),
-    p_bank_account_name: input.bankAccountName.trim(),
-    p_reason: input.reason?.trim() ?? "",
-  });
+  try {
+    const whatsapp = input.whatsapp.trim();
 
-  if (error) {
-    if (error.message?.includes("ALREADY_APPLIED")) {
+    // Yang masih PENDING atau sudah ACTIVE tidak boleh mendaftar lagi; yang
+    // ditolak atau dinonaktifkan boleh mencoba sekali lagi.
+    const existing = await db.affiliates.findFirst({
+      where: { whatsapp, status: { in: ["PENDING", "ACTIVE"] } },
+      select: { id: true },
+    });
+    if (existing) {
       return {
         ok: false,
         field: "whatsapp",
@@ -58,11 +51,25 @@ export async function applyAsAffiliate(
           "Nomor WhatsApp ini sudah mendaftar sebagai affiliator. Tim kami akan menghubungi kamu.",
       };
     }
+
+    const created = await db.affiliates.create({
+      data: {
+        full_name: input.fullName.trim(),
+        whatsapp,
+        email: input.email?.trim().toLowerCase() || null,
+        domicile: input.domicile.trim(),
+        bank_name: input.bankName.trim(),
+        bank_account_number: input.bankAccountNumber.replace(/\D/g, ""),
+        bank_account_name: input.bankAccountName.trim(),
+        reason: input.reason?.trim() || null,
+      },
+      select: { affiliate_number: true },
+    });
+
+    return { ok: true, affiliateNumber: created.affiliate_number };
+  } catch {
     return { ok: false, error: "Gagal mengirim pendaftaran. Coba lagi sebentar lagi." };
   }
-
-  const row = Array.isArray(data) ? data[0] : data;
-  return { ok: true, affiliateNumber: row.affiliate_number };
 }
 
 export interface AffiliateLookup {
@@ -75,11 +82,20 @@ export interface AffiliateLookup {
 export async function findAffiliateByCode(code: string): Promise<AffiliateLookup | null> {
   const trimmed = code.trim();
   if (!trimmed) return null;
-  const { data, error } = await getSupabase().rpc("find_affiliate_by_code", {
-    p_code: trimmed,
-  });
-  if (error || !data) return null;
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return null;
-  return { code: row.code, fullName: row.full_name, status: row.status };
+  try {
+    // Hanya tiga kolom. Rekening, WhatsApp, dan domisili tidak pernah keluar
+    // dari pencarian ini — siapa pun bisa mengetik kode apa saja ke formulir.
+    const row = await db.affiliates.findFirst({
+      where: { code: { equals: trimmed, mode: "insensitive" } },
+      select: { code: true, full_name: true, status: true },
+    });
+    if (!row || !row.code) return null;
+    return {
+      code: row.code,
+      fullName: row.full_name,
+      status: row.status as AffiliateLookup["status"],
+    };
+  } catch {
+    return null;
+  }
 }

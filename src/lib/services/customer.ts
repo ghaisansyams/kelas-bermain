@@ -1,16 +1,20 @@
-import { getSupabase } from "@/lib/supabase/client";
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
 import type { Child, Customer, Gender, RegistrationSource } from "@/lib/repositories/types";
 
 /**
- * Customer (parent/guardian) and child master data.
+ * Data induk pendamping (orang tua/wali) dan anak.
  *
- * Every write here goes through a SECURITY DEFINER function in
- * supabase/schema.sql (upsert_customer / upsert_child) — RLS on these tables
- * is default-deny, so there is no direct table access from the browser.
+ * Sengaja BUKAN server action. Berkas yang ditandai "use server" menjadi
+ * titik masuk yang bisa dipanggil siapa pun dari internet; fungsi-fungsi ini
+ * menulis ke tabel tanpa pemeriksaan apa pun, jadi hanya boleh dipanggil dari
+ * createRegistration, yang memeriksa semuanya lebih dulu. Karena itu semuanya
+ * menerima transaksi dari pemanggil: pendamping, anak, pendaftaran dan tagihan
+ * tersimpan bersama atau tidak sama sekali.
  *
- * A family is looked up by WhatsApp number so repeat registrations reuse the
- * same customer row instead of duplicating it — the parent's details are
- * never copied onto each child.
+ * Satu keluarga dicari lewat nomor WhatsApp supaya pendaftaran berulang memakai
+ * baris pelanggan yang sama — data orang tua tidak pernah disalin ke tiap anak.
  */
 
 export interface CustomerInput {
@@ -27,7 +31,7 @@ export interface CustomerInput {
 export interface ChildInput {
   fullName: string;
   nickname?: string;
-  /** Stated age, as the intake form asks for it. */
+  /** Usia yang disebut orang tua di formulir. */
   ageYears: number;
   ageMonths?: number;
   gender?: Gender | "";
@@ -37,8 +41,25 @@ export interface ChildInput {
   specialNotes?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCustomer(row: any): Customer {
+type Tx = Prisma.TransactionClient;
+
+const iso = (value: Date | null | undefined) => (value ? value.toISOString() : "");
+
+function mapCustomer(row: {
+  id: string;
+  customer_number: string;
+  full_name: string;
+  email: string;
+  whatsapp: string;
+  domicile: string;
+  address: string;
+  city: string;
+  occupation: string;
+  source: string;
+  status: string;
+  created_at: Date;
+  updated_at: Date;
+}): Customer {
   return {
     id: row.id,
     customerNumber: row.customer_number,
@@ -49,15 +70,31 @@ function mapCustomer(row: any): Customer {
     address: row.address ?? "",
     city: row.city ?? "",
     occupation: row.occupation ?? "—",
-    source: row.source,
-    status: row.status ?? "active",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    source: row.source as RegistrationSource,
+    status: (row.status ?? "active") as Customer["status"],
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapChild(row: any): Child {
+function mapChild(row: {
+  id: string;
+  child_number: string;
+  customer_id: string;
+  full_name: string;
+  nickname: string;
+  gender: string;
+  date_of_birth: Date | null;
+  age_years: number | null;
+  age_months: number | null;
+  age_recorded_at: Date | null;
+  school: string;
+  grade: string;
+  special_notes: string | null;
+  emergency_contact: string;
+  status: string;
+  created_at: Date;
+}): Child {
   return {
     id: row.id,
     childNumber: row.child_number,
@@ -65,52 +102,91 @@ function mapChild(row: any): Child {
     fullName: row.full_name,
     nickname: row.nickname,
     gender: (row.gender ?? "") as Gender | "",
-    dateOfBirth: row.date_of_birth ?? "",
+    dateOfBirth: row.date_of_birth ? row.date_of_birth.toISOString().slice(0, 10) : "",
     ageYears: row.age_years ?? undefined,
     ageMonths: row.age_months ?? undefined,
-    ageRecordedAt: row.age_recorded_at ?? undefined,
+    ageRecordedAt: row.age_recorded_at ? row.age_recorded_at.toISOString() : undefined,
     school: row.school ?? "",
     grade: row.grade ?? "—",
     specialNotes: row.special_notes ?? undefined,
     emergencyContact: row.emergency_contact ?? "—",
-    status: row.status ?? "active",
-    createdAt: row.created_at,
+    status: (row.status ?? "active") as Child["status"],
+    createdAt: iso(row.created_at),
   };
 }
 
-/** Reuses an existing customer when the WhatsApp number matches, else creates one. */
+/** Memakai pelanggan yang nomor WhatsApp-nya sama, kalau tidak ada baru dibuat. */
 export async function upsertCustomer(
+  tx: Tx,
   input: CustomerInput,
 ): Promise<{ customer: Customer; created: boolean }> {
-  const { data, error } = await getSupabase().rpc("upsert_customer", {
-    p_full_name: input.fullName.trim(),
-    p_whatsapp: input.whatsapp.trim(),
-    p_domicile: input.domicile.trim(),
-    p_email: input.email?.trim().toLowerCase() ?? "",
-    p_address: input.address?.trim() ?? "",
-    p_city: input.city?.trim() ?? "",
-    p_occupation: input.occupation?.trim() ?? "",
-    p_source: input.source,
-  });
-  if (error || !data) {
-    throw new Error(error?.message ?? "Gagal menyimpan data pendamping.");
+  const whatsapp = input.whatsapp.trim();
+  const email = input.email?.trim().toLowerCase() ?? "";
+  const domicile = input.domicile.trim();
+  const occupation = input.occupation?.trim() ?? "";
+
+  const existing = await tx.customers.findFirst({ where: { whatsapp } });
+
+  if (existing) {
+    // Nama selalu diperbarui; kolom lain hanya kalau formulir kali ini
+    // mengisinya — pendaftaran kedua tanpa email tidak boleh menghapus email
+    // yang sudah tercatat dari pendaftaran pertama.
+    const updated = await tx.customers.update({
+      where: { id: existing.id },
+      data: {
+        full_name: input.fullName.trim(),
+        ...(domicile ? { domicile } : {}),
+        ...(email ? { email } : {}),
+        ...(occupation ? { occupation } : {}),
+      },
+    });
+    return { customer: mapCustomer(updated), created: false };
   }
-  const row = Array.isArray(data) ? data[0] : data;
-  return { customer: mapCustomer(row), created: true };
+
+  const city = input.city?.trim() || domicile;
+  const created = await tx.customers.create({
+    data: {
+      full_name: input.fullName.trim(),
+      whatsapp,
+      domicile,
+      email,
+      address: input.address?.trim() ?? "",
+      city,
+      occupation: occupation || "—",
+      source: input.source,
+    },
+  });
+  return { customer: mapCustomer(created), created: true };
 }
 
-/** Matches an existing child of the same family by name before creating one. */
-export async function upsertChild(customerId: string, input: ChildInput): Promise<Child> {
-  const { data, error } = await getSupabase().rpc("upsert_child", {
-    p_customer_id: customerId,
-    p_full_name: input.fullName.trim(),
-    p_nickname: input.nickname?.trim() || input.fullName.trim().split(" ")[0],
-    p_age_years: input.ageYears,
-    p_age_months: input.ageMonths ?? 0,
+/** Mencocokkan anak dari keluarga yang sama lewat nama sebelum membuat baru. */
+export async function upsertChild(
+  tx: Tx,
+  customerId: string,
+  input: ChildInput,
+): Promise<Child> {
+  const fullName = input.fullName.trim();
+
+  const existing = await tx.children.findFirst({
+    where: { customer_id: customerId, full_name: { equals: fullName, mode: "insensitive" } },
   });
-  if (error || !data) {
-    throw new Error(error?.message ?? "Gagal menyimpan data anak.");
-  }
-  const row = Array.isArray(data) ? data[0] : data;
-  return mapChild(row);
+  if (existing) return mapChild(existing);
+
+  const customer = await tx.customers.findUnique({
+    where: { id: customerId },
+    select: { whatsapp: true },
+  });
+
+  const created = await tx.children.create({
+    data: {
+      customer_id: customerId,
+      full_name: fullName,
+      nickname: input.nickname?.trim() || fullName.split(" ")[0],
+      age_years: input.ageYears,
+      age_months: input.ageMonths ?? 0,
+      age_recorded_at: new Date(),
+      emergency_contact: customer?.whatsapp ?? "—",
+    },
+  });
+  return mapChild(created);
 }

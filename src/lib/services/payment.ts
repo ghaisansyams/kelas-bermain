@@ -1,16 +1,21 @@
-import { getSupabase } from "@/lib/supabase/client";
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
 import type { PaymentMethod } from "@/lib/repositories/types";
 import { formatRupiah } from "@/lib/utils/format";
 
 /**
- * Payment boundary.
+ * Batas pembayaran.
  *
- * The WEBSITE method is manual bank transfer (PRD v2.0, R-04), not a real
- * gateway. THIRD_PARTY only records the hand-off — the external platform
- * owns the outcome. Either way, the payment stays PENDING until an admin
- * verifies the WhatsApp proof and flips it to PAID by hand in the Supabase
- * Table Editor: no code path here can mark a payment PAID, on purpose — see
- * the note on set_payment_status in supabase/schema.sql.
+ * Metode WEBSITE adalah transfer bank manual (PRD v2.0, R-04), bukan gateway
+ * sungguhan. THIRD_PARTY hanya mencatat pengalihan — hasilnya milik platform
+ * mitra. Keduanya tetap PENDING sampai admin memverifikasi bukti dan
+ * mengubahnya jadi PAID lewat halaman Pembayaran: tidak ada jalur kode di sini
+ * yang bisa menandai pembayaran PAID, dan itu disengaja.
+ *
+ * Bukan server action, dengan sengaja: fungsi ini menulis nominal tanpa
+ * memeriksanya, jadi hanya createRegistration yang boleh memanggilnya, dan
+ * itu setelah menghitung nominalnya sendiri di server.
  */
 
 export interface PaymentInstruction {
@@ -73,25 +78,27 @@ function buildInstruction(input: ChargeInput, method: PaymentMethod): PaymentIns
   };
 }
 
-/** Creates the payment row that shadows a registration. */
+/** Membuat baris pembayaran yang membayangi sebuah pendaftaran. */
 export async function createPayment(
+  tx: Prisma.TransactionClient,
   input: ChargeInput,
   method: PaymentMethod,
 ): Promise<{ instruction: PaymentInstruction } | null> {
   if (method === "NONE") return null;
 
   const instruction = buildInstruction(input, method);
-  const { error } = await getSupabase().rpc("create_payment", {
-    p_registration_id: input.registrationId,
-    p_customer_id: input.customerId,
-    p_event_id: input.eventId,
-    p_amount: input.amount,
-    p_method: method,
-    p_provider: instruction.provider,
-    p_expires_at: instruction.expiresAt ?? null,
+
+  await tx.payments.create({
+    data: {
+      registration_id: input.registrationId,
+      customer_id: input.customerId,
+      event_id: input.eventId,
+      amount: input.amount,
+      method,
+      provider: instruction.provider,
+      expires_at: instruction.expiresAt ? new Date(instruction.expiresAt) : null,
+    },
   });
-  if (error) {
-    throw new Error("Gagal menyiapkan instruksi pembayaran. Coba lagi sebentar lagi.");
-  }
+
   return { instruction };
 }
