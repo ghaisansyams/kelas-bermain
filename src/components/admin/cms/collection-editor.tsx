@@ -85,20 +85,15 @@ export function CollectionEditor({
                 type="button"
                 onClick={() => setEditing(editing === row.itemKey ? null : row.itemKey)}
                 className="min-w-0 flex-1 text-left"
+                aria-expanded={editing === row.itemKey}
               >
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-ink">{titleOf(row.content)}</span>
-                  {!row.isVisible ? (
-                    <span className="rounded-pill bg-canvas-deep px-2 py-0.5 text-[0.625rem] font-bold text-muted">
-                      Disembunyikan
-                    </span>
-                  ) : null}
-                  {row.isDirty ? (
-                    <span className="rounded-pill bg-sun-soft px-2 py-0.5 text-[0.625rem] font-bold text-ink">
-                      Draf
-                    </span>
-                  ) : null}
-                </span>
+                <RowPreview
+                  title={titleOf(row.content)}
+                  content={row.content}
+                  expanded={editing === row.itemKey}
+                  isVisible={row.isVisible}
+                  isDirty={row.isDirty}
+                />
               </button>
 
               <div className="flex shrink-0 items-center gap-1.5">
@@ -161,6 +156,97 @@ export function CollectionEditor({
         ))}
       </ul>
     </div>
+  );
+}
+
+const HASHTAG = /#[\p{L}\p{N}_]+/gu;
+
+/**
+ * Pratinjau satu baris: gambar, judul, caption, dan hashtag. Untuk koleksi
+ * tanpa gambar/caption (pilar, testimoni, dst.) tampilannya tetap sebaris judul.
+ */
+function RowPreview({
+  title,
+  content,
+  expanded,
+  isVisible,
+  isDirty,
+}: {
+  title: string;
+  content: Record<string, unknown>;
+  expanded: boolean;
+  isVisible: boolean;
+  isDirty: boolean;
+}) {
+  const image = typeof content.imageUrl === "string" ? content.imageUrl : "";
+  const caption = typeof content.caption === "string" ? content.caption.trim() : "";
+  const date = typeof content.publishedAt === "string" ? content.publishedAt : "";
+  const category = typeof content.category === "string" ? content.category : "";
+
+  const hashtags = Array.from(new Set(caption.match(HASHTAG) ?? []));
+  const body = caption.replace(HASHTAG, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  return (
+    <span className="flex items-start gap-3">
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- admin thumbnail from local uploads
+        <img
+          src={image}
+          alt=""
+          className={`shrink-0 rounded-lg object-cover ${expanded ? "size-40" : "size-20"}`}
+        />
+      ) : null}
+
+      <span className="block min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-bold text-ink">{title}</span>
+          {!isVisible ? (
+            <span className="rounded-pill bg-canvas-deep px-2 py-0.5 text-[0.625rem] font-bold text-muted">
+              Disembunyikan
+            </span>
+          ) : null}
+          {isDirty ? (
+            <span className="rounded-pill bg-sun-soft px-2 py-0.5 text-[0.625rem] font-bold text-ink">
+              Draf
+            </span>
+          ) : null}
+        </span>
+
+        {date || category ? (
+          <span className="mt-0.5 block text-xs text-muted">
+            {[date, category].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
+
+        {body ? (
+          <span
+            className={`mt-1.5 block whitespace-pre-line text-sm text-ink-soft ${
+              expanded ? "" : "line-clamp-3"
+            }`}
+          >
+            {body}
+          </span>
+        ) : null}
+
+        {hashtags.length > 0 ? (
+          <span className="mt-2 flex flex-wrap gap-1.5">
+            {(expanded ? hashtags : hashtags.slice(0, 4)).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-pill bg-brand/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-brand"
+              >
+                {tag}
+              </span>
+            ))}
+            {!expanded && hashtags.length > 4 ? (
+              <span className="px-1 text-[0.6875rem] font-semibold text-muted">
+                +{hashtags.length - 4}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+    </span>
   );
 }
 

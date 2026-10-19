@@ -43,7 +43,7 @@ import { findCollection, GLOBAL_PAGE, HOME_PAGE, type PageDef } from "@/lib/cms/
 import { findTemplate } from "@/lib/cms/section-templates";
 import { toPresentation } from "@/lib/cms/presentation";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -130,49 +130,28 @@ export default async function CmsWebsitePage({
   await requireAdmin();
   const { tab: rawTab, status, message, edit: rawEdit } = await searchParams;
   const tab = TABS.some((item) => item.key === rawTab) ? rawTab! : "global";
-  const supabase = await createSupabaseServerClient();
 
   const pageDef: PageDef | null =
     tab === "global" ? GLOBAL_PAGE : tab === "home" ? HOME_PAGE : null;
 
-  const [sectionsRes, collectionsRes, navRes] = await Promise.all([
+  const [sectionData, collectionData, navData, versionData] = await Promise.all([
     pageDef
-      ? supabase
-          .from("cms_sections")
-          .select(
-            "section_key, label, draft, published, sort_order, is_visible, section_type, presentation, archived, published_at",
-          )
-          .eq("page_key", pageDef.key)
-          .order("sort_order")
-      : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from("cms_collections")
-      .select("collection_key, item_key, draft, published, sort_order, is_visible")
-      .order("sort_order"),
+      ? db.cms_sections.findMany({ where: { page_key: pageDef.key }, orderBy: { sort_order: "asc" } })
+      : Promise.resolve([]),
+    db.cms_collections.findMany({ orderBy: { sort_order: "asc" } }),
     tab === "global"
-      ? supabase.from("navigation_items").select("*").order("sort_order")
-      : Promise.resolve({ data: [], error: null }),
+      ? db.navigation_items.findMany({ orderBy: { sort_order: "asc" } })
+      : Promise.resolve([]),
+    pageDef
+      ? db.cms_versions.findMany({
+          where: { scope: "page", scope_key: pageDef.key },
+          orderBy: { created_at: "desc" },
+          take: 10,
+        })
+      : Promise.resolve([]),
   ]);
 
-  const versionsRes = pageDef
-    ? await supabase
-        .from("cms_versions")
-        .select("id, scope, scope_key, created_at, snapshot")
-        .eq("scope", "page")
-        .eq("scope_key", pageDef.key)
-        .order("created_at", { ascending: false })
-        .limit(10)
-    : { data: [], error: null };
-
-  const versionRows: VersionRow[] = (
-    (versionsRes.data ?? []) as unknown as {
-      id: string;
-      scope: string;
-      scope_key: string;
-      created_at: string;
-      snapshot: unknown[];
-    }[]
-  ).map((row, index) => ({
+  const versionRows: VersionRow[] = versionData.map((row, index) => ({
     id: row.id,
     scope: row.scope,
     scopeKey: row.scope_key,
@@ -182,76 +161,66 @@ export default async function CmsWebsitePage({
     isCurrent: index === 0,
   }));
 
-  const eventsRes =
+  const eventData =
     tab === "events"
-      ? await supabase
-          .from("events")
-          .select("id, title, slug, start_date, status, featured, show_on_event_page, show_in_history")
-          .order("start_date", { ascending: false })
-      : { data: [], error: null };
+      ? await db.events.findMany({ orderBy: { start_date: "desc" } })
+      : [];
 
   const galleryDriveSettings = tab === "global" ? await getGalleryDriveSettings() : null;
 
   const certificateEvents =
     tab === "certificates" ? (await getEvents()).map((e) => ({ id: e.id, title: e.title })) : [];
 
-  const templatesRes =
+  const templateData =
     tab === "certificates"
-      ? await supabase.from("certificate_templates").select("*").order("created_at")
-      : { data: [], error: null };
+      ? await db.certificate_templates.findMany({ orderBy: { created_at: "asc" } })
+      : [];
 
-  const templates: CertificateTemplate[] = (
-    (templatesRes.data ?? []) as unknown as {
-      id: string;
-      name: string;
-      description: string;
-      background_url: string;
-      orientation: "LANDSCAPE" | "PORTRAIT";
-      config: unknown;
-      status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-      is_default: boolean;
-    }[]
-  ).map((row) => ({
+  const templates: CertificateTemplate[] = templateData.map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
     backgroundUrl: row.background_url,
-    orientation: row.orientation,
+    orientation: row.orientation as "LANDSCAPE" | "PORTRAIT",
     config: normaliseConfig(row.config),
-    status: row.status,
+    status: row.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
     isDefault: row.is_default,
   }));
 
   const editingTemplate =
     templates.find((item) => item.id === rawEdit) ?? null;
 
-  const eventRows: EventVisibilityRow[] = (
-    (eventsRes.data ?? []) as unknown as {
-      id: string;
-      title: string;
-      slug: string;
-      start_date: string;
-      status: string;
-      featured: boolean;
-      show_on_event_page: boolean;
-      show_in_history: boolean;
-    }[]
-  ).map((row) => ({
+  const eventRows: EventVisibilityRow[] = eventData.map((row) => ({
     id: row.id,
     title: row.title,
     slug: row.slug,
-    startDate: row.start_date,
+    startDate: row.start_date.toISOString().slice(0, 10),
     status: row.status,
     featured: row.featured,
     showOnEventPage: row.show_on_event_page,
     showInHistory: row.show_in_history,
   }));
 
-  const notSetUp = Boolean(sectionsRes.error ?? collectionsRes.error);
-  const sectionRows = (sectionsRes.data ?? []) as unknown as SectionRow[];
-  const allItems = (collectionsRes.data ?? []) as unknown as (ItemRow & {
-    collection_key: string;
-  })[];
+  const sectionRows: SectionRow[] = sectionData.map((row) => ({
+    section_key: row.section_key,
+    label: row.label,
+    draft: row.draft as Record<string, unknown> | null,
+    published: row.published as Record<string, unknown> | null,
+    sort_order: row.sort_order,
+    is_visible: row.is_visible,
+    section_type: row.section_type,
+    presentation: row.presentation as Record<string, unknown> | null,
+    archived: row.archived,
+    published_at: row.published_at?.toISOString() ?? null,
+  }));
+  const allItems = collectionData.map((row) => ({
+    collection_key: row.collection_key,
+    item_key: row.item_key,
+    draft: row.draft as Record<string, unknown> | null,
+    published: row.published as Record<string, unknown> | null,
+    sort_order: row.sort_order,
+    is_visible: row.is_visible,
+  })) satisfies (ItemRow & { collection_key: string })[];
 
   const rowsFor = (collectionKey: string): CollectionRow[] =>
     allItems
@@ -343,13 +312,6 @@ export default async function CmsWebsitePage({
           </div>
         }
       />
-
-      {notSetUp ? (
-        <Notice tone="error">
-          Tabel CMS belum ada. Jalankan supabase/cms-website-schema.sql di SQL Editor Supabase
-          lebih dulu.
-        </Notice>
-      ) : null}
 
       {notice ? (
         <Notice tone={notice.tone}>
@@ -472,7 +434,7 @@ export default async function CmsWebsitePage({
           {tab === "global" ? (
             <>
               <Card>
-                <NavigationEditor items={(navRes.data ?? []) as unknown as NavRow[]} />
+                <NavigationEditor items={navData.map((row): NavRow => ({ ...row }))} />
               </Card>
               {galleryDriveSettings ? (
                 <Card>

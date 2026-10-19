@@ -347,6 +347,7 @@ export const COLLECTIONS: CollectionDef[] = [
       { key: "title", label: "Judul", type: "text" },
       { key: "slug", label: "Alamat halaman", type: "text" },
       { key: "excerpt", label: "Ringkasan", type: "textarea" },
+      { key: "caption", label: "Caption lengkap (termasuk hashtag)", type: "textarea" },
       { key: "imageUrl", label: "Gambar", type: "image" },
       { key: "category", label: "Kategori", type: "text" },
       { key: "postUrl", label: "Tautan postingan Instagram", type: "url" },
