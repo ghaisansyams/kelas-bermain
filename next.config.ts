@@ -16,6 +16,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   outputFileTracingRoot: projectRoot,
   poweredByHeader: false,
+  experimental: {
+    // Server action menolak isi permintaan di atas 1 MB secara bawaan. Unggahan
+    // media admin boleh 5 MB untuk gambar dan 50 MB untuk video; tanpa ini
+    // unggahan yang sah gagal dengan galat yang tidak menyebut penyebabnya.
+    serverActions: { bodySizeLimit: "55mb" },
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     // Images uploaded through the admin live in Supabase Storage.

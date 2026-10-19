@@ -9,7 +9,7 @@ import {
   MEDIA_FOLDER_LABEL,
   type MediaItem,
 } from "@/lib/admin/media";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -26,20 +26,35 @@ export default async function AdminMediaPage({
 }) {
   await requireAdmin();
   const { status, folder, q } = await searchParams;
-  const supabase = await createSupabaseServerClient();
 
-  let query = supabase
-    .from("media")
-    .select("id, file_name, storage_path, public_url, alt_text, mime_type, file_size, folder, created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  let items: MediaItem[] = [];
+  let error = false;
 
-  if (folder) query = query.eq("folder", folder);
-  if (q) query = query.ilike("file_name", `%${q}%`);
+  try {
+    const rows = await db.media.findMany({
+      where: {
+        ...(folder ? { folder } : {}),
+        ...(q ? { file_name: { contains: q, mode: "insensitive" as const } } : {}),
+      },
+      orderBy: { created_at: "desc" },
+      take: 200,
+    });
+    items = rows.map((row) => ({
+      id: row.id,
+      file_name: row.file_name,
+      storage_path: row.storage_path,
+      public_url: row.public_url,
+      alt_text: row.alt_text,
+      mime_type: row.mime_type,
+      // bigint di database; BigInt tidak bisa menyeberang ke komponen klien.
+      file_size: Number(row.file_size),
+      folder: row.folder,
+      created_at: row.created_at.toISOString(),
+    }));
+  } catch {
+    error = true;
+  }
 
-  const { data, error } = await query;
-
-  const items = (data ?? []) as MediaItem[];
   const notice = status ? STATUS[status] : undefined;
 
   return (
@@ -109,7 +124,7 @@ export default async function AdminMediaPage({
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       {error ? (
         <Notice tone="error">
-          Media gagal dimuat. Pastikan supabase/media-schema.sql sudah dijalankan.
+          Media gagal dimuat. Coba muat ulang halaman ini.
         </Notice>
       ) : null}
 

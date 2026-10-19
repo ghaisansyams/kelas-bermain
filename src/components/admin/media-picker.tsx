@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ImageIcon, Loader2, Upload, X } from "lucide-react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { ALLOWED_MIME, type MediaItem } from "@/lib/admin/media";
-import { uploadMediaFile } from "@/lib/admin/upload";
+import { listMedia, uploadMediaFile } from "@/lib/admin/upload";
 
 /**
- * Picks an image URL from the media library. Reads `media` with the admin's
- * own session (RLS decides), and hands back the public URL — the CMS stores
- * the URL, not the file.
+ * Picks an image URL from the media library and hands back the public URL —
+ * the CMS stores the URL, not the file.
  */
 export function MediaPicker({
   value,
@@ -42,7 +40,10 @@ export function MediaPicker({
 
     setError(null);
     setUploading(true);
-    const result = await uploadMediaFile(file, folder);
+    const form = new FormData();
+    form.set("file", file);
+    form.set("folder", folder);
+    const result = await uploadMediaFile(form);
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
 
@@ -58,18 +59,15 @@ export function MediaPicker({
 
   const load = useCallback(async () => {
     setError(null);
-    const supabase = createSupabaseBrowserClient();
-    const { data, error: loadError } = await supabase
-      .from("media")
-      .select("id, file_name, storage_path, public_url, alt_text, mime_type, file_size, folder, created_at")
-      .order("created_at", { ascending: false })
-      .limit(60);
-    if (loadError) {
+    // Dibaca lewat server action: tabel media tidak lagi bisa dijangkau dari
+    // browser, dan sesi admin diperiksa di sisi server.
+    const list = await listMedia();
+    if (!list) {
       setError("Media gagal dimuat.");
       setItems([]);
       return;
     }
-    setItems((data ?? []) as MediaItem[]);
+    setItems(list);
   }, []);
 
   useEffect(() => {

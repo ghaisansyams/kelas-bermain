@@ -35,7 +35,10 @@ export function MediaUploader({ onUploaded }: { onUploaded?: () => void }) {
 
     let uploaded = 0;
     for (const file of Array.from(files)) {
-      const result = await uploadMediaFile(file, folder);
+      const form = new FormData();
+      form.set("file", file);
+      form.set("folder", folder);
+      const result = await uploadMediaFile(form);
       if (!result.ok) {
         setError(result.error);
         continue;

@@ -22,3 +22,6 @@ public/uploads/
 
 # Bukti pembayaran yang diunggah (di luar public, tidak boleh dilayani langsung)
 storage/
+
+# Cadangan baris sebelum skrip migrasi mengubahnya (isi CMS)
+backups/
