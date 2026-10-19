@@ -1,56 +1,39 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 
 /**
- * Keeps the admin's Supabase session fresh and keeps signed-out visitors out
- * of /admin. The real authorization check (is this user actually an admin?)
- * happens again in the admin layout and in every server action — middleware
- * is a convenience, never the only gate.
+ * Menjaga pengunjung yang belum masuk keluar dari /admin.
+ *
+ * Yang diperiksa di sini hanya ADA tidaknya cookie sesi, bukan sahnya.
+ * Middleware Next berjalan di runtime edge yang tidak bisa memanggil
+ * Prisma, jadi tidak ada cara memeriksa sesi ke database dari sini — dan
+ * itu tidak masalah, karena ini memang bukan gerbangnya.
+ *
+ * Gerbang sesungguhnya ada di requireAdmin(), yang membaca sesi dari
+ * database dan dipanggil ulang di setiap halaman admin dan setiap server
+ * action. Cookie palsu lolos dari sini, lalu ditolak di sana.
  */
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+const COOKIE = "kb_session";
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return response;
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value } of cookiesToSet) {
-          request.cookies.set(name, value);
-        }
-        response = NextResponse.next({ request });
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export function middleware(request: NextRequest) {
+  const hasCookie = Boolean(request.cookies.get(COOKIE)?.value);
   const { pathname } = request.nextUrl;
   const isLoginRoute = pathname === "/admin/login";
 
-  if (!user && !isLoginRoute) {
+  if (!hasCookie && !isLoginRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/admin/login";
     redirectUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isLoginRoute) {
+  if (hasCookie && isLoginRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/admin";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

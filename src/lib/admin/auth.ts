@@ -1,40 +1,23 @@
+import "server-only";
+
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminSession, type AdminRole, type AdminSession } from "@/lib/auth/session";
 
-export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "STAFF";
+/**
+ * Gerbang hak akses admin.
+ *
+ * Dulu ini membaca Supabase Auth lalu mencocokkan ke admin_users dengan RLS
+ * sebagai jaring pengaman di belakangnya. Sekarang tidak ada RLS: Prisma
+ * memegang kredensial database penuh, jadi berkas inilah satu-satunya yang
+ * memutuskan siapa boleh apa. Setiap halaman admin dan setiap server action
+ * harus memanggilnya — tidak ada tombol tersembunyi yang bisa dianggap
+ * pengaman.
+ */
 
-export interface AdminSession {
-  userId: string;
-  email: string;
-  fullName: string;
-  role: AdminRole;
-}
+export type { AdminRole, AdminSession };
+export { getAdminSession };
 
-/** Everything an admin page may do is gated on this — never on hidden buttons. */
-export async function getAdminSession(): Promise<AdminSession | null> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("admin_users")
-    .select("full_name, role, status")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error || !data || data.status !== "ACTIVE") return null;
-
-  return {
-    userId: user.id,
-    email: user.email ?? "",
-    fullName: data.full_name || user.email || "Admin",
-    role: data.role as AdminRole,
-  };
-}
-
-/** Redirects to the login page when the visitor is not an active admin. */
+/** Mengalihkan ke halaman masuk kalau pengunjungnya bukan admin aktif. */
 export async function requireAdmin(): Promise<AdminSession> {
   const session = await getAdminSession();
   if (!session) redirect("/admin/login?error=unauthorized");
@@ -47,7 +30,7 @@ export function hasRole(role: AdminRole, minimum: AdminRole): boolean {
   return RANK[role] >= RANK[minimum];
 }
 
-/** Use inside server actions that STAFF must not reach. */
+/** Dipakai di server action yang tidak boleh dijangkau STAFF. */
 export async function requireRole(minimum: AdminRole): Promise<AdminSession> {
   const session = await requireAdmin();
   if (!hasRole(session.role, minimum)) redirect("/admin?error=forbidden");

@@ -1,86 +1,75 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Field, TextInput } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { signInAction } from "@/app/admin/actions";
 
-export function LoginForm() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-
-    const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInError) {
-      setSubmitting(false);
-      setError("Email atau kata sandi salah.");
-      return;
-    }
-
-    router.replace("/admin");
-    router.refresh();
-  }
+/**
+ * Masuk lewat server action, bukan dari browser.
+ *
+ * Dulu formulir ini memanggil Supabase langsung dari sisi klien. Sekarang
+ * password dikirim ke server dan tidak pernah disentuh kode yang berjalan di
+ * browser, dan cookie sesinya dipasang httpOnly dari sana.
+ */
+export function LoginForm({ next }: { next?: string }) {
+  const [state, action] = useActionState(signInAction, null);
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      {error ? (
+    <form action={action} noValidate className="space-y-4">
+      {state?.error ? (
         <p
           role="alert"
           className="flex items-start gap-2 rounded-xl border border-brand/30 bg-brand-soft p-3 text-sm font-medium text-brand-ink"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {error}
+          {state.error}
         </p>
       ) : null}
+
+      <input type="hidden" name="next" value={next ?? "/admin"} />
 
       <Field label="Email" htmlFor="email" required>
         <TextInput
           id="email"
+          name="email"
           type="email"
           autoComplete="email"
           placeholder="admin@kelasbermain.id"
-          value={email}
-          disabled={submitting}
-          onChange={(e) => setEmail(e.target.value)}
         />
       </Field>
 
       <Field label="Kata Sandi" htmlFor="password" required>
         <TextInput
           id="password"
+          name="password"
           type="password"
           autoComplete="current-password"
           placeholder="••••••••"
-          value={password}
-          disabled={submitting}
-          onChange={(e) => setPassword(e.target.value)}
         />
       </Field>
 
-      <Button type="submit" size="lg" disabled={submitting} className="w-full">
-        {submitting ? (
-          <>
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Memproses…
-          </>
-        ) : (
-          "Masuk"
-        )}
-      </Button>
+      <SubmitButton />
     </form>
+  );
+}
+
+/** Terpisah supaya useFormStatus melihat formulir yang membungkusnya. */
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" size="lg" disabled={pending} className="w-full">
+      {pending ? (
+        <>
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Memproses…
+        </>
+      ) : (
+        "Masuk"
+      )}
+    </Button>
   );
 }

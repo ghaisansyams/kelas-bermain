@@ -7,7 +7,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas-deep/40 p-5">
       <div className="w-full max-w-sm rounded-card border border-line bg-surface p-6 shadow-soft sm:p-8">
@@ -17,7 +22,7 @@ export default function AdminLoginPage() {
           Khusus tim Kelas Bermain. Gunakan akun yang sudah didaftarkan.
         </p>
         <div className="mt-6">
-          <LoginForm />
+          <LoginForm next={next} />
         </div>
       </div>
     </div>
