@@ -15,7 +15,7 @@ import {
 } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -30,29 +30,20 @@ export default async function AdminRegistrationsPage({
   await requireAdmin();
   const { q, event, status, payment, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
-  const supabase = await createSupabaseServerClient();
   const events = await getEvents();
 
-  let query = supabase
-    .from("registrations")
-    .select(
-      "id, registration_number, event_id, registration_date, status, payment_status, attendance_status, amount, affiliate_code, customers(id, full_name), children(full_name)",
-      { count: "exact" },
-    )
-    .order("registration_date", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const where = {
+    ...(q ? { registration_number: { contains: q, mode: "insensitive" as const } } : {}),
+    ...(event ? { event_id: event } : {}),
+    ...(status ? { status } : {}),
+    ...(payment ? { payment_status: payment } : {}),
+  };
 
-  if (q) query = query.ilike("registration_number", `%${q}%`);
-  if (event) query = query.eq("event_id", event);
-  if (status) query = query.eq("status", status);
-  if (payment) query = query.eq("payment_status", payment);
-
-  const { data, count, error } = await query;
-  const rows = (data ?? []) as unknown as {
+  type RegistrationRow = {
     id: string;
     registration_number: string;
     event_id: string;
-    registration_date: string;
+    registration_date: Date;
     status: string;
     payment_status: string;
     attendance_status: string;
@@ -60,7 +51,40 @@ export default async function AdminRegistrationsPage({
     affiliate_code: string | null;
     customers: { id: string; full_name: string } | null;
     children: { full_name: string } | null;
-  }[];
+  };
+
+  let rows: RegistrationRow[] = [];
+  let count = 0;
+  let error = false;
+
+  try {
+    const [list, total] = await Promise.all([
+      db.registrations.findMany({
+        where,
+        select: {
+          id: true,
+          registration_number: true,
+          event_id: true,
+          registration_date: true,
+          status: true,
+          payment_status: true,
+          attendance_status: true,
+          amount: true,
+          affiliate_code: true,
+          customers: { select: { id: true, full_name: true } },
+          children: { select: { full_name: true } },
+        },
+        orderBy: { registration_date: "desc" },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      db.registrations.count({ where }),
+    ]);
+    rows = list.map((row) => ({ ...row, amount: Number(row.amount) }));
+    count = total;
+  } catch {
+    error = true;
+  }
 
   const eventTitle = (id: string) => events.find((item) => item.id === id)?.title ?? id;
 
@@ -145,7 +169,7 @@ export default async function AdminRegistrationsPage({
                         )}
                       </Td>
                       <Td>{eventTitle(row.event_id)}</Td>
-                      <Td>{formatDate(row.registration_date)}</Td>
+                      <Td>{formatDate(row.registration_date.toISOString())}</Td>
                       <Td>{formatRupiah(Number(row.amount))}</Td>
                       <Td>
                         <StatusBadge tone={reg.tone}>{reg.text}</StatusBadge>
@@ -163,7 +187,7 @@ export default async function AdminRegistrationsPage({
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}
-            total={count ?? 0}
+            total={count}
             basePath="/admin/registrations"
             params={{ q, event, status, payment }}
           />

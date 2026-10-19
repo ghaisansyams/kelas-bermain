@@ -13,7 +13,7 @@ import Link from "next/link";
 import { deleteChildAction } from "@/app/admin/children/actions";
 import { DeleteDialog } from "@/components/admin/delete-dialog";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -39,32 +39,18 @@ export default async function AdminChildrenPage({
   const session = await requireAdmin();
   const { q, page: pageParam, msg } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
-  const supabase = await createSupabaseServerClient();
 
-  let query = supabase
-    .from("children")
-    .select(
-      "id, child_number, full_name, nickname, age_years, age_months, school, status, customer_id, customers(full_name)",
-      { count: "exact" },
-    )
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const where = q
+    ? {
+        OR: [
+          { full_name: { contains: q, mode: "insensitive" as const } },
+          { nickname: { contains: q, mode: "insensitive" as const } },
+          { child_number: { contains: q, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
 
-  if (q) query = query.or(`full_name.ilike.%${q}%,nickname.ilike.%${q}%,child_number.ilike.%${q}%`);
-
-  const { data, count, error } = await query;
-
-  // Which of these children already have registrations, and so cannot be
-  // removed without breaking payment and attendance records.
-  const ids = ((data ?? []) as unknown as { id: string }[]).map((row) => row.id);
-  const { data: regRows } = ids.length
-    ? await supabase.from("registrations").select("child_id").in("child_id", ids)
-    : { data: [] };
-  const registrationCount = new Map<string, number>();
-  for (const row of (regRows ?? []) as { child_id: string }[]) {
-    registrationCount.set(row.child_id, (registrationCount.get(row.child_id) ?? 0) + 1);
-  }
-  const rows = (data ?? []) as unknown as {
+  type ChildRow = {
     id: string;
     child_number: string;
     full_name: string;
@@ -75,7 +61,50 @@ export default async function AdminChildrenPage({
     status: string;
     customer_id: string;
     customers: { full_name: string } | null;
-  }[];
+  };
+
+  let rows: ChildRow[] = [];
+  let count = 0;
+  let error = false;
+  const registrationCount = new Map<string, number>();
+
+  try {
+    const [list, total] = await Promise.all([
+      db.children.findMany({
+        where,
+        select: {
+          id: true,
+          child_number: true,
+          full_name: true,
+          nickname: true,
+          age_years: true,
+          age_months: true,
+          school: true,
+          status: true,
+          customer_id: true,
+          customers: { select: { full_name: true } },
+        },
+        orderBy: { created_at: "desc" },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      db.children.count({ where }),
+    ]);
+    rows = list;
+    count = total;
+
+    // Satu kueri tambahan, bukan satu per baris: anak mana yang sudah punya
+    // pendaftaran, sehingga tidak bisa dihapus tanpa memutus catatan
+    // pembayaran dan kehadiran.
+    const grouped = await db.registrations.groupBy({
+      by: ["child_id"],
+      _count: { _all: true },
+      where: { child_id: { in: rows.map((row) => row.id) } },
+    });
+    for (const row of grouped) registrationCount.set(row.child_id, row._count._all);
+  } catch {
+    error = true;
+  }
 
   return (
     <div className="space-y-5">

@@ -14,7 +14,7 @@ import {
 import { deleteCustomerAction } from "@/app/admin/customers/actions";
 import { DeleteDialog } from "@/components/admin/delete-dialog";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
@@ -41,32 +41,23 @@ export default async function AdminCustomersPage({
   const session = await requireAdmin();
   const { q, status, page: pageParam, msg } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
-  const supabase = await createSupabaseServerClient();
 
-  let query = supabase
-    .from("customers")
-    .select("id, customer_number, full_name, whatsapp, email, domicile, source, status, created_at", {
-      count: "exact",
-    })
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const where = {
+    ...(q
+      ? {
+          OR: [
+            { full_name: { contains: q, mode: "insensitive" as const } },
+            { whatsapp: { contains: q, mode: "insensitive" as const } },
+            { customer_number: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+    // Hanya dua nilai yang sah; apa pun lain di URL diabaikan, bukan dipakai
+    // menyaring daftar sampai kosong.
+    ...(status === "active" || status === "inactive" ? { status } : {}),
+  };
 
-  if (q) query = query.or(`full_name.ilike.%${q}%,whatsapp.ilike.%${q}%,customer_number.ilike.%${q}%`);
-  if (status) query = query.eq("status", status);
-
-  const { data, count, error } = await query;
-
-  // One extra query instead of one per row: which of these customers already
-  // have registrations, and therefore cannot be removed.
-  const ids = ((data ?? []) as { id: string }[]).map((row) => row.id);
-  const { data: regRows } = ids.length
-    ? await supabase.from("registrations").select("customer_id").in("customer_id", ids)
-    : { data: [] };
-  const registrationCount = new Map<string, number>();
-  for (const row of (regRows ?? []) as { customer_id: string }[]) {
-    registrationCount.set(row.customer_id, (registrationCount.get(row.customer_id) ?? 0) + 1);
-  }
-  const rows = (data ?? []) as {
+  type CustomerRow = {
     id: string;
     customer_number: string;
     full_name: string;
@@ -75,8 +66,49 @@ export default async function AdminCustomersPage({
     domicile: string;
     source: string;
     status: string;
-    created_at: string;
-  }[];
+    created_at: Date;
+  };
+
+  let rows: CustomerRow[] = [];
+  let count = 0;
+  let error = false;
+  const registrationCount = new Map<string, number>();
+
+  try {
+    const [list, total] = await Promise.all([
+      db.customers.findMany({
+        where,
+        select: {
+          id: true,
+          customer_number: true,
+          full_name: true,
+          whatsapp: true,
+          email: true,
+          domicile: true,
+          source: true,
+          status: true,
+          created_at: true,
+        },
+        orderBy: { created_at: "desc" },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      db.customers.count({ where }),
+    ]);
+    rows = list;
+    count = total;
+
+    // Satu kueri tambahan, bukan satu per baris: pendamping mana yang sudah
+    // punya pendaftaran, sehingga tidak bisa dihapus.
+    const grouped = await db.registrations.groupBy({
+      by: ["customer_id"],
+      _count: { _all: true },
+      where: { customer_id: { in: rows.map((row) => row.id) } },
+    });
+    for (const row of grouped) registrationCount.set(row.customer_id, row._count._all);
+  } catch {
+    error = true;
+  }
 
   return (
     <div className="space-y-5">
@@ -103,7 +135,7 @@ export default async function AdminCustomersPage({
       {error ? (
         <Card>
           <p className="text-sm text-brand-ink">
-            Data gagal dimuat. Pastikan supabase/admin-schema.sql sudah dijalankan.
+            Data gagal dimuat. Coba muat ulang halaman ini.
           </p>
         </Card>
       ) : (
@@ -135,7 +167,7 @@ export default async function AdminCustomersPage({
                         {row.status === "active" ? "Aktif" : "Nonaktif"}
                       </StatusBadge>
                     </Td>
-                    <Td>{formatDate(row.created_at)}</Td>
+                    <Td>{formatDate(row.created_at.toISOString())}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
                         <Link
@@ -181,7 +213,7 @@ export default async function AdminCustomersPage({
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}
-            total={count ?? 0}
+            total={count}
             basePath="/admin/customers"
             params={{ q, status }}
           />

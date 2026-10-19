@@ -13,7 +13,7 @@ import {
   Th,
 } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -26,64 +26,84 @@ export default async function CustomerDetailPage({
 }) {
   const session = await requireAdmin();
   const { id } = await params;
-  const supabase = await createSupabaseServerClient();
 
-  const [{ data: customer }, { data: childRows }, { data: registrationRows }, { data: paymentRows }] =
-    await Promise.all([
-      supabase
-        .from("customers")
-        .select("id, customer_number, full_name, whatsapp, email, domicile, occupation, source, status, created_at")
-        .eq("id", id)
-        .maybeSingle(),
-      supabase
-        .from("children")
-        .select("id, child_number, full_name, nickname, age_years, age_months, status")
-        .eq("customer_id", id)
-        .order("created_at"),
-      supabase
-        .from("registrations")
-        .select("id, registration_number, event_id, registration_date, status, payment_status, amount, attendance_status, children(full_name)")
-        .eq("customer_id", id)
-        .order("registration_date", { ascending: false }),
-      supabase
-        .from("payments")
-        .select("id, payment_number, invoice_number, amount, status, method, paid_at, created_at")
-        .eq("customer_id", id)
-        .order("created_at", { ascending: false }),
-    ]);
+  // Id dari URL yang bukan uuid akan membuat Postgres melempar galat, bukan
+  // "tidak ditemukan". Alamat yang diketik asal harus berakhir di 404.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
+
+  const [customer, children, registrationRows, paymentRows] = await Promise.all([
+    db.customers.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        customer_number: true,
+        full_name: true,
+        whatsapp: true,
+        email: true,
+        domicile: true,
+        occupation: true,
+        source: true,
+        status: true,
+        created_at: true,
+      },
+    }),
+    db.children.findMany({
+      where: { customer_id: id },
+      select: {
+        id: true,
+        child_number: true,
+        full_name: true,
+        nickname: true,
+        age_years: true,
+        age_months: true,
+        status: true,
+      },
+      orderBy: { created_at: "asc" },
+    }),
+    db.registrations.findMany({
+      where: { customer_id: id },
+      select: {
+        id: true,
+        registration_number: true,
+        event_id: true,
+        registration_date: true,
+        status: true,
+        payment_status: true,
+        amount: true,
+        attendance_status: true,
+        children: { select: { full_name: true } },
+      },
+      orderBy: { registration_date: "desc" },
+    }),
+    db.payments.findMany({
+      where: { customer_id: id },
+      select: {
+        id: true,
+        payment_number: true,
+        invoice_number: true,
+        amount: true,
+        status: true,
+        method: true,
+        paid_at: true,
+        created_at: true,
+      },
+      orderBy: { created_at: "desc" },
+    }),
+  ]);
 
   if (!customer) notFound();
 
-  const children = (childRows ?? []) as {
-    id: string;
-    child_number: string;
-    full_name: string;
-    nickname: string;
-    age_years: number | null;
-    age_months: number | null;
-    status: string;
-  }[];
-  const registrations = (registrationRows ?? []) as unknown as {
-    id: string;
-    registration_number: string;
-    event_id: string;
-    registration_date: string;
-    status: string;
-    payment_status: string;
-    amount: number;
-    attendance_status: string;
-    children: { full_name: string } | null;
-  }[];
-  const payments = (paymentRows ?? []) as {
-    id: string;
-    payment_number: string;
-    invoice_number: string | null;
-    amount: number;
-    status: string;
-    method: string;
-    paid_at: string | null;
-    created_at: string;
-  }[];
+  const registrations = registrationRows.map((row) => ({
+    ...row,
+    registration_date: row.registration_date.toISOString(),
+    amount: Number(row.amount),
+  }));
+  const payments = paymentRows.map((row) => ({
+    ...row,
+    amount: Number(row.amount),
+    paid_at: row.paid_at ? row.paid_at.toISOString() : null,
+    created_at: row.created_at.toISOString(),
+  }));
 
   const paidTotal = payments
     .filter((payment) => payment.status === "PAID")
@@ -148,7 +168,7 @@ export default async function CustomerDetailPage({
           <Line label="Pekerjaan" value={customer.occupation || "—"} />
           <Line label="Mengetahui dari" value={customer.source || "—"} />
           <Line label="Status" value={customer.status === "active" ? "Aktif" : "Nonaktif"} />
-          <Line label="Terdaftar" value={formatDate(customer.created_at)} />
+          <Line label="Terdaftar" value={formatDate(customer.created_at.toISOString())} />
         </dl>
       </Card>
 

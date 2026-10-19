@@ -4,22 +4,25 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/admin/activity";
 import { requireRole } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 /**
- * Deleting people records.
+ * Menghapus data orang.
  *
- * Three guards, because this removes real data:
- *   1. Only a SUPER_ADMIN may do it.
- *   2. The action re-counts registrations here — the UI's own check is never
- *      trusted, since a stale page could offer delete on a row that has since
- *      been registered.
- *   3. The database has ON DELETE RESTRICT on registrations and payments, so
- *      even if both checks above were wrong, Postgres refuses.
+ * Tiga penjaga, karena ini menghapus data sungguhan:
+ *   1. Hanya SUPER_ADMIN.
+ *   2. Aksi ini menghitung ulang pendaftaran di sini — pemeriksaan di tampilan
+ *      tidak pernah dipercaya, sebab halaman yang basi bisa menawarkan hapus
+ *      pada baris yang barusan mendaftar.
+ *   3. Database memakai ON DELETE RESTRICT pada pendaftaran dan pembayaran,
+ *      jadi kalau dua pemeriksaan di atas keliru pun, Postgres menolak.
+ *      Diperiksa langsung: aturan itu sama persis dengan database asal.
  *
- * Deactivating is offered instead whenever a record cannot be removed: the
- * history stays intact and the row stops appearing in active lists.
+ * Kalau sebuah data tidak bisa dihapus, yang ditawarkan menonaktifkannya:
+ * riwayat tetap utuh dan barisnya berhenti muncul di daftar aktif.
  */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function back(path: string, status: string): never {
   redirect(`${path}?msg=${status}`);
@@ -29,51 +32,52 @@ export async function deleteCustomerAction(formData: FormData) {
   await requireRole("SUPER_ADMIN");
   const id = String(formData.get("customerId") ?? "");
   const code = String(formData.get("code") ?? "");
-  if (!id) back("/admin/customers", "error");
+  if (!UUID.test(id)) back("/admin/customers", "error");
 
-  const supabase = await createSupabaseServerClient();
+  let outcome = "deleted";
+  try {
+    const registrations = await db.registrations.count({ where: { customer_id: id } });
+    if (registrations > 0) {
+      outcome = "has-registrations";
+    } else {
+      // Anak ikut terhapus bersama induknya (CASCADE), jadi catat berapa
+      // banyak yang ikut hilang.
+      const childCount = await db.children.count({ where: { customer_id: id } });
+      await db.customers.delete({ where: { id } });
+      await logActivity(
+        "DELETE_CUSTOMER",
+        "customers",
+        code || id,
+        { code, childrenDeleted: childCount },
+        null,
+      );
+    }
+  } catch {
+    outcome = "error";
+  }
 
-  // Re-check here rather than trusting what the page rendered.
-  const { count } = await supabase
-    .from("registrations")
-    .select("id", { count: "exact", head: true })
-    .eq("customer_id", id);
-
-  if ((count ?? 0) > 0) back("/admin/customers", "has-registrations");
-
-  // Children cascade with the parent, so say how many went with them.
-  const { count: childCount } = await supabase
-    .from("children")
-    .select("id", { count: "exact", head: true })
-    .eq("customer_id", id);
-
-  const { error } = await supabase.from("customers").delete().eq("id", id);
-  if (error) back("/admin/customers", "error");
-
-  await logActivity(
-    "DELETE_CUSTOMER",
-    "customers",
-    code || id,
-    { code, childrenDeleted: childCount ?? 0 },
-    null,
-  );
-
-  revalidatePath("/admin/customers");
-  revalidatePath("/admin/children");
-  back("/admin/customers", "deleted");
+  if (outcome === "deleted") {
+    revalidatePath("/admin/customers");
+    revalidatePath("/admin/children");
+  }
+  back("/admin/customers", outcome);
 }
 
 export async function setCustomerStatusAction(formData: FormData) {
   await requireRole("SUPER_ADMIN");
   const id = String(formData.get("customerId") ?? "");
   const next = String(formData.get("next")) === "active" ? "active" : "inactive";
-  if (!id) back("/admin/customers", "error");
+  if (!UUID.test(id)) back("/admin/customers", "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("customers").update({ status: next }).eq("id", id);
-  if (error) back("/admin/customers", "error");
+  let failed = false;
+  try {
+    await db.customers.update({ where: { id }, data: { status: next } });
+    await logActivity("UPDATE_CUSTOMER", "customers", id, null, { status: next });
+  } catch {
+    failed = true;
+  }
+  if (failed) back("/admin/customers", "error");
 
-  await logActivity("UPDATE_CUSTOMER", "customers", id, null, { status: next });
   revalidatePath("/admin/customers");
   back("/admin/customers", next === "active" ? "activated" : "deactivated");
 }
