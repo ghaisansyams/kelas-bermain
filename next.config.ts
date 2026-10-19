@@ -24,10 +24,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    // Images uploaded through the admin live in Supabase Storage.
-    remotePatterns: [
-      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
-    ],
+    // Media diunggah dan dilayani dari server sendiri lewat /uploads — tidak
+    // ada host luar yang perlu diizinkan.
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
