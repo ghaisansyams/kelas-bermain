@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Discount rules, read from `site_settings.pricing` so the team can change
  * them in the admin without a deploy. Every failure path falls back to the
@@ -6,7 +8,7 @@
  */
 
 import { PRICING_CONFIG, type PricingConfig } from "@/lib/pricing";
-import { getSupabase } from "@/lib/supabase/client";
+import { db } from "@/lib/db";
 
 function coerce(value: unknown): PricingConfig {
   if (!value || typeof value !== "object") return PRICING_CONFIG;
@@ -24,7 +26,12 @@ function coerce(value: unknown): PricingConfig {
 
 export async function getPricingConfig(): Promise<PricingConfig> {
   try {
-    const { data, error } = await getSupabase().rpc("get_site_setting", { p_key: "pricing" });
+    const row = await db.site_settings.findUnique({
+      where: { key: "pricing" },
+      select: { value: true },
+    });
+    const data = row?.value ?? null;
+    const error = null;
     if (error || !data) return PRICING_CONFIG;
     return coerce(data);
   } catch {

@@ -1,8 +1,10 @@
+import "server-only";
+
 import { activities } from "@/data/activities";
 import { events as catalogueEvents } from "@/data/events";
 import { getCmsGallery, getCmsTestimonials } from "@/lib/services/cms-content";
 import { getGalleryDriveSettings } from "@/lib/services/gallery-settings";
-import { getSupabase } from "@/lib/supabase/client";
+import { db } from "@/lib/db";
 import { rowToEventRecord, type EventRow } from "./event-mapper";
 import { galleryDrive, galleryFeatured, galleryItems } from "@/data/gallery";
 import { speakers } from "@/data/speakers";
@@ -81,11 +83,24 @@ function sortEvents(a: EventView, b: EventView): number {
  */
 async function loadEventRecords(): Promise<EventRecord[]> {
   try {
-    const { data, error } = await getSupabase().rpc("get_public_events");
-    if (error || !Array.isArray(data) || data.length === 0) {
-      return catalogueEvents.filter((event) => event.published);
-    }
-    return (data as EventRow[]).map(rowToEventRecord);
+    // Status yang dulu disaring get_public_events. DRAFT tidak ada di sini
+    // dengan sengaja: kelas yang belum diumumkan tidak boleh bocor.
+    const rows = await db.events.findMany({
+      where: { status: { in: ["PUBLISHED", "ONGOING", "COMPLETED", "CANCELLED"] } },
+      orderBy: { start_date: "asc" },
+    });
+    if (rows.length === 0) return catalogueEvents.filter((event) => event.published);
+
+    // Supabase mengirim tanggal sebagai teks ISO; Prisma mengirim objek Date.
+    // Seluruh aplikasi memperlakukan tanggal event sebagai "YYYY-MM-DD", jadi
+    // diseragamkan di sini daripada menyebar penyesuaian ke setiap pemakai.
+    return rows
+      .map((row) => ({
+        ...row,
+        start_date: row.start_date.toISOString().slice(0, 10),
+        end_date: row.end_date.toISOString().slice(0, 10),
+      }))
+      .map((row) => rowToEventRecord(row as unknown as EventRow));
   } catch {
     return catalogueEvents.filter((event) => event.published);
   }

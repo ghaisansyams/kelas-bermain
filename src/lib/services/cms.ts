@@ -1,4 +1,7 @@
-import { getSupabase } from "@/lib/supabase/client";
+import "server-only";
+
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 import { heroSlides, type HeroSlide } from "@/data/hero-slides";
 import { mainNav } from "@/data/site";
 
@@ -107,12 +110,14 @@ function readSlides(content: Record<string, unknown> | null): HeroSlide[] {
 
 export async function getHomeContent(): Promise<HomeContent> {
   try {
-    const { data, error } = await getSupabase().rpc("get_cms_sections", {
-      p_page_key: "home",
+    const found = await db.cms_sections.findMany({
+      where: { page_key: "home", published: { not: Prisma.DbNull } },
+      select: { section_key: true, published: true },
     });
-    if (error || !data) return DEFAULT_HOME_CONTENT;
-
-    const rows = data as SectionRow[];
+    const rows = found.map((row) => ({
+      section_key: row.section_key,
+      content: row.published,
+    })) as SectionRow[];
     const find = (key: string) => rows.find((row) => row.section_key === key)?.content ?? null;
 
     return {
@@ -127,7 +132,12 @@ export async function getHomeContent(): Promise<HomeContent> {
 
 export async function getNavigationItems(): Promise<NavItem[]> {
   try {
-    const { data, error } = await getSupabase().rpc("get_navigation");
+    const data = await db.navigation_items.findMany({
+      where: { is_visible: true },
+      select: { label: true, href: true, open_in_new_tab: true },
+      orderBy: [{ sort_order: "asc" }, { label: "asc" }],
+    });
+    const error = null;
     if (error || !data) return DEFAULT_NAV;
     const rows = data as { label: string; href: string; open_in_new_tab: boolean }[];
     if (rows.length === 0) return DEFAULT_NAV;

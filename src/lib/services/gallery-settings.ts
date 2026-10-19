@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * The Google Drive folder behind the gallery.
  *
@@ -7,7 +9,7 @@
  * that can be forgotten.
  */
 
-import { getSupabase } from "@/lib/supabase/client";
+import { db } from "@/lib/db";
 import { galleryDrive } from "@/data/gallery";
 
 export interface GalleryDriveSettings {
@@ -44,9 +46,12 @@ export function toGalleryDrive(value: unknown): GalleryDriveSettings {
 
 export async function getGalleryDriveSettings(): Promise<GalleryDriveSettings> {
   try {
-    const { data, error } = await getSupabase().rpc("get_site_setting", {
-      p_key: "gallery_drive",
+    const row = await db.site_settings.findUnique({
+      where: { key: "gallery_drive" },
+      select: { value: true },
     });
+    const data = row?.value ?? null;
+    const error = null;
     if (error || !data) return DEFAULT_GALLERY_DRIVE;
     return toGalleryDrive(data);
   } catch {
