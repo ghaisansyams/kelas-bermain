@@ -10,7 +10,7 @@ import { EmptyRow, StatusBadge, TableShell, Td, Th } from "@/components/admin/da
 import { VoucherForm, type VoucherFormValues } from "@/components/admin/voucher-form";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -73,14 +73,34 @@ export default async function AdminVouchersPage({
 }) {
   await requireAdmin();
   const { status, edit } = await searchParams;
-  const supabase = await createSupabaseServerClient();
 
-  const [{ data, error }, events] = await Promise.all([
-    supabase.from("vouchers").select("*").order("created_at", { ascending: false }).limit(200),
-    getEvents(),
-  ]);
+  let rows: VoucherRow[] = [];
+  let error = false;
+  const events = await getEvents();
 
-  const rows = (data ?? []) as unknown as VoucherRow[];
+  try {
+    const list = await db.vouchers.findMany({ orderBy: { created_at: "desc" }, take: 200 });
+    // Kolom date datang sebagai Date; formulir dan label bekerja dengan teks
+    // "YYYY-MM-DD", dan desimal harus jadi angka biasa sebelum menyeberang ke
+    // komponen klien.
+    rows = list.map((row) => ({
+      code: row.code,
+      description: row.description,
+      type: row.type as VoucherRow["type"],
+      value: Number(row.value),
+      max_discount: row.max_discount == null ? null : Number(row.max_discount),
+      max_uses: row.max_uses,
+      used_count: row.used_count,
+      min_children: row.min_children,
+      event_id: row.event_id,
+      valid_from: row.valid_from ? row.valid_from.toISOString().slice(0, 10) : null,
+      valid_until: row.valid_until ? row.valid_until.toISOString().slice(0, 10) : null,
+      status: row.status as VoucherRow["status"],
+    }));
+  } catch {
+    error = true;
+  }
+
   const active = rows.filter((row) => row.status === "ACTIVE").length;
   const redeemed = rows.reduce((total, row) => total + row.used_count, 0);
   const editing = edit ? rows.find((row) => row.code === edit) : undefined;
@@ -98,7 +118,7 @@ export default async function AdminVouchersPage({
 
       {error ? (
         <Notice tone="error">
-          Tabel voucher belum ada. Jalankan supabase/voucher-users-schema.sql di SQL Editor.
+          Daftar voucher gagal dimuat. Coba muat ulang halaman ini.
         </Notice>
       ) : null}
 

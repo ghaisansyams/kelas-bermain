@@ -6,7 +6,7 @@ import { Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { EventForm, type EventFormValues } from "@/components/admin/event-form";
 import { requireAdmin } from "@/lib/admin/auth";
 import type { EventRow } from "@/lib/services/event-mapper";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatRupiah } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -27,23 +27,26 @@ export default async function EditEventPage({
   await requireAdmin();
   const { id } = await params;
   const { status } = await searchParams;
-  const supabase = await createSupabaseServerClient();
 
-  const [{ data }, paidAgg, attendanceAgg] = await Promise.all([
-    supabase.from("events").select("*").eq("id", id).maybeSingle(),
-    supabase.from("payments").select("amount").eq("event_id", id).eq("status", "PAID"),
-    supabase.from("registrations").select("attendance_status").eq("event_id", id),
+  // id dari URL yang bukan milik event mana pun harus berakhir di 404, bukan
+  // di halaman galat.
+  const [event, paidSum, presentCount] = await Promise.all([
+    db.events.findUnique({ where: { id } }),
+    db.payments.aggregate({ _sum: { amount: true }, where: { event_id: id, status: "PAID" } }),
+    db.registrations.count({ where: { event_id: id, attendance_status: "PRESENT" } }),
   ]);
 
-  if (!data) notFound();
-  const row = data as unknown as EventRow;
+  if (!event) notFound();
 
-  const revenue = (paidAgg.data ?? []).reduce(
-    (total, item) => total + Number((item as { amount: number }).amount),
-    0,
-  );
-  const attendance = (attendanceAgg.data ?? []) as { attendance_status: string }[];
-  const present = attendance.filter((item) => item.attendance_status === "PRESENT").length;
+  // Formulir dan pemetanya bekerja dengan tanggal "YYYY-MM-DD", bukan Date.
+  const row = {
+    ...event,
+    start_date: event.start_date.toISOString().slice(0, 10),
+    end_date: event.end_date.toISOString().slice(0, 10),
+  } as unknown as EventRow;
+
+  const revenue = Number(paidSum._sum.amount ?? 0);
+  const present = presentCount;
 
   const initial: EventFormValues = {
     id: row.id,

@@ -9,7 +9,7 @@ import { Card, Notice, PageHeader } from "@/components/admin/admin-ui";
 import { EmptyRow, StatusBadge, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { EVENT_STATUS_LABEL } from "@/lib/services/event-mapper";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +28,8 @@ export default async function AdminEventsPage({
 }) {
   await requireAdmin();
   const { status } = await searchParams;
-  const supabase = await createSupabaseServerClient();
 
-  const { data, error } = await supabase
-    .from("events")
-    .select("id, slug, title, category, start_date, capacity, registered, status, featured")
-    .order("start_date", { ascending: false }).limit(200);
-
-  const rows = (data ?? []) as {
+  let rows: {
     id: string;
     slug: string;
     title: string;
@@ -45,7 +39,29 @@ export default async function AdminEventsPage({
     registered: number;
     status: string;
     featured: boolean;
-  }[];
+  }[] = [];
+  let error = false;
+
+  try {
+    const list = await db.events.findMany({
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        category: true,
+        start_date: true,
+        capacity: true,
+        registered: true,
+        status: true,
+        featured: true,
+      },
+      orderBy: { start_date: "desc" },
+      take: 200,
+    });
+    rows = list.map((row) => ({ ...row, start_date: row.start_date.toISOString().slice(0, 10) }));
+  } catch {
+    error = true;
+  }
 
   const notice = status ? NOTICES[status] : undefined;
 
@@ -68,7 +84,7 @@ export default async function AdminEventsPage({
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       {error ? (
         <Notice tone="error">
-          Tabel event belum ada. Jalankan supabase/events-schema.sql terlebih dahulu.
+          Daftar event gagal dimuat. Coba muat ulang halaman ini.
         </Notice>
       ) : null}
 

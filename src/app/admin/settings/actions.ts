@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/admin/activity";
 import { requireAdmin } from "@/lib/admin/auth";
 import { PRICING_CONFIG } from "@/lib/pricing";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 
 function positive(formData: FormData, key: string, fallback: number): number {
   const value = Number(String(formData.get(key) ?? "").trim());
@@ -37,26 +37,24 @@ export async function savePricingSettingsAction(formData: FormData) {
     ),
   };
 
-  const supabase = await createSupabaseServerClient();
-  const { data: before } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "pricing")
-    .maybeSingle();
+  let failed = false;
+  try {
+    const before = await db.site_settings.findUnique({
+      where: { key: "pricing" },
+      select: { value: true },
+    });
 
-  const { error } = await supabase
-    .from("site_settings")
-    .upsert({ key: "pricing", value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    await db.site_settings.upsert({
+      where: { key: "pricing" },
+      create: { key: "pricing", value },
+      update: { value, updated_at: new Date() },
+    });
 
-  if (error) redirect("/admin/settings?status=error");
-
-  await logActivity(
-    "UPDATE_PRICING",
-    "site_settings",
-    "pricing",
-    (before as { value: unknown } | null)?.value ?? null,
-    value,
-  );
+    await logActivity("UPDATE_PRICING", "site_settings", "pricing", before?.value ?? null, value);
+  } catch {
+    failed = true;
+  }
+  if (failed) redirect("/admin/settings?status=error");
 
   // The register page prices from this, so every event's form must refresh.
   revalidatePath("/admin/settings");
