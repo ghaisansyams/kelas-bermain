@@ -1,11 +1,10 @@
+"use server";
+
 /**
  * Certificate service.
  *
- * Reads the same `certificates` table the ERP writes to, through the
- * `verify_certificate` SECURITY DEFINER function — so a certificate issued in
- * the admin is findable on the public checker straight away. It used to read
- * the old in-memory repositories, which real sign-ups never write to, meaning
- * every lookup of a genuinely issued certificate failed.
+ * Reads the same `certificates` table the ERP writes to, so a certificate
+ * issued in the admin is findable on the public checker straight away.
  *
  * Issuing lives in the admin (`admin_issue_certificate`), not here: a
  * certificate is proof of attendance, so only someone who can see the
@@ -13,7 +12,7 @@
  */
 
 import type { CertificateRecord } from "@/lib/repositories/types";
-import { getSupabase } from "@/lib/supabase/client";
+import { db } from "@/lib/db";
 import { normaliseConfig, type CertificateTemplate } from "@/lib/cms/certificate-template";
 
 const REASON_MESSAGE: Record<string, string> = {
@@ -52,19 +51,44 @@ export async function verifyCertificate(query: string): Promise<VerifyResult> {
   if (trimmed.length < 6) return { ok: false, error: REASON_MESSAGE.TOO_SHORT };
 
   try {
-    const { data, error } = await getSupabase().rpc("verify_certificate", { p_query: trimmed });
+    const query = trimmed.toUpperCase();
 
-    if (error || !data || typeof data !== "object") {
-      return { ok: false, error: REASON_MESSAGE.NOT_FOUND };
+    // Nomor sertifikat dulu, lalu nomor pendaftaran: orang tua lebih sering
+    // memegang nomor pendaftarannya daripada nomor sertifikatnya.
+    let cert = await db.certificates.findFirst({
+      where: { number: { equals: query, mode: "insensitive" } },
+    });
+
+    if (!cert) {
+      cert = await db.certificates.findFirst({
+        where: {
+          registrations: { registration_number: { equals: query, mode: "insensitive" } },
+        },
+        orderBy: { issued_at: "desc" },
+      });
     }
 
-    const result = data as Record<string, unknown>;
-    if (result.ok !== true) {
-      const reason = String(result.reason ?? "NOT_FOUND");
-      return { ok: false, error: REASON_MESSAGE[reason] ?? REASON_MESSAGE.NOT_FOUND };
-    }
+    if (!cert) return { ok: false, error: REASON_MESSAGE.NOT_FOUND };
+    if (cert.status === "revoked") return { ok: false, error: REASON_MESSAGE.REVOKED };
 
-    return { ok: true, certificate: toRecord(result) };
+    return {
+      ok: true,
+      certificate: toRecord({
+        number: cert.number,
+        registrationId: cert.registration_id,
+        childId: cert.child_id,
+        eventId: cert.event_id,
+        participantName: cert.participant_name,
+        eventTitle: cert.event_title,
+        eventDate: cert.event_date,
+        organizer: cert.organizer,
+        template: cert.template,
+        issuedAt: cert.issued_at?.toISOString() ?? "",
+        status: cert.status,
+        signatoryName: cert.signatory_name,
+        signatoryRole: cert.signatory_role,
+      }),
+    };
   } catch {
     return { ok: false, error: REASON_MESSAGE.NOT_FOUND };
   }
@@ -85,15 +109,23 @@ export async function getCertificateTemplate(
   name?: string,
 ): Promise<CertificateTemplate | null> {
   try {
-    const { data, error } = await getSupabase().rpc("get_certificate_template", {
-      p_name: name ?? null,
-    });
-    if (error || !data || typeof data !== "object") return null;
+    // Nama yang diminta menang, lalu template bawaan. Urutan yang sama
+    // dengan fungsi SQL yang digantikan.
+    const row =
+      (name
+        ? await db.certificate_templates.findFirst({
+            where: { status: "PUBLISHED", name },
+          })
+        : null) ??
+      (await db.certificate_templates.findFirst({
+        where: { status: "PUBLISHED" },
+        orderBy: { is_default: "desc" },
+      }));
 
-    const row = data as Record<string, unknown>;
+    if (!row) return null;
     // Without artwork there is nothing to overlay, so the built-in card is
     // the better fallback than an empty page with two floating strings.
-    const backgroundUrl = String(row.backgroundUrl ?? "");
+    const backgroundUrl = String(row.background_url ?? "");
     if (!backgroundUrl) return null;
 
     return {
@@ -119,14 +151,10 @@ export async function getCertificateTemplate(
  */
 export async function findTemplateNameForEvent(eventId: string): Promise<string> {
   try {
-    const { data, error } = await getSupabase()
-      .from("certificate_templates")
-      .select("name, config, is_default")
-      .eq("status", "PUBLISHED");
-
-    if (error || !Array.isArray(data)) return "classic";
-
-    const rows = data as { name: string; config: unknown; is_default: boolean }[];
+    const rows = await db.certificate_templates.findMany({
+      where: { status: "PUBLISHED" },
+      select: { name: true, config: true, is_default: true },
+    });
     const forEvent = rows.find(
       (row) => normaliseConfig(row.config).eventId === eventId,
     );

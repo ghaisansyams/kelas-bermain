@@ -19,3 +19,6 @@ supabase/.temp/
 
 # Berkas hasil unduhan dari Supabase Storage (bukan sumber)
 public/uploads/
+
+# Bukti pembayaran yang diunggah (di luar public, tidak boleh dilayani langsung)
+storage/
