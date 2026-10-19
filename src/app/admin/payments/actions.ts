@@ -3,28 +3,37 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireRole } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asAdmin } from "@/lib/admin/actor";
 
 /**
- * Money-moving actions. Both call SQL functions that update the payment, the
- * registration and the finance ledger in one transaction — see
- * supabase/erp-schema.sql — so the three can never drift apart.
+ * Aksi yang memindahkan uang. Semuanya memanggil fungsi database yang
+ * memperbarui pembayaran, pendaftaran, dan buku keuangan dalam satu transaksi,
+ * jadi ketiganya tidak pernah bisa berselisih.
+ *
+ * redirect() melempar pengecualian internal Next untuk berpindah halaman, jadi
+ * tidak boleh dipanggil di dalam try/catch — pengecualiannya akan tertelan dan
+ * pengguna melihat "berhasil" padahal tidak berpindah ke mana-mana. Karena itu
+ * hasil disimpan dulu, redirect-nya belakangan.
  */
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function confirmPaymentAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const paymentId = String(formData.get("paymentId") ?? "");
   const method = String(formData.get("method") ?? "");
-  if (!paymentId) redirect("/admin/payments?status=error");
+  if (!UUID.test(paymentId)) redirect("/admin/payments?status=error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_confirm_payment", {
-    p_payment_id: paymentId,
-    p_method: method || null,
-    p_notes: null,
-  });
+  let failed = false;
+  try {
+    await asAdmin(session, (tx) =>
+      tx.$executeRaw`select admin_confirm_payment(${paymentId}::uuid, ${method || null}, ${null})`,
+    );
+  } catch {
+    failed = true;
+  }
 
-  if (error) redirect("/admin/payments?status=error");
+  if (failed) redirect("/admin/payments?status=error");
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/finance");
@@ -32,20 +41,23 @@ export async function confirmPaymentAction(formData: FormData) {
   redirect("/admin/payments?status=confirmed");
 }
 
-/** Reversing a settled payment is SUPER_ADMIN only and always needs a reason. */
+/** Membalik pembayaran yang sudah lunas hanya untuk SUPER_ADMIN, dan selalu butuh alasan. */
 export async function refundPaymentAction(formData: FormData) {
-  await requireRole("SUPER_ADMIN");
+  const session = await requireRole("SUPER_ADMIN");
   const paymentId = String(formData.get("paymentId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!paymentId || !reason) redirect("/admin/payments?status=error");
+  if (!UUID.test(paymentId) || !reason) redirect("/admin/payments?status=error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_refund_payment", {
-    p_payment_id: paymentId,
-    p_reason: reason,
-  });
+  let failed = false;
+  try {
+    await asAdmin(session, (tx) =>
+      tx.$executeRaw`select admin_refund_payment(${paymentId}::uuid, ${reason})`,
+    );
+  } catch {
+    failed = true;
+  }
 
-  if (error) redirect("/admin/payments?status=error");
+  if (failed) redirect("/admin/payments?status=error");
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/finance");
@@ -59,18 +71,21 @@ export async function refundPaymentAction(formData: FormData) {
  * /cek-tiket.
  */
 export async function rejectPaymentAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const paymentId = String(formData.get("paymentId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!paymentId || !reason) redirect("/admin/payments?status=error");
+  if (!UUID.test(paymentId) || !reason) redirect("/admin/payments?status=error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_reject_payment", {
-    p_payment_id: paymentId,
-    p_reason: reason,
-  });
+  let failed = false;
+  try {
+    await asAdmin(session, (tx) =>
+      tx.$executeRaw`select admin_reject_payment(${paymentId}::uuid, ${reason})`,
+    );
+  } catch {
+    failed = true;
+  }
 
-  if (error) redirect("/admin/payments?status=error");
+  if (failed) redirect("/admin/payments?status=error");
 
   revalidatePath("/admin/payments");
   redirect("/admin/payments?status=rejected");

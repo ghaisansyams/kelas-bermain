@@ -4,6 +4,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
+import { PAYMENT_PROOF_DIR as UPLOAD_DIR } from "@/lib/config/storage";
 
 /**
  * Orang tua menyerahkan bukti transfer.
@@ -22,7 +23,6 @@ import { db } from "@/lib/db";
  * ditebak siapa pun.
  */
 
-const UPLOAD_DIR = process.env.PAYMENT_PROOF_DIR || "storage/bukti-pembayaran";
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 

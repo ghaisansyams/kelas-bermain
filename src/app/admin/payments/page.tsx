@@ -19,7 +19,7 @@ import {
 } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -43,10 +43,10 @@ interface PaymentRow {
   amount: number;
   status: string;
   method: string;
-  created_at: string;
-  paid_at: string | null;
+  created_at: Date;
+  paid_at: Date | null;
   proof_url: string | null;
-  proof_submitted_at: string | null;
+  proof_submitted_at: Date | null;
   rejection_reason: string | null;
   event_id: string;
   registrations: { registration_number: string; children: { full_name: string } | null } | null;
@@ -61,44 +61,97 @@ export default async function AdminPaymentsPage({
   const session = await requireAdmin();
   const { q, event, status, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
-  const supabase = await createSupabaseServerClient();
   const events = await getEvents();
 
-  let query = supabase
-    .from("payments")
-    .select(
-      "id, payment_number, invoice_number, amount, status, method, created_at, paid_at, proof_url, proof_submitted_at, rejection_reason, event_id, registrations(registration_number, children(full_name)), customers(full_name)",
-      { count: "exact" },
-    )
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  // ?status= dipakai dua hal sekaligus: penyaring daftar, dan penanda hasil
+  // aksi (?status=confirmed). Tanpa pemisahan ini, begitu pembayaran
+  // dikonfirmasi daftar disaring dengan status "confirmed", yang tidak cocok
+  // dengan baris mana pun, dan admin melihat tabel kosong tepat setelah
+  // berhasil. Hanya nilai yang memang status pembayaran yang menyaring.
+  const FILTERABLE = [
+    "PENDING",
+    "WAITING_VERIFICATION",
+    "REJECTED",
+    "PAID",
+    "FAILED",
+    "EXPIRED",
+    "CANCELLED",
+    "REFUNDED",
+  ];
+  const statusFilter = status && FILTERABLE.includes(status) ? status : undefined;
 
-  if (q) query = query.or(`invoice_number.ilike.%${q}%,payment_number.ilike.%${q}%`);
-  if (event) query = query.eq("event_id", event);
-  if (status) query = query.eq("status", status);
+  const where = {
+    ...(q
+      ? {
+          OR: [
+            { invoice_number: { contains: q, mode: "insensitive" as const } },
+            { payment_number: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+    ...(event ? { event_id: event } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
+  };
 
-  const [{ data, count, error }, pendingAgg, waitingAgg, paidAgg] = await Promise.all([
-    query,
-    supabase.from("payments").select("amount").eq("status", "PENDING"),
-    supabase.from("payments").select("amount").eq("status", "WAITING_VERIFICATION"),
-    supabase.from("payments").select("amount").eq("status", "PAID"),
-  ]);
+  let rows: PaymentRow[] = [];
+  let count = 0;
+  let pending = 0;
+  let waiting = 0;
+  let paid = 0;
+  let error = false;
 
-  const rows = (data ?? []) as unknown as PaymentRow[];
-  const sum = (list: { amount: number }[] | null) =>
-    (list ?? []).reduce((total, row) => total + Number(row.amount), 0);
+  try {
+    const [list, total, pendingSum, waitingSum, paidSum] = await Promise.all([
+      db.payments.findMany({
+        where,
+        select: {
+          id: true,
+          payment_number: true,
+          invoice_number: true,
+          amount: true,
+          status: true,
+          method: true,
+          created_at: true,
+          paid_at: true,
+          proof_url: true,
+          proof_submitted_at: true,
+          rejection_reason: true,
+          event_id: true,
+          registrations: {
+            select: { registration_number: true, children: { select: { full_name: true } } },
+          },
+          customers: { select: { full_name: true } },
+        },
+        orderBy: { created_at: "desc" },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      db.payments.count({ where }),
+      db.payments.aggregate({ _sum: { amount: true }, where: { status: "PENDING" } }),
+      db.payments.aggregate({
+        _count: true,
+        where: { status: "WAITING_VERIFICATION" },
+      }),
+      db.payments.aggregate({ _sum: { amount: true }, where: { status: "PAID" } }),
+    ]);
 
-  // The proof bucket is private on purpose — a screenshot of someone's
-  // banking app must never sit behind a public URL. Admins get a short-lived
-  // signed link instead, minted per page load.
-  const proofPaths = rows.map((row) => row.proof_url).filter((url): url is string => Boolean(url));
+    rows = list.map((row) => ({ ...row, amount: Number(row.amount) })) as PaymentRow[];
+    count = total;
+    pending = Number(pendingSum._sum.amount ?? 0);
+    waiting = waitingSum._count;
+    paid = Number(paidSum._sum.amount ?? 0);
+  } catch {
+    error = true;
+  }
+
+  // Bukti transfer dilayani lewat rute khusus admin yang memeriksa sesi setiap
+  // kali dibuka. Berkasnya di luar public/, jadi tidak ada URL yang bisa
+  // ditebak atau dibagikan: tangkapan layar aplikasi bank orang tua tidak
+  // boleh bisa dibuka siapa pun yang memegang tautannya.
   const proofLinks = new Map<string, string>();
-  if (proofPaths.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from("bukti-pembayaran")
-      .createSignedUrls(proofPaths, 300);
-    for (const item of signed ?? []) {
-      if (item.path && item.signedUrl) proofLinks.set(item.path, item.signedUrl);
+  for (const row of rows) {
+    if (row.proof_url) {
+      proofLinks.set(row.proof_url, `/admin/payments/proof/${encodeURIComponent(row.proof_url)}`);
     }
   }
 
@@ -116,13 +169,13 @@ export default async function AdminPaymentsPage({
       {noticeConfig ? <Notice tone={noticeConfig.tone}>{noticeConfig.text}</Notice> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Menunggu pembayaran" value={formatRupiah(sum(pendingAgg.data))} />
+        <StatCard label="Menunggu pembayaran" value={formatRupiah(pending)} />
         <StatCard
           label="Bukti menunggu dicek"
-          value={String((waitingAgg.data ?? []).length)}
+          value={String(waiting)}
         />
-        <StatCard label="Sudah lunas" value={formatRupiah(sum(paidAgg.data))} />
-        <StatCard label="Total transaksi" value={String(count ?? 0)} />
+        <StatCard label="Sudah lunas" value={formatRupiah(paid)} />
+        <StatCard label="Total transaksi" value={String(count)} />
       </div>
 
       <FilterBar action="/admin/payments">
@@ -154,7 +207,7 @@ export default async function AdminPaymentsPage({
       {error ? (
         <Card>
           <p className="text-sm text-brand-ink">
-            Data gagal dimuat. Pastikan supabase/erp-schema.sql sudah dijalankan.
+            Data gagal dimuat. Coba muat ulang halaman ini.
           </p>
         </Card>
       ) : (
@@ -213,7 +266,7 @@ export default async function AdminPaymentsPage({
                         <StatusBadge tone={label.tone}>{label.text}</StatusBadge>
                         {row.paid_at ? (
                           <span className="mt-1 block text-xs text-muted">
-                            {formatDate(row.paid_at)}
+                            {formatDate(row.paid_at.toISOString())}
                           </span>
                         ) : null}
                         {row.status === "REJECTED" && row.rejection_reason ? (
@@ -222,7 +275,7 @@ export default async function AdminPaymentsPage({
                           </span>
                         ) : null}
                       </Td>
-                      <Td>{formatDate(row.created_at)}</Td>
+                      <Td>{formatDate(row.created_at.toISOString())}</Td>
                       <Td>
                         {row.status === "PENDING" ||
                         row.status === "WAITING_VERIFICATION" ||
@@ -285,7 +338,7 @@ export default async function AdminPaymentsPage({
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}
-            total={count ?? 0}
+            total={count}
             basePath="/admin/payments"
             params={{ q, event, status }}
           />
@@ -308,7 +361,7 @@ function ProofCell({
 }: {
   url?: string;
   path: string | null;
-  submittedAt: string | null;
+  submittedAt: Date | null;
 }) {
   const isPdf = Boolean(path?.toLowerCase().endsWith(".pdf"));
 
@@ -345,7 +398,7 @@ function ProofCell({
         <span className="text-xs text-muted">—</span>
       )}
       {submittedAt ? (
-        <span className="block text-xs text-muted">{formatDate(submittedAt)}</span>
+        <span className="block text-xs text-muted">{formatDate(submittedAt.toISOString())}</span>
       ) : null}
     </div>
   );
