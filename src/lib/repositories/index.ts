@@ -20,8 +20,7 @@ import type {
  * localStorage-backed repository layer — legacy.
  *
  * The real data path (customers, children, registrations, payments,
- * affiliates) has moved to Supabase; see src/lib/services/*.ts and
- * supabase/schema.sql. Every repository exported here except
+ * affiliates) lives in Postgres; see src/lib/services/*.ts. Every repository exported here except
  * `certificatesRepo` is now dead code kept only so `certificate.ts` still
  * compiles while e-certificates stay switched off (FEATURE_CERTIFICATES,
  * PRD R-06/K-07) — a registration created today never appears in this

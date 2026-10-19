@@ -23,8 +23,8 @@ import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
  * "Selesai" step content. The registration/payment rows are already
  * created by this point (PENDING for a paid class) — this never claims a
  * payment succeeded, since nothing here can actually verify one. Marking a
- * payment PAID is admin's job today, and will be the future ERP's job later;
- * see the note on set_payment_status in supabase/schema.sql.
+ * payment PAID is an admin's job, done on the Pembayaran page after the
+ * transfer proof has been checked.
  */
 export function RegistrationReceipt({
   event,

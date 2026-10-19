@@ -95,9 +95,8 @@ function emptyGroup(): ParticipantGroup {
  *
  * The registration/payment rows are created at the Confirm step, before the
  * bank-transfer instructions ever appear, and stay PENDING — nothing in this
- * form ever marks a payment PAID. That verification is admin's job today
- * (Supabase Table Editor) and will be the future ERP's job later; see the
- * note on set_payment_status in supabase/schema.sql.
+ * form ever marks a payment PAID. That verification is an admin's job, done
+ * on the Pembayaran page after the transfer proof has been checked.
  */
 export function RegistrationWizard({
   event,

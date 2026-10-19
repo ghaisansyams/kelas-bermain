@@ -8,11 +8,9 @@ import { mainNav } from "@/data/site";
 /**
  * CMS read layer for the public site.
  *
- * Reads only PUBLISHED content, through the SECURITY DEFINER functions in
- * supabase/admin-schema.sql — drafts never leave the admin. Every getter
- * falls back to the copy the site shipped with, so an empty table, a missing
- * env var or a database hiccup degrades to today's text instead of a blank
- * page.
+ * Reads only PUBLISHED content — drafts never leave the admin. Every getter
+ * falls back to the copy the site shipped with, so an empty table or a
+ * database hiccup degrades to today's text instead of a blank page.
  */
 
 export interface HomeHeroContent {

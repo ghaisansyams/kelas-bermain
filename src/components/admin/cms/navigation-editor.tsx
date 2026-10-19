@@ -29,7 +29,7 @@ export function NavigationEditor({ items }: { items: NavRow[] }) {
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-          Belum ada menu. Jalankan supabase/admin-schema.sql lebih dulu.
+          Belum ada menu. Tambahkan menu pertama di bawah.
         </p>
       ) : (
         <form action={saveNavigationAction} className="space-y-3">
