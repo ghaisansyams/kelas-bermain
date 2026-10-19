@@ -1,6 +1,8 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Prisma } from "@prisma/client";
+import { getAdminSession } from "@/lib/admin/auth";
+import { db } from "@/lib/db";
 
 /**
  * Writes one audit row. Every admin action that changes data calls this, so
@@ -14,16 +16,18 @@ export async function logActivity(
   oldValue: unknown,
   newValue: unknown,
 ): Promise<void> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  await supabase.from("activity_logs").insert({
-    user_id: user?.id ?? null,
-    action,
-    entity,
-    entity_id: entityId,
-    old_value: (oldValue ?? null) as never,
-    new_value: (newValue ?? null) as never,
+  const session = await getAdminSession();
+  const json = (value: unknown) =>
+    value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
+
+  await db.activity_logs.create({
+    data: {
+      user_id: session?.userId ?? null,
+      action,
+      entity,
+      entity_id: entityId,
+      old_value: json(oldValue),
+      new_value: json(newValue),
+    },
   });
 }

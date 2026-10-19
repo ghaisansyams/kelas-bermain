@@ -1,6 +1,10 @@
 import "server-only";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 import { fetchApifyPosts, type ApifyPost } from "@/lib/services/instagram-apify";
 
 /**
@@ -16,15 +20,16 @@ import { fetchApifyPosts, type ApifyPost } from "@/lib/services/instagram-apify"
  *
  * 2. Gambarnya disalin, bukan ditautkan. URL CDN Instagram ditandatangani
  *    dan mati dalam hitungan minggu, dan menautkannya langsung kena 403.
+ *    Salinannya mendarat di public/uploads/website/instagram/, bentuk yang
+ *    sama dengan hasil migrate:storage, dilayani sebagai /uploads/...
  *
- * Soal hak akses: ini login sebagai akun admin khusus lewat Supabase Auth,
- * BUKAN service-role key. Artinya cron ini hanya bisa melakukan apa yang
- * seorang admin bisa lakukan lewat antarmuka — kalau kredensialnya bocor,
- * yang hilang sebatas itu, bukan seluruh database.
+ * Menulis lewat Prisma ke database yang sama dengan yang dibaca situs.
+ * Tidak ada lagi login Supabase di sini.
  */
 
-const BUCKET = "website";
 const COLLECTION = "updates";
+const UPLOAD_ROOT = process.env.UPLOAD_DIR || "public/uploads";
+const IMAGE_PATH = "website/instagram";
 
 export interface SyncReport {
   ok: boolean;
@@ -102,20 +107,9 @@ export async function syncInstagramPosts(): Promise<SyncReport> {
 
   const username = process.env.INSTAGRAM_USERNAME?.replace(/^@/, "") || "kelasbermain.id";
   const limit = Number(process.env.INSTAGRAM_LIMIT || 12);
-  // Hajid melewati video karena situsnya situs berita. Kelas Bermain banyak
-  // memakai reel, dan thumbnail reel tetap gambar yang layak, jadi di sini
-  // video ikut secara bawaan.
+  // Kelas Bermain banyak memakai reel, dan thumbnail reel tetap gambar yang
+  // layak, jadi video ikut secara bawaan.
   const skipVideo = process.env.INSTAGRAM_SKIP_VIDEO === "true";
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const email = process.env.SUPABASE_ADMIN_EMAIL;
-  const password = process.env.SUPABASE_ADMIN_PASSWORD;
-
-  if (!url || !anonKey) return { ...empty, error: "Konfigurasi Supabase belum lengkap." };
-  if (!email || !password) {
-    return { ...empty, error: "SUPABASE_ADMIN_EMAIL / SUPABASE_ADMIN_PASSWORD belum diatur." };
-  }
 
   const result = await fetchApifyPosts(username, limit);
   if (!result.ok) return { ...empty, error: result.error };
@@ -128,25 +122,17 @@ export async function syncInstagramPosts(): Promise<SyncReport> {
     return { ...empty, error: "Apify tidak mengembalikan satu postingan pun." };
   }
 
-  const supabase = createClient(url, anonKey, { auth: { persistSession: false } });
-  const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-  if (authError) return { ...empty, error: `Login admin gagal: ${authError.message}` };
-
   const report: SyncReport = { ...empty, ok: true, scanned: posts.length };
 
-  try {
-    for (const post of posts) {
-      const outcome = await savePost(supabase, post, { skipVideo });
-      if (outcome === "skipped") report.skipped += 1;
-      else {
-        report.saved += 1;
-        if (outcome.uploaded) report.uploaded += 1;
-        else report.reused += 1;
-        report.titles.push(outcome.title);
-      }
+  for (const post of posts) {
+    const outcome = await savePost(post, { skipVideo });
+    if (outcome === "skipped") report.skipped += 1;
+    else {
+      report.saved += 1;
+      if (outcome.uploaded) report.uploaded += 1;
+      else report.reused += 1;
+      report.titles.push(outcome.title);
     }
-  } finally {
-    await supabase.auth.signOut();
   }
 
   return report;
@@ -155,7 +141,6 @@ export async function syncInstagramPosts(): Promise<SyncReport> {
 type SaveOutcome = "skipped" | { uploaded: boolean; title: string };
 
 async function savePost(
-  supabase: SupabaseClient,
   post: ApifyPost,
   options: { skipVideo: boolean },
 ): Promise<SaveOutcome> {
@@ -164,26 +149,27 @@ async function savePost(
   const image = post.displayUrl;
 
   // Tanpa salah satu dari ini, kartunya tidak punya isi yang layak tampil.
-  if (!shortcode || !caption || !image) return "skipped";
+  // Shortcode juga dipakai sebagai nama berkas, jadi hanya huruf, angka,
+  // garis bawah, dan strip yang lolos.
+  if (!shortcode || !/^[\w-]+$/.test(shortcode) || !caption || !image) return "skipped";
   if (options.skipVideo && post.type && post.type !== "Image") return "skipped";
 
-  const path = `instagram/${shortcode}.jpg`;
-  const { data: stored } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const relative = `${IMAGE_PATH}/${shortcode}.jpg`;
+  const filePath = join(UPLOAD_ROOT, relative);
+  let uploaded = false;
 
   // Postingan lama tidak berubah gambarnya; mengunduh ulang tiap malam itu
   // kuota yang terbuang.
-  const head = await fetch(stored.publicUrl, { method: "HEAD" }).catch(() => null);
-  let uploaded = false;
-
-  if (!head?.ok) {
+  if (!existsSync(filePath)) {
     const response = await fetch(image).catch(() => null);
     if (!response?.ok) return "skipped";
 
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
-    if (error) return "skipped";
+    try {
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, Buffer.from(await response.arrayBuffer()));
+    } catch {
+      return "skipped";
+    }
     uploaded = true;
   }
 
@@ -192,28 +178,42 @@ async function savePost(
     slug: toSlug(caption, shortcode),
     title: toTitle(caption),
     excerpt: toExcerpt(caption),
-    imageUrl: stored.publicUrl,
+    caption,
+    imageUrl: `/uploads/${relative}`,
     postUrl: post.url ?? `https://www.instagram.com/p/${shortcode}/`,
     publishedAt,
     category: detectCategory(caption),
   };
 
-  // `published` sengaja tidak disentuh di sini. Baris baru lahir sebagai
+  // `published` sengaja tidak disentuh di `update`. Baris baru lahir sebagai
   // draf; baris yang sudah diterbitkan admin tetap tayang dengan isi yang
   // mereka setujui, dan perubahan caption di Instagram menunggu persetujuan
   // berikutnya.
-  const { error } = await supabase.from("cms_collections").upsert(
-    {
-      collection_key: COLLECTION,
-      item_key: `ig-${shortcode}`,
-      draft: content,
-      // Terbaru di atas: tanggal dibalik supaya urutannya stabil.
-      sort_order: -Number(publishedAt.replace(/-/g, "")),
-      is_visible: true,
-    },
-    { onConflict: "collection_key,item_key", ignoreDuplicates: false },
-  );
+  // Terbaru di atas: tanggal dibalik supaya urutannya stabil.
+  const sortOrder = -Number(publishedAt.replace(/-/g, ""));
+  try {
+    await db.cms_collections.upsert({
+      where: {
+        collection_key_item_key: { collection_key: COLLECTION, item_key: `ig-${shortcode}` },
+      },
+      create: {
+        collection_key: COLLECTION,
+        item_key: `ig-${shortcode}`,
+        draft: content as Prisma.InputJsonValue,
+        sort_order: sortOrder,
+        is_visible: true,
+      },
+      // is_visible tidak disentuh: kalau admin menyembunyikan kartunya,
+      // sync berikutnya tidak boleh menampilkannya lagi.
+      update: {
+        draft: content as Prisma.InputJsonValue,
+        sort_order: sortOrder,
+        updated_at: new Date(),
+      },
+    });
+  } catch {
+    return "skipped";
+  }
 
-  if (error) return "skipped";
   return { uploaded, title: content.title };
 }
