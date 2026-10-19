@@ -16,3 +16,6 @@ next-env.d.ts
 
 # Cache CLI Supabase
 supabase/.temp/
+
+# Berkas hasil unduhan dari Supabase Storage (bukan sumber)
+public/uploads/
