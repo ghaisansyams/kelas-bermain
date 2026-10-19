@@ -17,7 +17,7 @@ import {
 } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
@@ -68,21 +68,38 @@ export default async function AdminCertificatesPage({
   const { event, status } = await searchParams;
   const events = await getEvents();
   const selected = event ?? events[0]?.id ?? "";
-  const supabase = await createSupabaseServerClient();
 
-  const { data, error } = selected
-    ? await supabase
-        .from("registrations")
-        .select(
-          "id, registration_number, attendance_status, certificate_status, children(full_name), certificates(number, status, issued_at)",
-        )
-        .eq("event_id", selected)
-        .neq("status", "CANCELLED")
-        .order("registration_number")
-        .limit(500)
-    : { data: [], error: null };
+  let rows: Row[] = [];
+  let error = false;
 
-  const rows = (data ?? []) as unknown as Row[];
+  if (selected) {
+    try {
+      const found = await db.registrations.findMany({
+        where: { event_id: selected, status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          registration_number: true,
+          attendance_status: true,
+          certificate_status: true,
+          children: { select: { full_name: true } },
+          certificates: { select: { number: true, status: true, issued_at: true } },
+        },
+        orderBy: { registration_number: "asc" },
+        take: 500,
+      });
+
+      rows = found.map((row) => ({
+        ...row,
+        certificates: row.certificates.map((cert) => ({
+          ...cert,
+          issued_at: cert.issued_at.toISOString(),
+        })),
+      }));
+    } catch {
+      error = true;
+    }
+  }
+
   const issued = rows.filter((row) => row.certificate_status === "ISSUED").length;
   const ready = rows.filter((row) => row.certificate_status === "AVAILABLE").length;
   const eventTitle = events.find((item) => item.id === selected)?.title ?? "—";

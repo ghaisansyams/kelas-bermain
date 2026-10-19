@@ -3,7 +3,8 @@ import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui"
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyRow, StatusBadge, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { asAdmin } from "@/lib/admin/actor";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 
@@ -22,7 +23,7 @@ interface AffiliateRow {
   bank_account_name: string;
   reason: string | null;
   status: "PENDING" | "ACTIVE" | "INACTIVE" | "REJECTED";
-  applied_at: string;
+  applied_at: Date;
   notes: string | null;
 }
 
@@ -53,19 +54,35 @@ export default async function AdminAffiliatesPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { status } = await searchParams;
-  const supabase = await createSupabaseServerClient();
 
-  const [{ data, error }, statsRes] = await Promise.all([
-    supabase.from("affiliates").select("*").order("applied_at", { ascending: false }).limit(200),
-    supabase.rpc("admin_affiliate_stats"),
-  ]);
+  let rows: AffiliateRow[] = [];
+  let statRows: StatRow[] = [];
+  let error = false;
 
-  const rows = (data ?? []) as unknown as AffiliateRow[];
-  const stats = new Map(
-    ((statsRes.data ?? []) as unknown as StatRow[]).map((row) => [row.code, row]),
-  );
+  try {
+    const [list, stat] = await Promise.all([
+      db.affiliates.findMany({ orderBy: { applied_at: "desc" }, take: 200 }),
+      // Fungsi ini memeriksa is_admin() sendiri, jadi dipanggil atas nama admin.
+      // Dilempar ke angka biasa: kolom hitungan datang sebagai bigint, dan
+      // BigInt tidak bisa diserialisasi ke halaman.
+      asAdmin(session, (tx) =>
+        tx.$queryRaw<StatRow[]>`
+          select code,
+                 registrations::int       as registrations,
+                 paid_registrations::int  as paid_registrations,
+                 revenue::float8          as revenue
+            from admin_affiliate_stats()`,
+      ),
+    ]);
+    rows = list as unknown as AffiliateRow[];
+    statRows = stat;
+  } catch {
+    error = true;
+  }
+
+  const stats = new Map(statRows.map((row) => [row.code, row]));
 
   const pending = rows.filter((row) => row.status === "PENDING");
   const active = rows.filter((row) => row.status === "ACTIVE");
@@ -82,8 +99,7 @@ export default async function AdminAffiliatesPage({
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
       {error ? (
         <Notice tone="error">
-          Data affiliate gagal dimuat. Pastikan supabase/affiliate-certificate-schema.sql sudah
-          dijalankan.
+          Data affiliate gagal dimuat. Coba muat ulang halaman ini.
         </Notice>
       ) : null}
 
@@ -128,7 +144,7 @@ export default async function AdminAffiliatesPage({
                       {row.affiliate_number}
                     </span>
                     <span className="mt-0.5 block text-xs text-muted">
-                      {row.domicile || "—"} · {formatDate(row.applied_at)}
+                      {row.domicile || "—"} · {formatDate(row.applied_at.toISOString())}
                     </span>
                   </Td>
                   <Td className="text-xs">

@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/auth";
+import { asAdmin } from "@/lib/admin/actor";
+import { db } from "@/lib/db";
 import { findTemplateNameForEvent } from "@/lib/services/certificate";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ERROR_CODE: Record<string, string> = {
   NOT_ATTENDED: "not-attended",
@@ -13,65 +16,69 @@ const ERROR_CODE: Record<string, string> = {
 };
 
 function back(eventId: string, status: string): never {
-  redirect(`/admin/certificates?event=${eventId}&status=${status}`);
+  redirect(`/admin/certificates?event=${encodeURIComponent(eventId)}&status=${status}`);
 }
 
-/** Issue one certificate. The RPC mints the number and logs the change. */
+/** Menerbitkan satu sertifikat. Fungsi database yang membuat nomornya dan mencatat perubahannya. */
 export async function issueCertificateAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const registrationId = String(formData.get("registrationId") ?? "");
   const eventId = String(formData.get("eventId") ?? "");
-  if (!registrationId) back(eventId, "error");
+  if (!UUID.test(registrationId)) back(eventId, "error");
 
-  const [supabase, templateName] = await Promise.all([
-    createSupabaseServerClient(),
-    findTemplateNameForEvent(eventId),
-  ]);
-  const { error } = await supabase.rpc("admin_issue_certificate", {
-    p_registration_id: registrationId,
-    // The template name is stored on the certificate, so a later design
-    // change never alters a document already handed out.
-    p_template: templateName,
-    p_signatory_name: "",
-    p_signatory_role: "",
-  });
+  const templateName = await findTemplateNameForEvent(eventId);
 
-  if (error) {
-    const key = Object.keys(ERROR_CODE).find((code) => error.message.includes(code));
-    back(eventId, key ? ERROR_CODE[key] : "error");
+  // Hasilnya disimpan dulu: redirect() tidak boleh dipanggil di dalam try.
+  let outcome = "issued";
+  try {
+    await asAdmin(
+      session,
+      // Nama template disimpan pada sertifikat, jadi perubahan desain nanti
+      // tidak mengubah dokumen yang sudah dibagikan.
+      (tx) =>
+        tx.$executeRaw`select admin_issue_certificate(${registrationId}::uuid, ${templateName}, ${""}, ${""})`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const key = Object.keys(ERROR_CODE).find((code) => message.includes(code));
+    outcome = key ? ERROR_CODE[key] : "error";
   }
 
   revalidatePath("/admin/certificates");
-  back(eventId, "issued");
+  back(eventId, outcome);
 }
 
-/** Issues for every PRESENT participant that does not have one yet. */
+/** Menerbitkan untuk setiap peserta HADIR yang belum punya sertifikat. */
 export async function issueAllCertificatesAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const eventId = String(formData.get("eventId") ?? "");
   if (!eventId) back(eventId, "error");
 
-  const [supabase, templateName] = await Promise.all([
-    createSupabaseServerClient(),
-    findTemplateNameForEvent(eventId),
-  ]);
-  const { data } = await supabase
-    .from("registrations")
-    .select("id")
-    .eq("event_id", eventId)
-    .eq("attendance_status", "PRESENT")
-    .neq("certificate_status", "ISSUED");
+  const templateName = await findTemplateNameForEvent(eventId);
 
-  const ids = ((data ?? []) as { id: string }[]).map((row) => row.id);
+  const pending = await db.registrations.findMany({
+    where: {
+      event_id: eventId,
+      attendance_status: "PRESENT",
+      certificate_status: { not: "ISSUED" },
+    },
+    select: { id: true },
+  });
+
+  // Satu transaksi per sertifikat, bukan satu untuk semuanya: satu peserta yang
+  // bermasalah tidak boleh membatalkan puluhan sertifikat lain yang sah.
   let issued = 0;
-  for (const id of ids) {
-    const { error } = await supabase.rpc("admin_issue_certificate", {
-      p_registration_id: id,
-      p_template: templateName,
-      p_signatory_name: "",
-      p_signatory_role: "",
-    });
-    if (!error) issued += 1;
+  for (const { id } of pending) {
+    try {
+      await asAdmin(
+        session,
+        (tx) =>
+          tx.$executeRaw`select admin_issue_certificate(${id}::uuid, ${templateName}, ${""}, ${""})`,
+      );
+      issued += 1;
+    } catch {
+      // dilewati; jumlah yang berhasil dilaporkan di bawah
+    }
   }
 
   revalidatePath("/admin/certificates");
@@ -79,19 +86,22 @@ export async function issueAllCertificatesAction(formData: FormData) {
 }
 
 export async function revokeCertificateAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const number = String(formData.get("number") ?? "");
   const eventId = String(formData.get("eventId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   if (!number || !reason) back(eventId, "error");
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("admin_revoke_certificate", {
-    p_number: number,
-    p_reason: reason,
-  });
-
-  if (error) back(eventId, "error");
+  let failed = false;
+  try {
+    await asAdmin(
+      session,
+      (tx) => tx.$executeRaw`select admin_revoke_certificate(${number}, ${reason})`,
+    );
+  } catch {
+    failed = true;
+  }
+  if (failed) back(eventId, "error");
 
   revalidatePath("/admin/certificates");
   back(eventId, "revoked");

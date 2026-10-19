@@ -14,7 +14,7 @@ import {
 } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEvents } from "@/lib/services/content";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
 
 export const dynamic = "force-dynamic";
@@ -38,21 +38,46 @@ export default async function AdminAttendancePage({
   const { event, status } = await searchParams;
   const events = await getEvents();
   const selected = event ?? events[0]?.id ?? "";
-  const supabase = await createSupabaseServerClient();
 
-  const { data, error } = selected
-    ? await supabase
-        .from("registrations")
-        .select(
-          "id, registration_number, attendance_status, payment_status, children(full_name), customers(full_name), attendance_records(checked_in_at, method)",
-        )
-        .eq("event_id", selected)
-        .neq("status", "CANCELLED")
-        .order("registration_number")
-        .limit(500)
-    : { data: [], error: null };
+  let rows: AttendanceRow[] = [];
+  let error = false;
 
-  const rows = (data ?? []) as unknown as AttendanceRow[];
+  if (selected) {
+    try {
+      const found = await db.registrations.findMany({
+        where: { event_id: selected, status: { not: "CANCELLED" } },
+        select: {
+          id: true,
+          registration_number: true,
+          attendance_status: true,
+          payment_status: true,
+          children: { select: { full_name: true } },
+          customers: { select: { full_name: true } },
+          attendance_records: { select: { checked_in_at: true, method: true } },
+        },
+        orderBy: { registration_number: "asc" },
+        take: 500,
+      });
+
+      // Satu pendaftaran punya paling banyak satu catatan kehadiran. Halaman
+      // ini dibangun untuk daftar, jadi dibungkus larik supaya tampilannya
+      // tidak perlu berubah.
+      rows = found.map((row) => ({
+        ...row,
+        attendance_records: row.attendance_records
+          ? [
+              {
+                checked_in_at: row.attendance_records.checked_in_at?.toISOString() ?? null,
+                method: row.attendance_records.method,
+              },
+            ]
+          : [],
+      }));
+    } catch {
+      error = true;
+    }
+  }
+
   const present = rows.filter((row) => row.attendance_status === "PRESENT").length;
   const absent = rows.filter((row) => row.attendance_status === "ABSENT").length;
   const waiting = rows.length - present - absent;
