@@ -30,6 +30,7 @@ import { readFileSync } from "node:fs";
 import pg from "pg";
 
 const DRY = process.argv.includes("--dry");
+const REPLACE = process.argv.includes("--replace");
 
 /** Urutan tidak penting untuk penyisipan, tapi memudahkan membaca laporannya. */
 const TABLES = [
@@ -123,6 +124,22 @@ try {
       .filter((c) => available.has(c.column_name))
       .filter((c) => (table === "users" ? USER_COLUMNS.includes(c.column_name) : true));
     plan.push({ table, columns: wanted });
+  }
+
+  // Skrip ini mengosongkan tabel tujuan sebelum menyalin. Itu aman di database
+  // baru dan menghancurkan di database yang sudah dipakai: data yang ditulis
+  // setelah migrasi pertama (postingan Instagram, pendaftaran baru) tidak ada
+  // di Supabase, jadi tidak bisa dipulihkan dari sana. Karena itu menolak
+  // jalan di atas data, kecuali diminta dengan --replace.
+  if (!DRY && !REPLACE) {
+    let existing = 0;
+    for (const { table } of plan) existing += await countRows(target, table, `public."${table}"`);
+    if (existing > 0) {
+      console.error(`Database tujuan sudah berisi ${existing} baris.`);
+      console.error("Skrip ini MENGOSONGKAN tabel tujuan sebelum menyalin, jadi data yang ada akan hilang.");
+      console.error("Kalau memang itu yang diinginkan, jalankan ulang dengan --replace.");
+      process.exit(2);
+    }
   }
 
   console.log(DRY ? "MODE UJI — tidak ada yang ditulis\n" : "Menyalin…\n");
