@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   CircleCheckBig,
   Clock3,
-  ExternalLink,
   Loader2,
   MessageCircle,
   RotateCw,
@@ -157,35 +156,6 @@ export function Checkout({ accessToken }: { accessToken: string }) {
             Detail Kelas
           </Link>
         </div>
-      </div>
-    );
-  }
-
-  if (view.paymentMethod === "THIRD_PARTY") {
-    return (
-      <div className="space-y-6">
-        <div className="rounded-card border border-sky/25 bg-sky-soft/60 p-6">
-          <h2 className="flex items-center gap-2 text-lg font-extrabold text-ink">
-            <ExternalLink className="size-5 text-sky" aria-hidden />
-            Pembayaran di Platform Mitra
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            Kelas ini tidak diproses pembayarannya di situs Kelas Bermain. Selesaikan
-            pembayaran di platform mitra, lalu panitia akan memperbarui status pendaftaranmu.
-          </p>
-        </div>
-        {summary}
-        {event?.registration.thirdPartyUrl ? (
-          <a
-            href={event.registration.thirdPartyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-          >
-            Buka Platform Mitra
-            <ExternalLink className="size-4" aria-hidden />
-          </a>
-        ) : null}
       </div>
     );
   }

@@ -4,9 +4,6 @@ import Link from "next/link";
 import {
   CalendarPlus,
   Clock,
-  CreditCard,
-  ExternalLink,
-  Info,
   MessageCircle,
   Printer,
   Ticket,
@@ -37,7 +34,6 @@ export function RegistrationReceipt({
 }) {
   const lead = batch.registrations[0];
   const isFree = batch.paymentMethod === "NONE";
-  const isThirdParty = batch.paymentMethod === "THIRD_PARTY";
 
   // Built on the client only: this renders on the server first, where there
   // is no origin to build an absolute link from.
@@ -87,9 +83,7 @@ export function RegistrationReceipt({
 
   const standfirst = isFree
     ? "Registrasi Anda telah berhasil kami terima. Tim Kelas Bermain akan mengonfirmasi ketersediaan tempat, dan status terbarunya dapat Anda pantau melalui halaman Cek Tiket."
-    : isThirdParty
-      ? "Registrasi Anda telah berhasil kami terima. Pembayaran diselesaikan di platform mitra, dan status terbarunya dapat Anda pantau melalui halaman Cek Tiket."
-      : "Registrasi Anda telah berhasil kami terima. Mohon menunggu konfirmasi pembayaran dari tim Kelas Bermain. Status terbarunya dapat Anda pantau kapan saja melalui halaman Cek Tiket.";
+    : "Registrasi Anda telah berhasil kami terima. Mohon menunggu konfirmasi pembayaran dari tim Kelas Bermain. Status terbarunya dapat Anda pantau kapan saja melalui halaman Cek Tiket.";
 
   return (
     <div className="space-y-6">
@@ -116,13 +110,7 @@ export function RegistrationReceipt({
           <Line label="Nomor customer" value={batch.customerNumber} mono />
           <Line
             label="Status pembayaran"
-            value={
-              isFree
-                ? "Tidak diperlukan"
-                : isThirdParty
-                  ? "Menunggu konfirmasi mitra"
-                  : "Menunggu konfirmasi"
-            }
+            value={isFree ? "Tidak diperlukan" : "Menunggu konfirmasi"}
           />
           {!isFree ? (
             <Line label="Total" value={formatRupiah(batch.totalAmount)} />
@@ -188,46 +176,6 @@ export function RegistrationReceipt({
           </p>
         </div>
       </div>
-
-      {/* Payment routing */}
-      {!isFree && isThirdParty && batch.payment ? (
-        <div className="no-print rounded-card border border-sun/30 bg-sun-soft/50 p-5 sm:p-6">
-          <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
-            <CreditCard className="size-5 text-sun-dark" aria-hidden />
-            Pembayaran di Platform Mitra
-          </h3>
-
-          <ol className="mt-4 space-y-2.5">
-            {batch.payment.steps.map((step, index) => (
-              <li key={step} className="flex gap-3 text-sm leading-relaxed text-ink-soft">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sun-dark/15 text-xs font-bold text-sun-dark">
-                  {index + 1}
-                </span>
-                {step}
-              </li>
-            ))}
-          </ol>
-
-          {batch.payment.redirectUrl ? (
-            <div className="mt-5">
-              <a
-                href={batch.payment.redirectUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-              >
-                Lanjut ke Platform Mitra
-                <ExternalLink className="size-4" aria-hidden />
-              </a>
-            </div>
-          ) : null}
-
-          <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
-            <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-            {batch.payment.note}
-          </p>
-        </div>
-      ) : null}
 
       {!isFree ? (
         <p className="no-print text-center text-xs text-muted">

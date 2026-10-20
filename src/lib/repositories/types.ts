@@ -160,11 +160,12 @@ export type CertificateStatus = "NOT_ELIGIBLE" | "AVAILABLE" | "ISSUED";
 
 /**
  * How money is collected for an event.
- * NONE        — free event
- * WEBSITE     — checkout happens here (mock gateway for now)
- * THIRD_PARTY — customer is handed off to an external platform
+ * NONE    — free event
+ * WEBSITE — manual bank transfer, verified by an admin. There is no payment
+ *           gateway and no other method — Kelas Bermain does not use Midtrans
+ *           or any third-party checkout.
  */
-export type PaymentMethod = "NONE" | "WEBSITE" | "THIRD_PARTY";
+export type PaymentMethod = "NONE" | "WEBSITE";
 
 export interface Registration {
   id: string;

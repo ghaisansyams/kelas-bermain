@@ -90,8 +90,7 @@ function emptyGroup(): ParticipantGroup {
  * Group — several companions, each bringing their own child/children) ->
  * Konfirmasi (a compact, checkout-style recap with pricing) -> Pembayaran
  * (bank transfer instructions — see PRD, not a payment gateway) -> Selesai.
- * A FREE event or a THIRD_PARTY one (paid on the partner's own platform)
- * skips straight from Konfirmasi to Selesai.
+ * A FREE event skips straight from Konfirmasi to Selesai.
  *
  * The registration/payment rows are created at the Confirm step, before the
  * bank-transfer instructions ever appear, and stay PENDING — nothing in this
@@ -129,7 +128,6 @@ export function RegistrationWizard({
   // The real internal price — used for the actual charge even when
   // priceDisplay is HIDDEN on the public card (see lib/types.ts).
   const unitPrice = isFree ? 0 : (event.registration.price ?? 0);
-  const isThirdParty = !isFree && event.registration.method === "THIRD_PARTY";
 
   const totalChildren = groups.reduce((sum, g) => sum + g.children.length, 0);
   // Capacity is the only real limit on how many children one submission can
@@ -258,8 +256,8 @@ export function RegistrationWizard({
 
   // The stepper never shows "Pembayaran" for a path that can't reach it.
   const steps = useMemo(
-    () => (isFree || isThirdParty ? STEPS.filter((step) => step.key !== "payment") : STEPS),
-    [isFree, isThirdParty],
+    () => (isFree ? STEPS.filter((step) => step.key !== "payment") : STEPS),
+    [isFree],
   );
   const currentIndex = Math.max(
     0,
@@ -482,7 +480,7 @@ export function RegistrationWizard({
     }
 
     setBatch(result.batch);
-    setStepKey(isFree || isThirdParty ? "done" : "payment");
+    setStepKey(isFree ? "done" : "payment");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1049,13 +1047,6 @@ export function RegistrationWizard({
             voucherError={voucherError}
             voucherChecking={voucherChecking}
           />
-
-          {isThirdParty ? (
-            <p className="rounded-xl border border-sky/25 bg-sky-soft/70 p-4 text-xs leading-relaxed text-ink-soft">
-              Pembayaran kelas ini diselesaikan di platform mitra, bukan di situs Kelas
-              Bermain. Setelah mendaftar kamu akan diarahkan ke sana.
-            </p>
-          ) : null}
 
           <Checkbox
             id="consent"

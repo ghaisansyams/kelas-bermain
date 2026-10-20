@@ -268,7 +268,6 @@ export async function createRegistration(
             eventId: event.id,
             eventTitle: event.title,
             amount: totalAmount,
-            thirdPartyUrl: event.registration.thirdPartyUrl,
           },
           method,
         );

@@ -295,7 +295,7 @@ export const registrations: Registration[] = [
     paymentStatus: "PENDING",
     attendanceStatus: "NOT_ATTENDED",
     certificateStatus: "NOT_ELIGIBLE",
-    paymentMethod: "THIRD_PARTY",
+    paymentMethod: "WEBSITE",
     amount: 225000,
     source: "instagram",
   },

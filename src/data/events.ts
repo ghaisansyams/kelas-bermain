@@ -307,8 +307,7 @@ export const events: EventRecord[] = [
     registered: 9,
     registration: {
       type: "PAID",
-      method: "THIRD_PARTY",
-      thirdPartyUrl: "https://kelasbermain-partner.example.com/checkout/pottery-class-oktober-2026",
+      method: "WEBSITE",
       price: 225_000,
       currency: "IDR",
       deadline: "2026-10-21",
@@ -448,8 +447,7 @@ export const events: EventRecord[] = [
     registered: 18,
     registration: {
       type: "PAID",
-      method: "THIRD_PARTY",
-      thirdPartyUrl: "https://kelasbermain-partner.example.com/checkout/little-farmer-november-2026",
+      method: "WEBSITE",
       price: 275_000,
       currency: "IDR",
       deadline: "2026-11-18",

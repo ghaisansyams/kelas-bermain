@@ -77,9 +77,8 @@ export interface AgendaItem {
 export interface EventRegistrationInfo {
   type: RegistrationType;
   /**
-   * How the money is collected. A PAID event is either settled on this site
-   * (WEBSITE, mock gateway for now) or handed off to an external platform
-   * (THIRD_PARTY). FREE events use NONE.
+   * How the money is collected. A PAID event is settled by manual bank
+   * transfer (WEBSITE) — there is no payment gateway. FREE events use NONE.
    */
   method: PaymentMethod;
   /** Rupiah, integer. Only meaningful when `type` is PAID. */
@@ -87,8 +86,6 @@ export interface EventRegistrationInfo {
   /** Card-display override — see `resolvePriceDisplay`. Rarely set explicitly. */
   priceDisplay?: PriceDisplay;
   currency?: "IDR";
-  /** Where THIRD_PARTY registrations continue. */
-  thirdPartyUrl?: string;
   /** ISO date; sign-ups close at the end of this day. */
   deadline: string;
   /** Explicit override. When absent, availability is derived from capacity. */
