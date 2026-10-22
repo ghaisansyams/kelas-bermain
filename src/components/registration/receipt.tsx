@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   CalendarPlus,
   Clock,
+  FileText,
   MessageCircle,
   Printer,
   Ticket,
@@ -15,6 +16,7 @@ import { certificatesEnabled } from "@/lib/features";
 import { formatDate, formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
+import { InvoiceDocument } from "@/components/registration/invoice-document";
 
 /**
  * "Selesai" step content. The registration/payment rows are already
@@ -87,7 +89,9 @@ export function RegistrationReceipt({
 
   return (
     <div className="space-y-6">
-      <div className="print-area rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
+      <div
+        className={`rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8 ${isFree ? "print-area" : "print:hidden"}`}
+      >
         <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-sun-dark text-white motion-safe:animate-fade-up">
           <Clock className="size-8" aria-hidden />
         </span>
@@ -220,8 +224,17 @@ export function RegistrationReceipt({
             onClick={() => window.print()}
             className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
           >
-            <Printer className="size-4" aria-hidden />
-            Download Bukti Registrasi
+            {isFree ? (
+              <>
+                <Printer className="size-4" aria-hidden />
+                Download Bukti Registrasi
+              </>
+            ) : (
+              <>
+                <FileText className="size-4" aria-hidden />
+                Download Invoice
+              </>
+            )}
           </button>
           <Link
             href={`/attendance/${event.slug}`}
@@ -238,6 +251,9 @@ export function RegistrationReceipt({
         </div>
       </div>
 
+      {!isFree ? (
+        <InvoiceDocument event={event} batch={batch} parentName={parentName} />
+      ) : null}
     </div>
   );
 }
