@@ -3,6 +3,7 @@ import {
   refundPaymentAction,
   rejectPaymentAction,
 } from "@/app/admin/payments/actions";
+import { ProofViewer } from "@/components/admin/proof-viewer";
 import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
@@ -368,28 +369,7 @@ function ProofCell({
   return (
     <div className="space-y-1">
       {path && url ? (
-        isPdf ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-bold text-brand hover:underline"
-          >
-            Buka PDF
-          </a>
-        ) : (
-          <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
-            {/* Unoptimised on purpose: the URL is signed and expires, so
-                Next's image cache would be holding a key that stops working. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt="Bukti transfer yang dikirim pendaftar"
-              className="h-16 w-16 rounded-lg border border-line object-cover transition-transform hover:scale-105"
-            />
-            <span className="mt-1 block text-xs font-bold text-brand">Perbesar</span>
-          </a>
-        )
+        <ProofViewer url={url} isPdf={isPdf} />
       ) : path ? (
         <span className="text-xs text-muted">Berkas tidak terbaca</span>
       ) : submittedAt ? (
