@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Field, TextInput } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
-import { findTicketAccessToken } from "@/lib/services/ticket";
+import {
+  findRegistrationsByContact,
+  findTicketAccessToken,
+  type ForgottenLookupResult,
+} from "@/lib/services/ticket";
 import { checkTicketStatus, type TicketStatusView } from "@/lib/services/ticket-status";
 import {
   hasErrors,
@@ -24,6 +29,7 @@ const EMPTY: TicketLookupFormValues = { registrationNumber: "", contact: "" };
  */
 export function TicketCheckForm() {
   const router = useRouter();
+  const [forgot, setForgot] = useState(false);
   const [values, setValues] = useState<TicketLookupFormValues>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors<TicketLookupFormValues>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -146,6 +152,10 @@ export function TicketCheckForm() {
     );
   }
 
+  if (forgot) {
+    return <ForgottenNumberForm onBack={() => setForgot(false)} />;
+  }
+
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {formError ? (
@@ -196,7 +206,7 @@ export function TicketCheckForm() {
         />
       </Field>
 
-      <div className="border-t border-line pt-5">
+      <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
         <Button type="submit" size="lg" disabled={submitting} className="w-full sm:w-auto">
           {submitting ? (
             <>
@@ -207,6 +217,13 @@ export function TicketCheckForm() {
             "Cek Status Tiket"
           )}
         </Button>
+        <button
+          type="button"
+          onClick={() => setForgot(true)}
+          className="text-sm font-bold text-brand hover:underline"
+        >
+          Lupa nomor pendaftaran?
+        </button>
       </div>
     </form>
   );
@@ -217,6 +234,105 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
       <dt className="text-muted">{label}</dt>
       <dd className="text-right font-semibold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+/** Pencarian untuk yang lupa nomor: nomor WhatsApp + nama anak/pendamping. */
+function ForgottenNumberForm({ onBack }: { onBack: () => void }) {
+  const [whatsapp, setWhatsapp] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ForgottenLookupResult | null>(null);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setResult(await findRegistrationsByContact({ whatsapp, name }));
+    setBusy(false);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-extrabold text-ink">Lupa nomor pendaftaran?</h2>
+        <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+          Isi nomor WhatsApp yang dipakai saat mendaftar dan nama anak (atau nama pendamping)
+          persis seperti saat mendaftar. Nomor pendaftaranmu akan ditampilkan.
+        </p>
+      </div>
+
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <Field label="Nomor WhatsApp" htmlFor="forgotWhatsapp" required>
+          <TextInput
+            id="forgotWhatsapp"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="08123456789"
+            value={whatsapp}
+            disabled={busy}
+            onChange={(e) => setWhatsapp(e.target.value)}
+          />
+        </Field>
+        <Field label="Nama anak atau pendamping" htmlFor="forgotName" required>
+          <TextInput
+            id="forgotName"
+            autoComplete="off"
+            placeholder="Nama persis seperti saat mendaftar"
+            value={name}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+
+        {result && !result.ok ? (
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-xl border border-brand/30 bg-brand-soft p-4 text-sm font-medium text-brand-ink"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {result.error}
+          </p>
+        ) : null}
+
+        <Button type="submit" size="lg" disabled={busy} className="w-full sm:w-auto">
+          {busy ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Mencari…
+            </>
+          ) : (
+            "Cari Pendaftaran Saya"
+          )}
+        </Button>
+      </form>
+
+      {result && result.ok ? (
+        <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+          {result.registrations.map((item) => (
+            <li
+              key={item.registrationNumber}
+              className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <p className="font-mono text-sm font-bold text-ink">{item.registrationNumber}</p>
+                <p className="text-xs text-ink-soft">{item.eventTitle}</p>
+              </div>
+              <Link
+                href={`/payment/${item.accessToken}`}
+                className="text-sm font-bold text-brand hover:underline"
+              >
+                Lihat status pembayaran
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <button type="button" onClick={onBack} className="text-sm font-bold text-brand hover:underline">
+        Kembali ke Cek Tiket
+      </button>
     </div>
   );
 }

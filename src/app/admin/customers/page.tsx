@@ -112,7 +112,7 @@ export default async function AdminCustomersPage({
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Pendamping" description="Data orang tua atau wali yang mendaftarkan anak. Anaknya sendiri ada di menu Anak." />
+      <PageHeader title="Pendamping" description="Data orang tua atau wali yang mendaftarkan anak. Kode KB-CUS hanya untuk arsip internal — yang diberikan ke orang tua adalah Nomor Pendaftaran (KB-REG) di halaman Detail. Anaknya sendiri ada di menu Anak." />
 
       {msg && STATUS_NOTICE[msg] ? (
         <Notice tone={STATUS_NOTICE[msg].tone}>{STATUS_NOTICE[msg].text}</Notice>
@@ -143,7 +143,7 @@ export default async function AdminCustomersPage({
           <TableShell>
             <thead>
               <tr className="border-b border-line">
-                <Th>Kode</Th>
+                <Th>Kode (internal)</Th>
                 <Th>Nama</Th>
                 <Th>WhatsApp</Th>
                 <Th>Domisili</Th>
