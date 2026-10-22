@@ -310,7 +310,7 @@ export const events: EventRecord[] = [
       method: "WEBSITE",
       price: 225_000,
       currency: "IDR",
-      deadline: "2026-10-21",
+      deadline: "2026-10-23",
       notes: [
         "Biaya termasuk tanah liat, alat, pembakaran karya, snack, dan sertifikat.",
         "Karya dapat diambil ±2 minggu setelah kelas.",
