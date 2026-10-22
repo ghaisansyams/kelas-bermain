@@ -3,7 +3,12 @@ import {
   issueCertificateAction,
   revokeCertificateAction,
 } from "@/app/admin/certificates/actions";
-import { Card, Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
+import {
+  Card,
+  Notice,
+  PageHeader,
+  StatCard,
+} from "@/components/admin/admin-ui";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   EmptyRow,
@@ -39,8 +44,10 @@ const CERT_LABEL: Record<string, { text: string; tone: string }> = {
 
 function noticeFor(status?: string) {
   if (!status) return undefined;
-  if (status === "issued") return { tone: "success" as const, text: "Sertifikat diterbitkan." };
-  if (status === "revoked") return { tone: "success" as const, text: "Sertifikat dibatalkan." };
+  if (status === "issued")
+    return { tone: "success" as const, text: "Sertifikat diterbitkan." };
+  if (status === "revoked")
+    return { tone: "success" as const, text: "Sertifikat dibatalkan." };
   if (status.startsWith("bulk-")) {
     return {
       tone: "success" as const,
@@ -48,7 +55,10 @@ function noticeFor(status?: string) {
     };
   }
   if (status === "none") {
-    return { tone: "info" as const, text: "Tidak ada peserta hadir yang belum punya sertifikat." };
+    return {
+      tone: "info" as const,
+      text: "Tidak ada peserta hadir yang belum punya sertifikat.",
+    };
   }
   if (status === "not-attended") {
     return {
@@ -82,7 +92,9 @@ export default async function AdminCertificatesPage({
           attendance_status: true,
           certificate_status: true,
           children: { select: { full_name: true } },
-          certificates: { select: { number: true, status: true, issued_at: true } },
+          certificates: {
+            select: { number: true, status: true, issued_at: true },
+          },
         },
         orderBy: { registration_number: "asc" },
         take: 500,
@@ -100,8 +112,12 @@ export default async function AdminCertificatesPage({
     }
   }
 
-  const issued = rows.filter((row) => row.certificate_status === "ISSUED").length;
-  const ready = rows.filter((row) => row.certificate_status === "AVAILABLE").length;
+  const issued = rows.filter(
+    (row) => row.certificate_status === "ISSUED",
+  ).length;
+  const ready = rows.filter(
+    (row) => row.certificate_status === "AVAILABLE",
+  ).length;
   const eventTitle = events.find((item) => item.id === selected)?.title ?? "—";
   const notice = noticeFor(status);
 
@@ -154,7 +170,9 @@ export default async function AdminCertificatesPage({
 
       {error ? (
         <Card>
-          <p className="text-sm text-brand-ink">Data sertifikat gagal dimuat.</p>
+          <p className="text-sm text-brand-ink">
+            Data sertifikat gagal dimuat.
+          </p>
         </Card>
       ) : (
         <TableShell>
@@ -170,10 +188,14 @@ export default async function AdminCertificatesPage({
           </thead>
           <tbody className="divide-y divide-line">
             {rows.length === 0 ? (
-              <EmptyRow colSpan={6}>Belum ada anak terdaftar untuk event ini.</EmptyRow>
+              <EmptyRow colSpan={6}>
+                Belum ada anak terdaftar untuk event ini.
+              </EmptyRow>
             ) : (
               rows.map((row) => {
-                const cert = row.certificates?.find((item) => item.status === "issued");
+                const cert = row.certificates?.find(
+                  (item) => item.status === "issued",
+                );
                 const label = CERT_LABEL[row.certificate_status] ?? {
                   text: row.certificate_status,
                   tone: "grey",
@@ -183,42 +205,69 @@ export default async function AdminCertificatesPage({
                     <Td>
                       <RefCell>{row.registration_number}</RefCell>
                     </Td>
-                    <Td className="font-semibold text-ink">{row.children?.full_name ?? "—"}</Td>
+                    <Td className="font-semibold text-ink">
+                      {row.children?.full_name ?? "—"}
+                    </Td>
                     <Td>
-                      <StatusBadge tone={row.attendance_status === "PRESENT" ? "pine" : "grey"}>
-                        {row.attendance_status === "PRESENT" ? "Hadir" : "Belum hadir"}
+                      <StatusBadge
+                        tone={
+                          row.attendance_status === "PRESENT" ? "pine" : "grey"
+                        }
+                      >
+                        {row.attendance_status === "PRESENT"
+                          ? "Hadir"
+                          : "Belum hadir"}
                       </StatusBadge>
                     </Td>
                     <Td>
                       <StatusBadge tone={label.tone}>{label.text}</StatusBadge>
                     </Td>
-                    <Td>
-                      {cert ? <RefCell>{cert.number}</RefCell> : "—"}
-                    </Td>
+                    <Td>{cert ? <RefCell>{cert.number}</RefCell> : "—"}</Td>
                     <Td>
                       {cert ? (
-                        <ConfirmDialog
-                          action={revokeCertificateAction}
-                          hidden={{ number: cert.number, eventId: selected }}
-                          trigger="Batalkan"
-                          title="Batalkan sertifikat"
-                          description="Nomor tetap tercatat dan tidak akan dipakai ulang. Anak ini bisa diterbitkan sertifikat baru setelah ini."
-                          summary={[
-                            { label: "Nomor", value: cert.number },
-                            { label: "Anak", value: row.children?.full_name ?? "—" },
-                          ]}
-                          confirmLabel="Batalkan sertifikat"
-                          tone="danger"
-                          reasonField={{
-                            name: "reason",
-                            label: "Alasan pembatalan",
-                            placeholder: "Nama salah tulis",
-                          }}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/certificate/${encodeURIComponent(cert.number)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-9 items-center rounded-pill bg-brand px-3.5 text-xs font-bold text-white hover:bg-brand-ink"
+                          >
+                            Lihat / Unduh
+                          </a>
+                          <ConfirmDialog
+                            action={revokeCertificateAction}
+                            hidden={{ number: cert.number, eventId: selected }}
+                            trigger="Batalkan"
+                            title="Batalkan sertifikat"
+                            description="Nomor tetap tercatat dan tidak akan dipakai ulang. Anak ini bisa diterbitkan sertifikat baru setelah ini."
+                            summary={[
+                              { label: "Nomor", value: cert.number },
+                              {
+                                label: "Anak",
+                                value: row.children?.full_name ?? "—",
+                              },
+                            ]}
+                            confirmLabel="Batalkan sertifikat"
+                            tone="danger"
+                            reasonField={{
+                              name: "reason",
+                              label: "Alasan pembatalan",
+                              placeholder: "Nama salah tulis",
+                            }}
+                          />
+                        </div>
                       ) : row.attendance_status === "PRESENT" ? (
                         <form action={issueCertificateAction}>
-                          <input type="hidden" name="registrationId" value={row.id} />
-                          <input type="hidden" name="eventId" value={selected} />
+                          <input
+                            type="hidden"
+                            name="registrationId"
+                            value={row.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="eventId"
+                            value={selected}
+                          />
                           <button
                             type="submit"
                             className="inline-flex min-h-9 items-center rounded-pill bg-brand px-3 text-xs font-bold text-white"
@@ -227,7 +276,9 @@ export default async function AdminCertificatesPage({
                           </button>
                         </form>
                       ) : (
-                        <span className="text-xs text-muted">Tandai hadir dulu</span>
+                        <span className="text-xs text-muted">
+                          Tandai hadir dulu
+                        </span>
                       )}
                     </Td>
                   </tr>
