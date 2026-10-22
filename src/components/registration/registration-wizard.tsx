@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { BankTransferPanel } from "@/components/registration/bank-transfer";
+import { ProofUploadPanel } from "@/components/registration/proof-upload-panel";
 import { Checkbox, Field, Select, TextInput } from "@/components/forms/field";
 import { PricingSummary } from "@/components/registration/pricing-summary";
 import { StepProgress, type WizardStep } from "@/components/registration/steps";
@@ -518,6 +519,20 @@ export function RegistrationWizard({
             eventTitle={event.title}
             childName={groups[0]?.children[0]?.fullName}
           />
+
+          {/* Mengunggah di sini sama persis dengan mengunggah di halaman
+              status nanti — satu baris pembayaran, satu komponen, satu aturan
+              (tidak pernah bisa menjadikan dirinya lunas). Admin melihatnya
+              di /admin/payments seketika, tidak perlu menunggu orang tua
+              membuka tautan WhatsApp dulu. */}
+          {lead.accessToken ? (
+            <ProofUploadPanel
+              accessToken={lead.accessToken}
+              registrationNumber={lead.registrationNumber}
+              companionName={groups[0]?.companion.fullName || "Orang tua"}
+              childName={groups[0]?.children[0]?.fullName || ""}
+            />
+          ) : null}
 
           {/* The team works in WhatsApp, so that is where a parent is sent
               next. The link carries their registration number, and the page

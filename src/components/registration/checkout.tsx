@@ -1,15 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   CircleCheckBig,
   Clock3,
-  Loader2,
-  MessageCircle,
   RotateCw,
   ShieldAlert,
-  Upload,
   XCircle,
 } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
@@ -22,9 +19,8 @@ import {
 } from "@/lib/services/registration";
 import { formatDate } from "@/lib/utils/date";
 import { BankTransferPanel } from "@/components/registration/bank-transfer";
+import { ProofUploadPanel } from "@/components/registration/proof-upload-panel";
 import { formatRupiah } from "@/lib/utils/format";
-import { submitProof, uploadPaymentProof } from "@/lib/services/payment-proof";
-import { paymentProofWhatsappUrl } from "@/lib/config/whatsapp";
 
 /**
  * Read-only registration/payment status, looked up by the opaque access
@@ -40,9 +36,6 @@ import { paymentProofWhatsappUrl } from "@/lib/config/whatsapp";
 export function Checkout({ accessToken }: { accessToken: string }) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<RegistrationStatusView | null>(null);
-  const [markingProof, setMarkingProof] = useState(false);
-  const [proofError, setProofError] = useState<string | null>(null);
-  const proofInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,46 +153,6 @@ export function Checkout({ accessToken }: { accessToken: string }) {
     );
   }
 
-  /** Uploads the screenshot, then records the claim in one step. */
-  async function handleProofFile(files: FileList | null) {
-    const file = files?.[0];
-    if (!file || markingProof) return;
-
-    setProofError(null);
-    setMarkingProof(true);
-    const result = await uploadPaymentProof(accessToken, file);
-    setMarkingProof(false);
-    if (proofInputRef.current) proofInputRef.current.value = "";
-
-    if (!result.ok) {
-      setProofError(result.error);
-      return;
-    }
-    await load();
-  }
-
-  /** Records the claim without a file, for proof sent over WhatsApp. */
-  async function handleProofSent() {
-    if (markingProof) return;
-    setProofError(null);
-    setMarkingProof(true);
-    const result = await submitProof(accessToken);
-    setMarkingProof(false);
-    // Reload either way: if the call failed the page should show the real
-    // state rather than pretending the claim landed.
-    if (!result.ok) {
-      setProofError(result.error);
-      return;
-    }
-    await load();
-  }
-
-  const proofWhatsappUrl = paymentProofWhatsappUrl({
-    registrationNumber: view.registrationNumber,
-    companionName: view.customerFullName,
-    childName: view.childFullName,
-  });
-
   const rejected = view.paymentStatus === "FAILED";
   const waiting = view.paymentStatus === "WAITING_VERIFICATION";
 
@@ -277,84 +230,13 @@ export function Checkout({ accessToken }: { accessToken: string }) {
         childName={view.childFullName}
       />
 
-      {/* Two ways in: upload the screenshot here, or send it over WhatsApp
-          where the team already works. Either way this only records that proof
-          was handed in — it can never mark the payment settled, which stays an
-          admin decision. */}
-      <div className="rounded-card border border-brand/25 bg-brand-soft/35 p-5 sm:p-6">
-        <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
-          <Upload className="size-4 text-brand" aria-hidden />
-          Sudah transfer? Kirim buktinya
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Unggah foto atau tangkapan layar bukti transfer langsung di sini, atau kirim lewat
-          WhatsApp kalau lebih mudah. Nomor pendaftaranmu sudah kami siapkan di pesannya.
-        </p>
-
-        <div className="mt-4 rounded-xl border border-dashed border-brand/40 bg-surface p-4">
-          <label
-            htmlFor="paymentProof"
-            className="text-sm font-bold text-ink"
-          >
-            Unggah bukti transfer
-          </label>
-          <input
-            ref={proofInputRef}
-            id="paymentProof"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            disabled={markingProof}
-            onChange={(e) => void handleProofFile(e.target.files)}
-            className="mt-2 block w-full text-sm text-ink-soft file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-pill file:border-0 file:bg-brand file:px-4 file:text-sm file:font-bold file:text-white disabled:opacity-60"
-          />
-          <p className="mt-2 text-xs text-muted">
-            JPG, PNG, WEBP, atau PDF. Maksimal 5 MB. Hanya tim Kelas Bermain yang bisa
-            melihat berkas ini.
-          </p>
-          {proofError ? (
-            <p role="alert" className="mt-2 text-xs font-semibold text-brand-ink">
-              {proofError}
-            </p>
-          ) : null}
-        </div>
-
-        <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted">
-          Atau lewat WhatsApp
-        </p>
-
-        <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
-          <a
-            href={proofWhatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => void handleProofSent()}
-            className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-          >
-            <MessageCircle className="size-4" aria-hidden />
-            Kirim Bukti via WhatsApp
-          </a>
-          <button
-            type="button"
-            onClick={() => void handleProofSent()}
-            disabled={markingProof}
-            className={buttonStyles({
-              variant: "secondary",
-              size: "lg",
-              className: "w-full sm:w-auto",
-            })}
-          >
-            {markingProof ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : null}
-            Saya Sudah Kirim Bukti
-          </button>
-        </div>
-
-        <p className="mt-3 text-xs leading-relaxed text-muted">
-          Setelah menekan salah satunya, status berubah jadi menunggu pemeriksaan. Tim kami
-          yang memastikan dananya masuk sebelum pendaftaran dinyatakan lunas.
-        </p>
-      </div>
+      <ProofUploadPanel
+        accessToken={accessToken}
+        registrationNumber={view.registrationNumber}
+        companionName={view.customerFullName}
+        childName={view.childFullName}
+        onSubmitted={() => void load()}
+      />
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <h3 className="text-base font-extrabold text-ink">Status saat ini</h3>
