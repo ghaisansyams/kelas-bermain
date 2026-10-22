@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MousePointer2 } from "lucide-react";
 import { MediaPicker } from "@/components/admin/media-picker";
 import { TemplateCanvas } from "@/components/certificate/template-canvas";
@@ -47,6 +47,9 @@ export function CertificateDesigner({
     template ? normaliseConfig(template.config) : defaultConfig(),
   );
   const [selected, setSelected] = useState<FieldKey>("participantName");
+  // Preview-only text. Never saved: issued certificates take the real name.
+  const [sample, setSample] = useState(SAMPLE_DATA);
+  const sampleInputRef = useRef<HTMLInputElement>(null);
 
   const field = config.fields[selected];
 
@@ -69,11 +72,15 @@ export function CertificateDesigner({
             config={config}
             backgroundUrl={backgroundUrl}
             orientation={orientation}
-            data={SAMPLE_DATA}
+            data={sample}
             selected={selected}
             onSelect={setSelected}
             onMove={(key, x, y) => patch(key, { x, y })}
             onResize={(key, fontSize) => patch(key, { fontSize })}
+            onEditText={(key) => {
+              setSelected(key);
+              setTimeout(() => sampleInputRef.current?.select(), 0);
+            }}
           />
 
           <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted">
@@ -84,6 +91,21 @@ export function CertificateDesigner({
             untuk langkah lebih besar. Contoh memakai data dummy; saat sertifikat asli dibuat,
             isinya diambil dari data peserta.
           </p>
+
+          <label className="block text-xs font-bold text-ink">
+            Teks contoh {FIELD_LABEL[selected]} (hanya pratinjau)
+            <input
+              ref={sampleInputRef}
+              type="text"
+              value={sample[selected]}
+              onChange={(e) => setSample((cur) => ({ ...cur, [selected]: e.target.value }))}
+              className="mt-1 block min-h-10 w-full rounded-lg border border-line px-3 text-sm font-normal"
+            />
+            <span className="mt-1 block font-normal text-muted">
+              Klik 2x nama di desain untuk mengubah contoh ini. Tidak tersimpan; sertifikat asli
+              memakai nama peserta.
+            </span>
+          </label>
 
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(config.fields) as FieldKey[]).map((key) => (

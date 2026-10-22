@@ -30,6 +30,7 @@ export function TemplateCanvas({
   onSelect,
   onMove,
   onResize,
+  onEditText,
 }: {
   config: TemplateConfig;
   backgroundUrl?: string;
@@ -41,6 +42,8 @@ export function TemplateCanvas({
   onMove?: (key: FieldKey, x: number, y: number) => void;
   /** Receives a new font size, dragged from the corner handle. */
   onResize?: (key: FieldKey, fontSize: number) => void;
+  /** Double-click on a field: the designer focuses its sample-text input. */
+  onEditText?: (key: FieldKey) => void;
 }) {
   const page = PAGE_SIZE[orientation];
   const boxRef = useRef<HTMLDivElement>(null);
@@ -134,6 +137,7 @@ export function TemplateCanvas({
                   }
                 : undefined
             }
+            onDoubleClick={editable ? () => onEditText?.(key) : undefined}
             // Arrow keys nudge by 1%, so placement works without a mouse.
             onKeyDown={
               editable
