@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Baby,
   CircleCheckBig,
@@ -492,6 +493,17 @@ export function RegistrationWizard({
       <div className="space-y-6">
         <StepProgress steps={steps} current={currentIndex} />
         <RegistrationReceipt event={event} batch={batch} parentName={leadCompanionName} />
+        <div className="no-print">
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => setStepKey(isFree ? "confirm" : "payment")}
+            className="w-full sm:w-auto"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Kembali ke {isFree ? "Konfirmasi" : "Pembayaran"}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -569,7 +581,16 @@ export function RegistrationWizard({
             </a>
           </div>
 
-          <div className="flex justify-end border-t border-line pt-5">
+          <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:justify-between">
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setStepKey("confirm")}
+              className="w-full sm:w-auto"
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Kembali
+            </Button>
             <Button
               variant="secondary"
               size="lg"
@@ -993,7 +1014,7 @@ export function RegistrationWizard({
 
           {mode === "PERSONAL" ? (
             <>
-              <SummaryBlock title="Data Anak" onEdit={() => setStepKey("participants")}>
+              <SummaryBlock title="Data Anak" onEdit={batch ? undefined : () => setStepKey("participants")}>
                 <ul className="space-y-1">
                   {groups[0]?.children.map((child, index) => (
                     <li key={index} className="text-sm text-ink">
@@ -1009,7 +1030,7 @@ export function RegistrationWizard({
                 </ul>
               </SummaryBlock>
 
-              <SummaryBlock title="Pendamping" onEdit={() => setStepKey("participants")}>
+              <SummaryBlock title="Pendamping" onEdit={batch ? undefined : () => setStepKey("participants")}>
                 <p className="text-sm font-semibold text-ink">{groups[0]?.companion.fullName}</p>
                 <p className="text-sm text-muted">{groups[0]?.companion.whatsapp}</p>
                 <p className="text-sm text-muted">{groups[0]?.companion.domicile}</p>
@@ -1020,7 +1041,7 @@ export function RegistrationWizard({
               <SummaryBlock
                 key={groupIndex}
                 title={`Pendamping ${groupIndex + 1}`}
-                onEdit={() => setStepKey("participants")}
+                onEdit={batch ? undefined : () => setStepKey("participants")}
               >
                 <p className="text-sm font-semibold text-ink">{group.companion.fullName}</p>
                 <p className="text-sm text-muted">{group.companion.whatsapp}</p>
@@ -1042,7 +1063,7 @@ export function RegistrationWizard({
             ))
           )}
 
-          <SummaryBlock title="Sumber Informasi" onEdit={() => setStepKey("participants")}>
+          <SummaryBlock title="Sumber Informasi" onEdit={batch ? undefined : () => setStepKey("participants")}>
             <p className="text-sm text-ink">{heardFrom ? sourceLabel[heardFrom] : "—"}</p>
             {affiliateCode.trim() ? (
               <p className="mt-0.5 text-xs text-muted">Kode affiliate: {affiliateCode}</p>
@@ -1079,19 +1100,31 @@ export function RegistrationWizard({
             }
           />
 
+          {batch ? (
+            <p className="rounded-card border border-line bg-canvas-deep/40 p-3 text-xs leading-relaxed text-ink-soft">
+              Pendaftaran ini sudah tercatat ({batch.registrations[0]?.registrationNumber}), jadi
+              datanya tidak bisa diubah di sini. Kalau ada yang salah, hubungi tim lewat
+              WhatsApp.
+            </p>
+          ) : null}
+
           <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:justify-between">
+            {batch ? (
+              <span />
+            ) : (
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => setStepKey("participants")}
+                disabled={submitting}
+                className="w-full sm:w-auto"
+              >
+                Kembali
+              </Button>
+            )}
             <Button
-              variant="secondary"
               size="lg"
-              onClick={() => setStepKey("participants")}
-              disabled={submitting}
-              className="w-full sm:w-auto"
-            >
-              Kembali
-            </Button>
-            <Button
-              size="lg"
-              onClick={submitRegistration}
+              onClick={batch ? () => setStepKey(isFree ? "done" : "payment") : submitRegistration}
               disabled={submitting}
               className="w-full sm:w-auto"
             >
@@ -1100,6 +1133,8 @@ export function RegistrationWizard({
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Memproses…
                 </>
+              ) : batch ? (
+                "Lanjut"
               ) : isFree ? (
                 "Daftar Sekarang"
               ) : (
@@ -1151,21 +1186,23 @@ function SummaryBlock({
   children,
 }: {
   title: string;
-  onEdit: () => void;
+  onEdit?: () => void;
   children: ReactNode;
 }) {
   return (
     <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-bold uppercase tracking-wider text-muted">{title}</p>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
-        >
-          <Pencil className="size-3" aria-hidden />
-          Ubah
-        </button>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
+          >
+            <Pencil className="size-3" aria-hidden />
+            Ubah
+          </button>
+        ) : null}
       </div>
       <div className="mt-2">{children}</div>
     </div>
