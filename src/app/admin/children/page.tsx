@@ -184,7 +184,7 @@ export default async function AdminChildrenPage({
                           consequences={["Data anak ini", "Catatan kehadiran dan sertifikatnya"]}
                           blockedReason={
                             (registrationCount.get(row.id) ?? 0) > 0
-                              ? `Anak ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Untuk membersihkan data percobaan beserta seluruh riwayatnya, pakai skrip pembersihan di Supabase.`
+                              ? `Anak ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Untuk membersihkan data percobaan beserta seluruh riwayatnya, minta tim teknis membersihkannya langsung di database.`
                               : undefined
                           }
                         />
