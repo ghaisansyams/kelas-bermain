@@ -96,7 +96,10 @@ export async function signIn(
   jar.set(COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Di VPS (https) harus true. Untuk produksi lokal lewat http, set COOKIE_SECURE=false.
+    secure: process.env.COOKIE_SECURE
+      ? process.env.COOKIE_SECURE === "true"
+      : process.env.NODE_ENV === "production",
     path: "/",
     maxAge: MAX_AGE_SECONDS,
   });
