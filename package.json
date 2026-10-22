@@ -14,10 +14,7 @@
     "instagram:scrape": "node scripts/instagram-scrape.mjs",
     "db:start": "node scripts/db.mjs start",
     "db:stop": "node scripts/db.mjs stop",
-    "db:reset": "node scripts/db.mjs reset",
-    "migrate:data": "node scripts/migrate-data.mjs",
-    "migrate:storage": "node scripts/migrate-storage.mjs",
-    "migrate:media-urls": "node scripts/rewrite-media-urls.mjs"
+    "db:reset": "node scripts/db.mjs reset"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

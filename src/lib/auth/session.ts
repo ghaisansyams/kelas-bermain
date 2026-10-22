@@ -6,20 +6,16 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
 /**
- * Sesi admin, menggantikan Supabase Auth.
+ * Sesi admin.
  *
  * Bentuknya sederhana karena kebutuhannya sederhana: hanya admin yang login,
  * orang tua tidak pernah punya akun. Satu baris di tabel `sessions`, dirujuk
  * oleh cookie httpOnly. Tidak ada JWT — token yang bisa dibaca browser berarti
  * token yang tidak bisa dicabut, dan mencabut akses admin harus bisa seketika.
  *
- * Hash passwordnya bcrypt, format yang sama dengan yang dipakai Supabase, dan
- * hash lama ikut pindah saat migrasi. Jadi password yang sudah ada tetap
- * berlaku — tidak ada admin yang terkunci di luar setelah pindah.
+ * Hash passwordnya bcrypt, dan hash yang sudah ada tetap berlaku.
  *
- * Yang hilang bersama Supabase Auth dan TIDAK digantikan di sini: reset
- * password lewat email, OAuth, dan MFA. Tidak ada satu pun yang dipakai
- * sistem ini sebelumnya.
+ * Tidak tersedia: reset password lewat email, OAuth, dan MFA.
  */
 
 const COOKIE = "kb_session";

@@ -91,7 +91,7 @@ async function loadEventRecords(): Promise<EventRecord[]> {
     });
     if (rows.length === 0) return catalogueEvents.filter((event) => event.published);
 
-    // Supabase mengirim tanggal sebagai teks ISO; Prisma mengirim objek Date.
+    // Prisma mengirim tanggal sebagai objek Date.
     // Seluruh aplikasi memperlakukan tanggal event sebagai "YYYY-MM-DD", jadi
     // diseragamkan di sini daripada menyebar penyesuaian ke setiap pemakai.
     return rows

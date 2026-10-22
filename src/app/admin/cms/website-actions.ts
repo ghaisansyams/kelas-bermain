@@ -25,8 +25,8 @@ function back(tab: string, status: string): never {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Pembaruan yang tidak menemukan baris bukan keberhasilan. Supabase membalas
- * UPDATE tanpa baris cocok dengan "tidak ada galat", jadi admin melihat
+ * Pembaruan yang tidak menemukan baris bukan keberhasilan. Sebuah
+ * UPDATE tanpa baris cocok tidak menghasilkan galat, jadi admin melihat
  * "tersimpan" padahal tidak ada yang berubah — kunci bagian yang salah, atau
  * bagian yang sudah dihapus, tampak sukses. Nol baris dihitung gagal.
  */

@@ -1,4 +1,4 @@
--- Pengganti auth.uid() milik Supabase.
+-- Pengganti auth.uid(): id pengguna yang bertindak dibaca dari app.user_id.
 --
 -- Fungsi admin_* (uang, sertifikat, publikasi CMS) memeriksa is_admin() di
 -- dalam database, dan itu sengaja dipertahankan: pemeriksaan hak akses yang

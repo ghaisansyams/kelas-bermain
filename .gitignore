@@ -14,10 +14,7 @@ next-env.d.ts
 # Postgres lokal (npm run db:start)
 .postgres-data/
 
-# Cache CLI Supabase
-supabase/.temp/
-
-# Berkas hasil unduhan dari Supabase Storage (bukan sumber)
+# Berkas unggahan (bukan sumber)
 public/uploads/
 
 # Bukti pembayaran yang diunggah (di luar public, tidak boleh dilayani langsung)

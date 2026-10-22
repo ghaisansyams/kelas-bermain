@@ -1,15 +1,7 @@
 // Skema Kelas Bermain di Postgres sendiri.
 //
-// Diambil dengan introspeksi dari database Supabase yang hidup, lalu
-// disaring: 35 tabel internal Supabase Auth dibuang, dan `auth.users`
-// dipindahkan apa adanya ke skema public sebagai `users`. Id-nya tetap uuid
-// yang sama, jadi 24 foreign key dari tabel aplikasi tetap sah dan datanya
-// bisa disalin satu lawan satu.
-//
-// Yang hilang bersama Supabase dan dibangun ulang di lapisan aplikasi:
-//   · RLS      -> pemeriksaan hak akses di server action
-//   · Storage  -> mengikuti keputusan hosting
-//   · Auth     -> tabel sessions di bawah + hash argon2 di users
+// Hak akses diperiksa di server action (tidak ada RLS), berkas disimpan di
+// disk, dan login memakai tabel `sessions` di bawah + hash bcrypt di `users`.
 
 generator client {
   provider = "prisma-client-js"
@@ -20,7 +12,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Sesi admin. Pengganti Supabase Auth: satu baris per login, dirujuk oleh
+/// Sesi admin. Satu baris per login, dirujuk oleh
 /// cookie httpOnly. Dihapus saat logout atau lewat masa berlaku.
 model sessions {
   id         String   @id @db.Uuid

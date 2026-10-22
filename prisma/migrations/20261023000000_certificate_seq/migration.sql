@@ -1,5 +1,5 @@
 -- admin_issue_certificate memanggil nextval('certificate_seq'), tetapi urutan ini
--- tidak ikut terbawa dari Supabase. Dimulai setelah nomor terbesar yang sudah ada.
+-- tidak dibuat oleh migrasi awal. Dimulai setelah nomor terbesar yang sudah ada.
 DO $$
 DECLARE
   v_start bigint;

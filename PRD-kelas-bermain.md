@@ -863,7 +863,7 @@ PaymentStatus:  NOT_REQUIRED | PENDING | WAITING_VERIFICATION | PAID
 
 | Kategori | Status | Rencana |
 |---|---|---|
-| **Object storage** 🔴 | ❌ Belum ada | **Menjadi blocker di v2.0** — bukti transfer wajib diunggah, dan bukti transfer tidak bisa disimpan di browser. S3/Cloudinary/Supabase Storage harus ada sebelum R-04 bisa jalan sungguhan |
+| **Object storage** 🔴 | ❌ Belum ada | **Menjadi blocker di v2.0** — bukti transfer wajib diunggah, dan bukti transfer tidak bisa disimpan di browser. S3/Cloudinary atau disk server harus ada sebelum R-04 bisa jalan sungguhan |
 | **Storage galeri** | Google Drive (link manual) | Tetap (K-02) |
 | **Payment gateway** | ❌ Tidak dipakai lagi | Antarmuka `PaymentGateway` disimpan; transfer manual menggantikannya |
 | **Messaging (WA)** | ❌ Manual | Fonnte/Wablas jika notifikasi disetujui |
@@ -1088,7 +1088,7 @@ Keduanya dikendalikan lewat env var, dan sudah diuji dalam dua keadaan: `NEXT_PU
 | Fase | Isi | Estimasi | Prasyarat |
 |---|---|---|---|
 | F16 — Autentikasi produksi | Hashing, user management, rate limiting (S-01…S-03) | 3–5 hari | Keputusan penyedia auth |
-| F17 — Database | Migrasi PostgreSQL/Supabase, audit log, backup | 5–8 hari | Akun database |
+| F17 — Database | Migrasi PostgreSQL, audit log, backup | 5–8 hari | Akun database |
 | F18 — Kepatuhan PDP | Persetujuan, kebijakan privasi, retensi | 2–3 hari | Keputusan klien + review hukum |
 | F19 — Notifikasi | WA/email sesuai prioritas §8 | 3–4 hari | Provider + anggaran |
 | F20 — Object storage lanjutan | Kegiatan & Galeri bisa diedit dari ERP | 2–3 hari | F10 sudah ada |

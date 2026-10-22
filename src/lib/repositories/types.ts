@@ -178,7 +178,7 @@ export interface Registration {
    * WhatsApp number once this data lives in a shared database. Optional only
    * because the legacy localStorage seed data (src/data/registrations.ts,
    * kept solely for the disabled certificate feature) predates this field —
-   * every Supabase-backed registration always has one.
+   * every database-backed registration always has one.
    */
   accessToken?: string;
   customerId: string;
@@ -299,7 +299,7 @@ export interface Affiliate {
 
 /**
  * Minimal persistence contract. `LocalStorageStore` implements it today;
- * a Supabase or REST adapter can implement the same methods later.
+ * a database or REST adapter can implement the same methods later.
  */
 export interface CollectionStore<T> {
   all(): T[];

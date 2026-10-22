@@ -20,9 +20,8 @@ import {
  * Dipakai Pustaka Media dan setiap kolom gambar di CMS, jadi validasi, jalur
  * penyimpanan, dan baris metadatanya identik di mana pun unggahan dimulai.
  *
- * Ini server action, jadi setiap argumennya adalah masukan dari internet. Dulu
- * kebijakan Supabase Storage yang memutuskan siapa boleh menulis; sekarang
- * tidak ada kebijakan, jadi sesi admin diperiksa di sini.
+ * Ini server action, jadi setiap argumennya adalah masukan dari internet. Tidak
+ * ada kebijakan di sisi penyimpanan, jadi sesi admin diperiksa di sini.
  */
 
 export type UploadResult =

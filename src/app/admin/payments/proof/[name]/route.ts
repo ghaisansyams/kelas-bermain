@@ -8,8 +8,8 @@ import { PAYMENT_PROOF_DIR } from "@/lib/config/storage";
  *
  * Berkasnya di luar public/, jadi rute ini satu-satunya jalan ke sana — dan
  * sesinya diperiksa di SETIAP permintaan, bukan sekali lalu tautannya boleh
- * dibagikan. Tautan bertanda tangan 5 menit milik Supabase membolehkan siapa
- * pun yang menerima tautan itu melihat tangkapan layar bank orang lain; di
+ * dibagikan. Tautan bertanda tangan sementara membolehkan siapa pun yang
+ * menerima tautan itu melihat tangkapan layar bank orang lain; di
  * sini tautan yang diteruskan ke orang lain hanya membawa mereka ke halaman
  * masuk.
  */

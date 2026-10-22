@@ -1,7 +1,6 @@
 -- Sequence penomoran. Introspeksi Prisma menangkap pemakaiannya di default
 -- kolom tapi tidak objek sequence-nya sendiri, jadi dibuat eksplisit di sini
--- sebelum tabel mana pun berdiri. Nilai terakhirnya diselaraskan dengan
--- Supabase saat data disalin.
+-- sebelum tabel mana pun berdiri.
 CREATE SEQUENCE IF NOT EXISTS "affiliate_number_seq";
 CREATE SEQUENCE IF NOT EXISTS "child_number_seq";
 CREATE SEQUENCE IF NOT EXISTS "customer_number_seq";

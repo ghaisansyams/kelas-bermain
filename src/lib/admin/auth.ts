@@ -6,8 +6,7 @@ import { getAdminSession, type AdminRole, type AdminSession } from "@/lib/auth/s
 /**
  * Gerbang hak akses admin.
  *
- * Dulu ini membaca Supabase Auth lalu mencocokkan ke admin_users dengan RLS
- * sebagai jaring pengaman di belakangnya. Sekarang tidak ada RLS: Prisma
+ * Tidak ada RLS di database: Prisma
  * memegang kredensial database penuh, jadi berkas inilah satu-satunya yang
  * memutuskan siapa boleh apa. Setiap halaman admin dan setiap server action
  * harus memanggilnya — tidak ada tombol tersembunyi yang bisa dianggap

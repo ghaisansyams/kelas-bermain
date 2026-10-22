@@ -24,7 +24,6 @@ import { fetchApifyPosts, type ApifyPost } from "@/lib/services/instagram-apify"
  *    sama dengan hasil migrate:storage, dilayani sebagai /uploads/...
  *
  * Menulis lewat Prisma ke database yang sama dengan yang dibaca situs.
- * Tidak ada lagi login Supabase di sini.
  */
 
 const COLLECTION = "updates";

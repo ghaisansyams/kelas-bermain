@@ -11,11 +11,8 @@ Kelas Bermain adalah aktivitas kreatif dan edukatif untuk anak **3–15 tahun di
 
 ### Catatan penting
 
-- **Basis data Postgres sendiri**, bukan Supabase. Dulu aplikasi ini jalan di atas Supabase
-  (Auth + RLS + fungsi SECURITY DEFINER); sekarang semuanya lewat Prisma ke Postgres biasa,
-  dengan sesi admin dan pemeriksaan hak akses ditulis di aplikasi sendiri
-  (`src/lib/auth/session.ts`, `src/lib/admin/auth.ts`). Lihat bagian **Riwayat migrasi**
-  di bawah kalau menemukan berkas yang masih menyebut Supabase.
+- **Basis data PostgreSQL**, diakses lewat Prisma, dengan sesi admin dan pemeriksaan hak
+  akses ditulis di aplikasi sendiri (`src/lib/auth/session.ts`, `src/lib/admin/auth.ts`).
 - **Pembayaran transfer manual.** Tidak ada payment gateway. Orang tua transfer lalu
   mengunggah bukti; admin memverifikasi dan menekan "Konfirmasi Lunas" di `/admin/payments`.
   Tidak ada jalur kode yang bisa menandai pembayaran lunas tanpa admin.
@@ -28,7 +25,7 @@ Kelas Bermain adalah aktivitas kreatif dan edukatif untuk anak **3–15 tahun di
 | --- | --- |
 | Framework | Next.js 15 (App Router, React 19, Server Components) |
 | Bahasa | TypeScript (strict) |
-| Basis data | PostgreSQL, diakses lewat Prisma — tidak ada Supabase, tidak ada RLS |
+| Basis data | PostgreSQL, diakses lewat Prisma — tidak ada RLS |
 | Auth | Sesi sendiri: argon2/bcrypt + cookie httpOnly (`src/lib/auth/session.ts`) |
 | Media | Disk lokal (`UPLOAD_DIR`), dilayani lewat `/uploads/[...path]` |
 | Styling | Tailwind CSS v4 (CSS-first `@theme`) |
@@ -69,7 +66,7 @@ Lihat `.env.example` untuk daftar lengkap beserta penjelasannya. Yang wajib:
 
 Semua yang lain opsional dan punya nilai bawaan yang masuk akal — lihat `.env.example`.
 
-Tidak ada kunci service-role, tidak ada bypass RLS, tidak ada kredensial Supabase
+Tidak ada kunci service-role, tidak ada bypass RLS
 di repositori ini.
 
 ## Rute
@@ -208,7 +205,7 @@ src/
   middleware.ts              # Penjaga cepat /admin — bukan gerbang sesungguhnya
 prisma/
   schema.prisma              # Skema basis data
-  migrations/                 # Riwayat migrasi, termasuk fungsi & trigger yang dibawa dari Supabase
+  migrations/                 # Riwayat migrasi, termasuk fungsi & trigger database
 public/images/                # Foto bawaan (aset lokal)
 public/uploads/                # Media yang diunggah admin + hasil sinkron Instagram
 scripts/                       # Alat pengembangan + migrasi satu kali (lihat di bawah)
@@ -237,7 +234,7 @@ Setiap tulisan yang menyentuh uang atau hak akses (konfirmasi pembayaran,
 refund, terbitkan sertifikat, kelola pengguna) memanggil fungsi `admin_*`
 di database lewat `src/lib/admin/actor.ts` (`asAdmin`), yang membungkus
 panggilannya dalam satu transaksi dan mengisi `app.user_id` supaya fungsi
-database tahu siapa yang bertindak — pengganti `auth.uid()` milik Supabase.
+database tahu siapa yang bertindak — pengganti `auth.uid()`.
 Fungsi itu memeriksa hak akses DI DALAM database, jadi aturannya tetap
 berlaku dua lapis sekalipun satu pemanggil di aplikasi lupa memeriksa.
 
@@ -263,24 +260,8 @@ berlaku dua lapis sekalipun satu pemanggil di aplikasi lupa memeriksa.
 Setiap aksi memeriksa perannya sendiri lewat `requireAdmin()` / `requireRole()` —
 menu yang disembunyikan di tampilan bukan satu-satunya penjaga.
 
-## Riwayat migrasi: Supabase → Postgres
+## Fungsi & trigger database
 
-Proyek ini awalnya dibangun di atas Supabase (Postgres terkelola + Auth + RLS +
-fungsi SECURITY DEFINER). Semuanya sudah dipindahkan ke Postgres polos dengan
-Prisma; tidak ada lagi ketergantungan pada `@supabase/*` di kode aplikasi.
-Beberapa jejak sengaja dibiarkan karena berguna:
-
-- `prisma/migrations/*_logika_database/` — 24 fungsi dan 3 trigger yang dulu
-  hidup di Supabase, dibawa apa adanya (bukan ditulis ulang) supaya perilakunya
-  identik dengan yang sudah teruji bertahun-tahun.
-- `scripts/migrate-data.mjs`, `scripts/migrate-storage.mjs`,
-  `scripts/rewrite-media-urls.mjs` — alat migrasi satu kali. Aman dijalankan
-  ulang (idempotent) tapi tidak dipakai aplikasi yang berjalan; boleh dihapus
-  kapan saja setelah cutover selesai dan terbukti stabil.
-- Komentar yang menyebut "dulu di Supabase ini begini..." di beberapa berkas
-  (`src/lib/auth/session.ts`, `src/lib/admin/actor.ts`) — dipertahankan karena
-  menjelaskan KENAPA kodenya berbentuk begitu, bukan sekadar sejarah.
-
-Kalau menemukan berkas lain yang masih menyebut Supabase di luar daftar ini,
-itu kemungkinan sisa yang belum sempat dibersihkan — aman dihapus setelah
-diperiksa tidak ada yang memanggilnya.
+`prisma/migrations/*_logika_database/` berisi 24 fungsi dan 3 trigger (`admin_*`,
+`is_admin`, penomoran, sinkron kuota). Pemeriksaan hak akses di dalamnya sengaja
+dipertahankan sebagai lapis kedua di belakang `requireAdmin()`.

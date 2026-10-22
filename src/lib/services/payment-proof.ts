@@ -18,7 +18,7 @@ import { PAYMENT_PROOF_DIR as UPLOAD_DIR } from "@/lib/config/storage";
  * lain. Sekarang dijaga berkas ini — dan berkas ini berjalan di server, jadi
  * tidak ada jalan memanggilnya dengan status karangan sendiri.
  *
- * Berkasnya mendarat di disk, bukan Supabase Storage. Di luar public/ dengan
+ * Berkasnya mendarat di disk. Di luar public/ dengan
  * sengaja: tangkapan layar aplikasi bank orang tidak boleh jadi URL yang bisa
  * ditebak siapa pun.
  */

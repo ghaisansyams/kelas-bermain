@@ -39,10 +39,9 @@ function mapError(error: unknown): string {
 /**
  * Memberi hak admin, dan membuat akun loginnya kalau belum ada.
  *
- * Dulu akun login dibuat di dashboard Supabase karena itu butuh service-role
- * key, yang sengaja tidak dipegang aplikasi. Setelah Supabase hilang tidak ada
- * dashboard itu lagi — kalau ini tidak bisa membuat akun, tidak ada cara
- * menambah admin sama sekali. Hanya SUPER_ADMIN yang sampai ke sini.
+ * Akun login disimpan di tabel `users` milik aplikasi sendiri, jadi tidak ada
+ * dashboard lain tempat membuatnya — kalau ini tidak bisa membuat akun, tidak
+ * ada cara menambah admin sama sekali. Hanya SUPER_ADMIN yang sampai ke sini.
  *
  * Kata sandi awal ditentukan SUPER_ADMIN dan disampaikan langsung ke orangnya.
  * Tidak ada tautan reset lewat email: aplikasi ini tidak punya pengirim email,

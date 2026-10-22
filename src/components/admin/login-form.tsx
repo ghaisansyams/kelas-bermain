@@ -10,8 +10,7 @@ import { signInAction } from "@/app/admin/actions";
 /**
  * Masuk lewat server action, bukan dari browser.
  *
- * Dulu formulir ini memanggil Supabase langsung dari sisi klien. Sekarang
- * password dikirim ke server dan tidak pernah disentuh kode yang berjalan di
+ * Password dikirim ke server dan tidak pernah disentuh kode yang berjalan di
  * browser, dan cookie sesinya dipasang httpOnly dari sana.
  */
 export function LoginForm({ next }: { next?: string }) {

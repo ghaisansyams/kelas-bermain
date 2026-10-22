@@ -5,7 +5,7 @@ import type { PaymentMethod } from "@/lib/repositories/types";
  *
  * These types are the contract between the UI and whatever supplies the
  * content. Today the supplier is the static fixtures in `src/data`; later it
- * can be a CMS, Supabase, or a REST API. As long as the new source returns
+ * can be a CMS, a database, or a REST API. As long as the new source returns
  * these shapes, no component has to change.
  */
 
