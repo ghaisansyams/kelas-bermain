@@ -4,12 +4,11 @@ import { syncInstagramPosts } from "@/lib/services/instagram-sync";
 /**
  * Sinkron Instagram tengah malam.
  *
- * Dipanggil Vercel Cron tiap 00.00 WIB (lihat vercel.json — jadwalnya 17.00
- * UTC, karena cron Vercel memakai UTC). Bisa juga dipanggil tangan untuk
- * memaksa sinkron:
+ * Dipanggil crontab di server tiap 00.00 WIB. Bisa juga dipanggil tangan
+ * untuk memaksa sinkron:
  *
  *   curl -H "Authorization: Bearer $CRON_SECRET" \
- *        https://kelas-bermain.vercel.app/api/cron/instagram
+ *        http://localhost:3000/api/cron/instagram
  *
  * Rute ini tertutup. Tanpa CRON_SECRET yang cocok jawabannya 401 — kalau
  * terbuka, siapa pun bisa memaksa pemanggilan Apify berulang kali dan
@@ -17,7 +16,7 @@ import { syncInstagramPosts } from "@/lib/services/instagram-sync";
  */
 
 export const dynamic = "force-dynamic";
-// Apify menjalankan browser di sisi mereka; batas bawaan Vercel terlalu pendek.
+// Apify menjalankan browser di sisi mereka, jadi satu panggilan bisa makan waktu menit.
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
@@ -37,7 +36,7 @@ export async function GET(request: Request) {
   const report = await syncInstagramPosts();
 
   // Dicatat supaya kegagalan tengah malam masih bisa ditelusuri paginya di
-  // log Vercel, bukan hilang tanpa jejak.
+  // log server, bukan hilang tanpa jejak.
   if (report.ok) {
     console.log(
       `[instagram] ${report.saved} tersimpan, ${report.skipped} dilewati, ` +
