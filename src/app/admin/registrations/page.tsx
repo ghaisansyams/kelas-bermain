@@ -48,6 +48,8 @@ export default async function AdminRegistrationsPage({
     payment_status: string;
     attendance_status: string;
     amount: number;
+    /** Tagihan sebenarnya setelah diskon/voucher; hanya ada di pendaftaran utama paket. */
+    billed: number | null;
     affiliate_code: string | null;
     customers: { id: string; full_name: string } | null;
     children: { full_name: string } | null;
@@ -71,6 +73,7 @@ export default async function AdminRegistrationsPage({
           attendance_status: true,
           amount: true,
           affiliate_code: true,
+          payments: { select: { amount: true }, take: 1 },
           customers: { select: { id: true, full_name: true } },
           children: { select: { full_name: true } },
         },
@@ -80,7 +83,11 @@ export default async function AdminRegistrationsPage({
       }),
       db.registrations.count({ where }),
     ]);
-    rows = list.map((row) => ({ ...row, amount: Number(row.amount) }));
+    rows = list.map(({ payments, ...row }) => ({
+      ...row,
+      amount: Number(row.amount),
+      billed: payments[0] ? Number(payments[0].amount) : null,
+    }));
     count = total;
   } catch {
     error = true;
@@ -140,7 +147,7 @@ export default async function AdminRegistrationsPage({
                 <Th>Pendamping</Th>
                 <Th>Event</Th>
                 <Th>Tanggal</Th>
-                <Th>Nominal</Th>
+                <Th>Tagihan</Th>
                 <Th>Status</Th>
                 <Th>Pembayaran</Th>
               </tr>
@@ -170,7 +177,14 @@ export default async function AdminRegistrationsPage({
                       </Td>
                       <Td>{eventTitle(row.event_id)}</Td>
                       <Td>{formatDate(row.registration_date.toISOString())}</Td>
-                      <Td>{formatRupiah(Number(row.amount))}</Td>
+                      <Td>
+                        {formatRupiah(row.billed ?? row.amount)}
+                        {row.billed !== null && row.billed !== row.amount ? (
+                          <span className="block text-xs text-muted line-through">
+                            {formatRupiah(row.amount)}
+                          </span>
+                        ) : null}
+                      </Td>
                       <Td>
                         <StatusBadge tone={reg.tone}>{reg.text}</StatusBadge>
                       </Td>
