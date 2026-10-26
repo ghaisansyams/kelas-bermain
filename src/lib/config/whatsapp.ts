@@ -10,7 +10,7 @@
  * here stays invisible until a parent reports it.
  */
 export const WHATSAPP_REGISTRATION_NUMBER =
-  process.env.NEXT_PUBLIC_WHATSAPP_REGISTRATION_NUMBER?.replace(/\D/g, "") || "6282211278857";
+  process.env.NEXT_PUBLIC_WHATSAPP_REGISTRATION_NUMBER?.replace(/\D/g, "") || "6281774918611";
 
 export interface RegistrationHandoff {
   registrationNumber: string;
