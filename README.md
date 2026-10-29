@@ -172,6 +172,18 @@ Cron tengah malam (crontab di server)
   → admin menekan Terbitkan di /admin/cms
 ```
 
+**Penjadwalan wajib dipasang di server** — aplikasi tidak menjalankan jadwalnya sendiri.
+Tanpa crontab, postingan baru tidak pernah masuk. Contoh `crontab -e` (tengah malam WIB,
+mesin berzona WIB; ganti `0 0 * * *` jadi `0 */6 * * *` bila ingin tiap 6 jam — Apify berbayar per
+pemakaian):
+
+```
+0 0 * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/instagram >> /var/log/kb-instagram.log 2>&1
+```
+
+Untuk menarik sekarang tanpa menunggu: tombol **Sinkron Instagram sekarang** di
+`/admin/cms?tab=updates`.
+
 Cadangan gratis kalau kuota Apify habis: `npm run instagram:scrape` menjalankan
 Firefox headless dari laptop (Instagram memblokir IP datacenter, jadi ini tidak
 bisa dijalankan dari server).

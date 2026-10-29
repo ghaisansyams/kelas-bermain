@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/admin/activity";
 import { requireAdmin } from "@/lib/admin/auth";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { syncInstagramPosts } from "@/lib/services/instagram-sync";
 
 /**
  * CMS writes. Every action re-checks the admin session server-side — hiding a
@@ -230,4 +231,31 @@ export async function saveNavigationAction(formData: FormData) {
   // The navbar lives in the public layout, so every page needs refreshing.
   revalidatePath("/", "layout");
   redirect("/admin/cms/navigation?status=saved");
+}
+
+/**
+ * Menarik postingan Instagram terbaru sekarang, tanpa menunggu jadwal malam.
+ * Hasilnya tetap masuk sebagai DRAF; admin yang menerbitkan.
+ */
+export async function syncInstagramNowAction() {
+  await requireAdmin();
+
+  // redirect() melempar, jadi hasilnya ditahan dulu di luar try.
+  let message: string;
+  let status = "ig-synced";
+  try {
+    const report = await syncInstagramPosts();
+    if (!report.ok) {
+      status = "ig-failed";
+      message = report.error ?? "Sinkron gagal.";
+    } else {
+      message = `Sinkron selesai: ${report.scanned} postingan dibaca, ${report.saved} tersimpan, ${report.uploaded} gambar baru. Postingan baru masuk sebagai draf — terbitkan bila sudah yakin.`;
+    }
+  } catch {
+    status = "ig-failed";
+    message = "Sinkron gagal. Coba lagi sebentar lagi.";
+  }
+
+  revalidatePath("/admin/cms");
+  redirect(`/admin/cms?tab=updates&status=${status}&message=${encodeURIComponent(message)}`);
 }

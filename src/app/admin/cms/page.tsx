@@ -22,6 +22,7 @@ import {
   setEventPlacementAction,
   setSectionVisibilityAction,
 } from "@/app/admin/cms/website-actions";
+import { syncInstagramNowAction } from "@/app/admin/cms/actions";
 import { Card, Notice, PageHeader } from "@/components/admin/admin-ui";
 import { PublishBar } from "@/components/admin/cms/publish-bar";
 import { CollectionEditor, type CollectionRow } from "@/components/admin/cms/collection-editor";
@@ -81,6 +82,8 @@ const NOTICES: Record<string, { tone: "success" | "error" | "info"; text: string
     tone: "info",
     text: "Draf tersimpan. Website publik belum berubah — tekan Publikasikan bila sudah yakin.",
   },
+  "ig-synced": { tone: "success", text: "Sinkron Instagram selesai." },
+  "ig-failed": { tone: "error", text: "Sinkron Instagram gagal." },
   published: { tone: "success", text: "Perubahan terbit. Website publik sudah diperbarui." },
   hidden: { tone: "success", text: "Bagian disembunyikan dari website." },
   shown: { tone: "success", text: "Bagian ditampilkan kembali." },
@@ -544,6 +547,24 @@ export default async function CmsWebsitePage({
         </div>
       ) : (
         <Card>
+          {tab === "updates" ? (
+            <form
+              action={syncInstagramNowAction}
+              className="mb-4 flex flex-col gap-2 rounded-xl border border-line bg-canvas-deep/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p className="text-xs leading-relaxed text-ink-soft">
+                Postingan Instagram ditarik otomatis tiap malam (00.00 WIB). Ada postingan baru
+                dan ingin segera tampil? Tarik sekarang — hasilnya masuk sebagai draf, lalu
+                terbitkan.
+              </p>
+              <button
+                type="submit"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-pill bg-brand px-4 text-sm font-bold text-white hover:bg-brand-ink"
+              >
+                Sinkron Instagram sekarang
+              </button>
+            </form>
+          ) : null}
           {(() => {
             const collection = findCollection(tab);
             if (!collection) return <p className="text-sm text-muted">Bagian tidak ditemukan.</p>;
