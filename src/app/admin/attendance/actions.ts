@@ -13,7 +13,11 @@ export async function setAttendanceAction(formData: FormData) {
   const registrationId = String(formData.get("registrationId") ?? "");
   const status = String(formData.get("status") ?? "");
   const eventId = String(formData.get("eventId") ?? "");
-  const failure = `/admin/attendance?event=${encodeURIComponent(eventId)}&status=error`;
+  // Pencarian dibawa kembali setelah menandai hadir, supaya admin yang sedang
+  // menyaring nama tidak harus mengetik ulang untuk peserta berikutnya.
+  const q = String(formData.get("q") ?? "").slice(0, 100);
+  const base = `/admin/attendance?event=${encodeURIComponent(eventId)}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const failure = `${base}&status=error`;
 
   if (!UUID.test(registrationId) || !status) redirect(failure);
 
@@ -31,5 +35,5 @@ export async function setAttendanceAction(formData: FormData) {
 
   revalidatePath("/admin/attendance");
   revalidatePath("/admin");
-  redirect(`/admin/attendance?event=${encodeURIComponent(eventId)}&status=saved`);
+  redirect(`${base}&status=saved`);
 }

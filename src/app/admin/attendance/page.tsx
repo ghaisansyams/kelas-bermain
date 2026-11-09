@@ -6,6 +6,7 @@ import {
   FilterBar,
   RefCell,
   PAYMENT_LABEL,
+  SearchField,
   SelectField,
   StatusBadge,
   TableShell,
@@ -32,10 +33,11 @@ interface AttendanceRow {
 export default async function AdminAttendancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; status?: string }>;
+  searchParams: Promise<{ event?: string; status?: string; q?: string }>;
 }) {
   await requireAdmin();
-  const { event, status } = await searchParams;
+  const { event, status, q } = await searchParams;
+  const query = (q ?? "").trim().toLowerCase();
   const events = await getEvents();
   const selected = event ?? events[0]?.id ?? "";
 
@@ -78,6 +80,16 @@ export default async function AdminAttendancePage({
     }
   }
 
+  // Statistik dihitung dari seluruh peserta event; pencarian hanya menyaring
+  // daftar yang tampil, supaya angka tingkat kehadiran tidak ikut berubah.
+  const visibleRows = query
+    ? rows.filter((row) =>
+        [row.children?.full_name, row.customers?.full_name, row.registration_number].some(
+          (value) => value?.toLowerCase().includes(query),
+        ),
+      )
+    : rows;
+
   const present = rows.filter((row) => row.attendance_status === "PRESENT").length;
   const absent = rows.filter((row) => row.attendance_status === "ABSENT").length;
   const waiting = rows.length - present - absent;
@@ -104,7 +116,20 @@ export default async function AdminAttendancePage({
             label: `${item.title} — ${formatDate(item.startDate)}`,
           }))}
         />
+        <SearchField value={q} placeholder="Nama anak, pendamping, atau nomor" />
       </FilterBar>
+
+      {query ? (
+        <p className="text-sm text-muted">
+          Menampilkan {visibleRows.length} dari {rows.length} peserta untuk &ldquo;{q}&rdquo;.{" "}
+          <a
+            href={`/admin/attendance?event=${encodeURIComponent(selected)}`}
+            className="font-semibold text-brand hover:underline"
+          >
+            Hapus pencarian
+          </a>
+        </p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total anak" value={String(rows.length)} hint={eventTitle} />
@@ -131,10 +156,14 @@ export default async function AdminAttendancePage({
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {rows.length === 0 ? (
-              <EmptyRow colSpan={7}>Belum ada anak terdaftar untuk event ini.</EmptyRow>
+            {visibleRows.length === 0 ? (
+              <EmptyRow colSpan={7}>
+                {rows.length === 0
+                  ? "Belum ada anak terdaftar untuk event ini."
+                  : `Tidak ada peserta yang cocok dengan "${q}".`}
+              </EmptyRow>
             ) : (
-              rows.map((row) => {
+              visibleRows.map((row) => {
                 const attendance = ATTENDANCE_LABEL[row.attendance_status] ?? {
                   text: row.attendance_status,
                   tone: "grey",
@@ -168,6 +197,7 @@ export default async function AdminAttendancePage({
                           <form action={setAttendanceAction}>
                             <input type="hidden" name="registrationId" value={row.id} />
                             <input type="hidden" name="eventId" value={selected} />
+                            <input type="hidden" name="q" value={q ?? ""} />
                             <input type="hidden" name="status" value="PRESENT" />
                             <button
                               type="submit"
@@ -181,6 +211,7 @@ export default async function AdminAttendancePage({
                           <form action={setAttendanceAction}>
                             <input type="hidden" name="registrationId" value={row.id} />
                             <input type="hidden" name="eventId" value={selected} />
+                            <input type="hidden" name="q" value={q ?? ""} />
                             <input type="hidden" name="status" value="ABSENT" />
                             <button
                               type="submit"

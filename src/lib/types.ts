@@ -83,6 +83,12 @@ export interface EventRegistrationInfo {
   method: PaymentMethod;
   /** Rupiah, integer. Only meaningful when `type` is PAID. */
   price?: number;
+  /**
+   * Rp per pendamping tambahan (orang dewasa di luar yang mendaftar). 0 atau
+   * kosong berarti gratis. Diatur per event di admin; tidak berlaku untuk
+   * kelas gratis.
+   */
+  extraCompanionPrice?: number;
   /** Card-display override — see `resolvePriceDisplay`. Rarely set explicitly. */
   priceDisplay?: PriceDisplay;
   currency?: "IDR";
@@ -112,20 +118,6 @@ export interface CertificatePolicy {
 export interface AboutEventContent {
   description?: string[];
   images: ImageAsset[];
-}
-
-/**
- * Preview video for the detail page's sidebar, shown right under the
- * registration card. Optional — an event without one simply renders no
- * video card, never an empty placeholder (see `EventVideoCard`).
- */
-export interface EventVideo {
-  /** Empty when the event uses an uploaded file instead. */
-  youtubeUrl: string;
-  title?: string;
-  thumbnail?: string;
-  /** Media Library URL of an uploaded MP4/WEBM. Takes priority over YouTube. */
-  fileUrl?: string;
 }
 
 /** An event exactly as an admin would store it. */
@@ -168,8 +160,6 @@ export interface EventRecord {
   facilities: string[];
   requirements: string[];
   certificate: CertificatePolicy;
-  /** Preview video for the detail page — absent for most events today. */
-  video?: EventVideo;
   featured: boolean;
   published: boolean;
 }

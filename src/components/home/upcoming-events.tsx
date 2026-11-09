@@ -1,3 +1,4 @@
+import { Sticker } from "@/components/home/stickers";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { EventCard } from "@/components/event/event-card";
@@ -17,7 +18,10 @@ export function UpcomingEvents({
   heading: SectionHeadingContent;
 }) {
   return (
-    <section className="bg-canvas-deep/50 py-16 sm:py-20" id="event-terdekat">
+    <section className="relative overflow-hidden bg-canvas-deep/50 py-16 sm:py-20" id="event-terdekat">
+      <Sticker kind="squiggle" color="red" rotate={-4} className="right-[4%] top-5 hidden h-7 w-20 lg:block" />
+      <Sticker kind="book" color="blue" rotate={-8} className="bottom-4 left-[2%] hidden h-10 w-12 xl:block" delay={1.4} />
+      <Sticker kind="star" color="yellow" rotate={10} className="bottom-5 right-[3%] hidden size-9 lg:block" delay={0.8} />
       <Container>
         <SectionHeading
           eyebrow={heading.eyebrow}

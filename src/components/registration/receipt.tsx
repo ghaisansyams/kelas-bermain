@@ -1,25 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import {
-  CalendarPlus,
-  Clock,
-  FileText,
-  MessageCircle,
-  Printer,
-  Ticket,
-} from "lucide-react";
+import { Clock } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import type { RegistrationBatch } from "@/lib/services/registration";
 import type { EventView } from "@/lib/types";
-import { certificatesEnabled } from "@/lib/features";
-import { formatDate, formatDateRange } from "@/lib/utils/date";
+import { formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
-import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
-import { InvoiceDocument } from "@/components/registration/invoice-document";
 
 /**
- * "Selesai" step content. The registration/payment rows are already
+ * "Konfirmasi" step content (the last step of the form). The registration/payment rows are already
  * created by this point (PENDING for a paid class) — this never claims a
  * payment succeeded, since nothing here can actually verify one. Marking a
  * payment PAID is an admin's job, done on the Pembayaran page after the
@@ -29,50 +19,23 @@ export function RegistrationReceipt({
   event,
   batch,
   parentName,
+  whatsappUrl,
 }: {
   event: EventView;
   batch: RegistrationBatch;
   parentName: string;
+  /** Pesan lengkap ke admin; disusun pemanggil yang memegang data pendaftarnya. */
+  whatsappUrl: string;
 }) {
   const lead = batch.registrations[0];
   const isFree = batch.paymentMethod === "NONE";
 
-  // Built on the client only: this renders on the server first, where there
-  // is no origin to build an absolute link from.
-  const statusUrl =
-    typeof window === "undefined"
-      ? undefined
-      : isFree
-        ? `${window.location.origin}/cek-tiket`
-        : `${window.location.origin}/payment/${lead.accessToken}`;
-
-  function addToCalendar() {
-    const stamp = (value: string) => value.replace(/-/g, "");
-    const end = new Date(event.endDate);
-    end.setDate(end.getDate() + 1);
-    const ics = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Kelas Bermain//Registrasi//ID",
-      "BEGIN:VEVENT",
-      `UID:${lead.registrationNumber}@kelasbermain`,
-      `DTSTART;VALUE=DATE:${stamp(event.startDate)}`,
-      `DTEND;VALUE=DATE:${stamp(end.toISOString().slice(0, 10))}`,
-      `SUMMARY:${event.title} — Kelas Bermain`,
-      `LOCATION:${event.location.venue}, ${event.location.city}`,
-      `DESCRIPTION:Nomor pendaftaran ${lead.registrationNumber}. Jam ${event.timeStart}-${event.timeEnd} ${event.timezone}.`,
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n");
-
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${lead.registrationNumber}.ics`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
+  // Harga penuh = tanpa diskon dan voucher, dengan biaya pendamping tambahan
+  // tetap ikut (biaya itu memang tidak didiskon).
+  const pricing = batch.pricing;
+  const fullPrice = pricing.subtotal + pricing.extraCompanionTotal;
+  const savings = Math.max(0, fullPrice - batch.totalAmount);
+  const savingsNote = [pricing.discountLabel, pricing.voucher?.label].filter(Boolean).join(" + ");
 
   // Nothing here is finished yet, so nothing here is green. A tick reads as
   // "done" to a parent, and the team has not confirmed anything — a paid
@@ -81,17 +44,15 @@ export function RegistrationReceipt({
   // parent watches for it on Cek Tiket.
   const headline = isFree
     ? "Mohon Tunggu Konfirmasi Pendaftaran"
-    : "Mohon Tunggu Konfirmasi Pembayaran";
+    : "Mohon Segera Melakukan Pembayaran";
 
   const standfirst = isFree
     ? "Registrasi Anda telah berhasil kami terima. Tim Kelas Bermain akan mengonfirmasi ketersediaan tempat, dan status terbarunya dapat Anda pantau melalui halaman Cek Tiket."
-    : "Registrasi Anda telah berhasil kami terima. Mohon menunggu konfirmasi pembayaran dari tim Kelas Bermain. Status terbarunya dapat Anda pantau kapan saja melalui halaman Cek Tiket.";
+    : "Registrasi Anda telah berhasil kami terima. Mohon segera melakukan pembayaran dan menunggu konfirmasi dari Kelas Bermain. Status terbarunya dapat Anda pantau kapan saja melalui halaman Cek Tiket.";
 
   return (
     <div className="space-y-6">
-      <div
-        className={`rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8 ${isFree ? "print-area" : "print:hidden"}`}
-      >
+      <div className="rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
         <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-sun-dark text-white motion-safe:animate-fade-up">
           <Clock className="size-8" aria-hidden />
         </span>
@@ -117,7 +78,15 @@ export function RegistrationReceipt({
             value={isFree ? "Tidak diperlukan" : "Menunggu konfirmasi"}
           />
           {!isFree ? (
-            <Line label="Total" value={formatRupiah(batch.totalAmount)} />
+            <Line
+              label="Total"
+              value={formatRupiah(batch.totalAmount)}
+              // Harga sebelum diskon dicoret kalau ada potongan (affiliate,
+              // sibling, group, atau voucher), supaya orang tua melihat
+              // bahwa angkanya sudah dikurangi.
+              struck={savings > 0 ? formatRupiah(fullPrice) : undefined}
+              note={savings > 0 ? savingsNote : undefined}
+            />
           ) : null}
         </dl>
 
@@ -137,52 +106,19 @@ export function RegistrationReceipt({
           ))}
         </div>
 
-        {/* The number above is the only thing a parent needs to look the
-            registration up later, so the way to use it sits right beneath
-            it rather than somewhere further down the page. */}
-        <div className="no-print mt-5">
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-center">
-            {/* The chat normally opens by itself on confirm. Some browsers
-                refuse that tab, so the same link is here as well rather than
-                leaving the parent with no way to reach the team. */}
-            <a
-              href={registrationWhatsappUrl({
-                registrationNumber: lead.registrationNumber,
-                companionName: parentName || "Orang tua",
-                childrenCount: batch.registrations.length,
-                eventName: event.title,
-                formattedTotal: isFree ? "Gratis" : formatRupiah(batch.totalAmount),
-                statusUrl,
-                needsPayment: !isFree,
-              })}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-            >
-              <MessageCircle className="size-4" aria-hidden />
-              Konfirmasi via WhatsApp
-            </a>
-            <Link
-              href="/cek-tiket"
-              className={buttonStyles({
-                variant: "secondary",
-                size: "lg",
-                className: "w-full sm:w-auto",
-              })}
-            >
-              <Ticket className="size-4" aria-hidden />
-              Cek Status di Cek Tiket
-            </Link>
-          </div>
-          <p className="mt-3 text-xs leading-relaxed text-muted">
-            Simpan nomor pendaftaran di atas. Masukkan nomor tersebut di halaman Cek Tiket
-            untuk melihat status terbaru pendaftaran Anda.
-          </p>
-        </div>
+        {/* Tombol Selesai ada di luar kartu ini, di bawah kanan. Yang di sini hanya
+            penjelasannya. */}
+        <p className="mt-5 text-xs leading-relaxed text-muted">
+          {isFree
+            ? "Klik Selesai untuk mengirim rincian pendaftaran ke tim Kelas Bermain lewat WhatsApp. "
+            : "Klik Selesai untuk mengirim rincian pendaftaran dan melakukan pembayaran lewat WhatsApp. "}
+          Simpan nomor pendaftaran di atas. Masukkan nomor tersebut di halaman Cek Tiket untuk
+          melihat status terbaru pendaftaran Anda.
+        </p>
       </div>
 
       {!isFree ? (
-        <p className="no-print text-center text-xs text-muted">
+        <p className="text-center text-xs text-muted">
           Simpan halaman ini atau{" "}
           <Link
             href={`/payment/${lead.accessToken}`}
@@ -194,66 +130,19 @@ export function RegistrationReceipt({
         </p>
       ) : null}
 
-      {/* Next steps */}
-      <div className="no-print rounded-card border border-line bg-surface p-5 sm:p-6">
-        <h3 className="text-base font-extrabold text-ink">Langkah berikutnya</h3>
-        <ul className="mt-4 space-y-3 text-sm leading-relaxed text-ink-soft">
-          <li>
-            Datang ke {event.location.venue}, {event.location.city} pada{" "}
-            {formatDate(event.startDate)} pukul {event.timeStart} {event.timezone}.
-          </li>
-          <li>
-            Isi kehadiran lewat halaman check-in menggunakan nomor pendaftaran di atas.
-          </li>
-          {certificatesEnabled && event.certificate.available ? (
-            <li>Setelah kehadiran tercatat, e-sertifikat anak bisa langsung diunduh.</li>
-          ) : null}
-        </ul>
-
-        <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={addToCalendar}
-            className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
-          >
-            <CalendarPlus className="size-4" aria-hidden />
-            Tambah ke Kalender
-          </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
-          >
-            {isFree ? (
-              <>
-                <Printer className="size-4" aria-hidden />
-                Download Bukti Registrasi
-              </>
-            ) : (
-              <>
-                <FileText className="size-4" aria-hidden />
-                Download Invoice
-              </>
-            )}
-          </button>
-          <Link
-            href={`/attendance/${event.slug}`}
-            className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
-          >
-            Check-in Kehadiran
-          </Link>
-          <Link
-            href={`/event/${event.slug}`}
-            className={buttonStyles({ variant: "ghost", className: "w-full sm:w-auto" })}
-          >
-            Detail Kelas
-          </Link>
-        </div>
+      {/* Selesai membuka WhatsApp ke admin dengan rincian pendaftaran (dan
+          rekening, untuk kelas berbayar). WhatsApp tidak terbuka sendiri saat
+          berpindah dari Data Peserta ke sini; baru terbuka lewat klik ini. */}
+      <div className="flex justify-end">
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonStyles({ size: "lg", className: "w-full sm:w-auto sm:min-w-40" })}
+        >
+          Selesai
+        </a>
       </div>
-
-      {!isFree ? (
-        <InvoiceDocument event={event} batch={batch} parentName={parentName} />
-      ) : null}
     </div>
   );
 }
@@ -262,16 +151,28 @@ function Line({
   label,
   value,
   mono,
+  struck,
+  note,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  /** Harga sebelum dikurangi; tampil dicoret di sebelah `value`. */
+  struck?: string;
+  /** Keterangan kecil di bawah angka, mis. nama diskonnya. */
+  note?: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className={`text-right font-semibold text-ink ${mono ? "font-mono" : ""}`}>
+        {struck ? (
+          <span className="mr-2 font-medium text-muted line-through decoration-brand/70">
+            {struck}
+          </span>
+        ) : null}
         {value}
+        {note ? <span className="block text-xs font-semibold text-pine-dark">{note}</span> : null}
       </dd>
     </div>
   );

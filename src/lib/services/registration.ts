@@ -13,7 +13,10 @@ import type {
 import type { EventView } from "@/lib/types";
 import { calculateRegistrationPrice, type PricingResult } from "@/lib/pricing";
 import { upsertChild, upsertCustomer, type ChildInput, type CustomerInput } from "./customer";
+import { formatDate } from "@/lib/utils/date";
 import { createPayment, type PaymentInstruction } from "./payment";
+import { birthDateError, freeChildFlags } from "@/lib/utils/age";
+import { MAX_EXTRA_COMPANIONS } from "@/lib/utils/validation";
 
 /**
  * Layanan pendaftaran — satu-satunya tempat sebuah pendaftaran dibuat.
@@ -32,6 +35,8 @@ import { createPayment, type PaymentInstruction } from "./payment";
 
 export interface RegistrationParticipantGroup {
   companion: CustomerInput;
+  /** Pendamping lain yang ikut datang; dikenai biaya kalau event menetapkannya. */
+  extraCompanions: number;
   children: (ChildInput & { ageOverride?: boolean })[];
 }
 
@@ -129,6 +134,13 @@ export async function createRegistration(
     return { ok: false, error: "Tambahkan minimal satu data anak." };
   }
 
+  for (const group of participants) {
+    for (const child of group.children) {
+      const problem = birthDateError(String(child.dateOfBirth ?? ""));
+      if (problem) return { ok: false, error: `${child.fullName || "Anak"}: ${problem}`, field: "children" };
+    }
+  }
+
   // Event dimuat ulang dari database. Yang dikirim browser hanya dipakai
   // sebagai penunjuk id — harga dan ketersediaannya tidak dipercaya.
   const events = await getEvents();
@@ -154,6 +166,20 @@ export async function createRegistration(
   const isFree = event.registration.type === "FREE";
   const method: PaymentMethod = isFree ? "NONE" : event.registration.method;
   const unitPrice = isFree ? 0 : (event.registration.price ?? 0);
+  const extraCompanionPrice = isFree ? 0 : (event.registration.extraCompanionPrice ?? 0);
+
+  // Siapa yang gratis dan berapa pendamping tambahan dihitung ulang di sini
+  // dari tanggal lahir dan jumlah yang dikirim; angka dari browser hanya
+  // dibandingkan dengan hasilnya di bawah.
+  const freeFlags = freeChildFlags(
+    participants.map((group) => group.children.map((child) => child.dateOfBirth)),
+    event.startDate,
+  );
+  const freeChildrenCount = freeFlags.flat().filter(Boolean).length;
+  const extraByGroup = participants.map((group) =>
+    Math.min(MAX_EXTRA_COMPANIONS, Math.max(0, Math.floor(Number(group.extraCompanions) || 0))),
+  );
+  const extraCompanions = extraByGroup.reduce((sum, count) => sum + count, 0);
 
   // Harga dihitung ulang dengan aturan dan voucher dari database. Kalau hasilnya
   // beda dari yang disetujui orang tua di layar konfirmasi, pendaftaran
@@ -175,6 +201,9 @@ export async function createRegistration(
   const pricing = calculateRegistrationPrice({
     eventPrice: unitPrice,
     childrenCount: totalChildren,
+    freeChildrenCount,
+    extraCompanions,
+    extraCompanionPrice,
     hasActiveAffiliate: Boolean(affiliate),
     affiliateCode,
     voucher: voucher?.ok ? voucher.voucher : null,
@@ -212,11 +241,11 @@ export async function createRegistration(
       // pembayaran: tagihan satu paket dibebankan ke pendaftarannya.
       let leadCustomer: Customer | null = null;
 
-      for (const group of participants) {
+      for (const [groupIndex, group] of participants.entries()) {
         const { customer } = await upsertCustomer(tx, { ...group.companion, source });
         if (!leadCustomer) leadCustomer = customer;
 
-        for (const child of group.children) {
+        for (const [childIndex, child] of group.children.entries()) {
           const childRow = await upsertChild(tx, customer.id, child);
 
           const duplicate = await tx.registrations.findFirst({
@@ -230,7 +259,7 @@ export async function createRegistration(
           });
           if (duplicate) {
             throw new RegistrationRefused(
-              `${childRow.fullName} sudah terdaftar di kelas ini.`,
+              `${childRow.fullName} (tanggal lahir ${formatDate(child.dateOfBirth)}) sudah terdaftar di kelas ini dengan nomor WhatsApp yang sama. Kalau ini anak yang berbeda, periksa lagi tanggal lahirnya. Untuk melihat pendaftarannya, buka halaman Cek Tiket.`,
               "children",
             );
           }
@@ -240,7 +269,10 @@ export async function createRegistration(
               customer_id: customer.id,
               child_id: childRow.id,
               event_id: event.id,
-              amount: unitPrice,
+              // Anak gratis tercatat Rp0, jadi daftar registrasi menunjukkan
+              // siapa yang tidak membayar tanpa perlu menghitung ulang.
+              amount: freeFlags[groupIndex][childIndex] ? 0 : unitPrice,
+              extra_companions: childIndex === 0 ? extraByGroup[groupIndex] : 0,
               status: isFree ? "CONFIRMED" : "REGISTERED",
               payment_status: isFree ? "NOT_REQUIRED" : "PENDING",
               payment_method: method,

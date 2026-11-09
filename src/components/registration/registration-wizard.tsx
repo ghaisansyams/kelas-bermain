@@ -1,28 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   Baby,
   CircleCheckBig,
   Loader2,
-  MessageCircle,
-  Pencil,
+  Minus,
   Plus,
   Trash2,
   UserRound,
   Users,
 } from "lucide-react";
-import { BankTransferPanel } from "@/components/registration/bank-transfer";
-import { ProofUploadPanel } from "@/components/registration/proof-upload-panel";
-import { Checkbox, Field, Select, TextInput } from "@/components/forms/field";
-import { PricingSummary } from "@/components/registration/pricing-summary";
+import { Field, Select, TextInput } from "@/components/forms/field";
 import { StepProgress, type WizardStep } from "@/components/registration/steps";
 import { RegistrationReceipt } from "@/components/registration/receipt";
-import { Button, buttonStyles } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   SELECTABLE_SOURCES,
   sourceLabel,
@@ -36,7 +31,13 @@ import {
 } from "@/lib/services/registration";
 import { calculateRegistrationPrice, type PricingConfig, type VoucherDefinition } from "@/lib/pricing";
 import { lookupVoucher, redeemVoucher } from "@/lib/services/voucher";
-import { registrationWhatsappUrl } from "@/lib/config/whatsapp";
+import {
+  pricingToLines,
+  registrationWhatsappUrl,
+  type HandoffCompanion,
+} from "@/lib/config/whatsapp";
+import { paymentAccounts } from "@/data/payment-accounts";
+import { formatDateRange } from "@/lib/utils/date";
 import { formatRupiah } from "@/lib/utils/format";
 import {
   clearDraft,
@@ -45,13 +46,20 @@ import {
   saveDraft,
 } from "@/lib/registration/draft-storage";
 import type { EventView } from "@/lib/types";
-import { formatAge } from "@/lib/utils/age";
+import {
+  FREE_CHILD_UNDER_AGE,
+  ageFromBirthDate,
+  formatAgeFromBirthDate,
+  freeChildFlags,
+  todayIso,
+} from "@/lib/utils/age";
 import { cn } from "@/lib/utils/cn";
 import {
   ageOutsideRange,
   emptyChild,
   emptyParent,
   hasErrors,
+  MAX_EXTRA_COMPANIONS,
   validateChild,
   validateParent,
   type ChildFormValues,
@@ -59,14 +67,15 @@ import {
   type ParentFormValues,
 } from "@/lib/utils/validation";
 
+// Dua langkah saja. Pembayaran dilakukan lewat WhatsApp, jadi tidak ada lagi
+// langkah pembayaran di formulir; langkah kedua adalah halaman rincian yang
+// tampil begitu pendaftarannya tercatat.
 const STEPS: WizardStep[] = [
   { key: "participants", label: "Data Peserta" },
   { key: "confirm", label: "Konfirmasi" },
-  { key: "payment", label: "Pembayaran" },
-  { key: "done", label: "Selesai" },
 ];
 
-type StepKey = "participants" | "confirm" | "payment" | "done";
+type StepKey = "participants" | "confirm";
 type RegistrationMode = "PERSONAL" | "GROUP";
 
 interface ParticipantGroup {
@@ -117,11 +126,8 @@ export function RegistrationWizard({
   const [heardFrom, setHeardFrom] = useState<RegistrationSource | "">("");
   const [heardFromError, setHeardFromError] = useState<string | null>(null);
   const [affiliateCode, setAffiliateCode] = useState("");
-  const [appliedVoucher, setAppliedVoucher] = useState<VoucherDefinition | null>(null);
+  const [voucherCode, setVoucherCode] = useState("");
   const [voucherError, setVoucherError] = useState<string | null>(null);
-  const [voucherChecking, setVoucherChecking] = useState(false);
-  const [consent, setConsent] = useState(false);
-  const [consentError, setConsentError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [batch, setBatch] = useState<RegistrationBatch | null>(null);
@@ -132,6 +138,20 @@ export function RegistrationWizard({
   const unitPrice = isFree ? 0 : (event.registration.price ?? 0);
 
   const totalChildren = groups.reduce((sum, g) => sum + g.children.length, 0);
+
+  // Anak di bawah 3 tahun pada hari kelas gratis kalau kelompoknya membawa
+  // anak berusia 3 tahun ke atas. Aturan yang sama dipakai server saat menagih.
+  const freeFlags = useMemo(
+    () =>
+      freeChildFlags(
+        groups.map((g) => g.children.map((c) => c.dateOfBirth)),
+        event.startDate,
+      ),
+    [groups, event.startDate],
+  );
+  const freeChildrenCount = freeFlags.flat().filter(Boolean).length;
+  const extraCompanions = groups.reduce((sum, g) => sum + g.companion.extraCompanions, 0);
+  const extraCompanionPrice = isFree ? 0 : (event.registration.extraCompanionPrice ?? 0);
   // Capacity is the only real limit on how many children one submission can
   // add — no arbitrary frontend cap, since Group pricing needs 5+ to ever
   // be reachable at all.
@@ -147,10 +167,15 @@ export function RegistrationWizard({
   // Restore anything typed before a refresh. Runs once, and only while the
   // parent is still filling the form — never after a registration exists.
   const [restored, setRestored] = useState(false);
-  const [pendingVoucher, setPendingVoucher] = useState<string | null>(null);
+  // Penyimpanan baru boleh jalan setelah pemulihan selesai. Tanpa ini, render
+  // pertama yang masih kosong akan menimpa draft sebelum sempat dibaca.
+  const [draftReady, setDraftReady] = useState(false);
   useEffect(() => {
     const draft = loadDraft(event.id);
-    if (!draft || !draftHasContent(draft)) return;
+    if (!draft || !draftHasContent(draft)) {
+      setDraftReady(true);
+      return;
+    }
 
     setModeState(draft.mode);
     setGroups(
@@ -163,45 +188,31 @@ export function RegistrationWizard({
     );
     setHeardFrom(draft.heardFrom);
     setAffiliateCode(draft.affiliateCode);
-    if (draft.voucherCode) setPendingVoucher(draft.voucherCode);
-    setStepKey(draft.stepKey);
+    setVoucherCode(draft.voucherCode ?? "");
     setRestored(true);
+    setDraftReady(true);
     // Intentionally only on mount: a later run would fight the parent's typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save on every change, but only before submission. Debounced so a fast
-  // typist is not writing to storage on each keystroke.
+  // Save on every change, but only before submission. Tidak lagi ditunda:
+  // draftnya kecil, dan penundaan 0,4 detik dulu membuat isian yang baru saja
+  // diketik hilang kalau halaman di-refresh seketika.
   useEffect(() => {
-    if (batch) return;
-    if (stepKey !== "participants" && stepKey !== "confirm") return;
+    if (!draftReady || batch) return;
 
-    const timer = setTimeout(() => {
-      saveDraft(event.id, {
-        mode,
-        groups: groups.map((group) => ({
-          companion: group.companion,
-          children: group.children,
-        })),
-        heardFrom,
-        affiliateCode,
-        voucherCode: appliedVoucher?.code ?? "",
-        stepKey,
-      });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [event.id, mode, groups, heardFrom, affiliateCode, appliedVoucher, stepKey, batch]);
-
-  // A restored voucher is checked again rather than trusted: it may have
-  // expired, run out, or no longer match the number of children.
-  useEffect(() => {
-    if (!pendingVoucher) return;
-    setPendingVoucher(null);
-    void applyVoucher(pendingVoucher);
-    // applyVoucher reads the freshly restored group count, which this render
-    // already has.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingVoucher]);
+    saveDraft(event.id, {
+      mode,
+      groups: groups.map((group) => ({
+        companion: group.companion,
+        children: group.children,
+      })),
+      heardFrom,
+      affiliateCode,
+      voucherCode,
+      stepKey: "participants",
+    });
+  }, [draftReady, event.id, mode, groups, heardFrom, affiliateCode, voucherCode, batch]);
 
   const [affiliateMatch, setAffiliateMatch] = useState<AffiliateLookup | null>(null);
   useEffect(() => {
@@ -222,45 +233,25 @@ export function RegistrationWizard({
     };
   }, [affiliateCode]);
 
-  const pricing = useMemo(
-    () =>
-      calculateRegistrationPrice({
-        eventPrice: unitPrice,
-        childrenCount: totalChildren,
-        hasActiveAffiliate: affiliateMatch?.status === "ACTIVE",
-        affiliateCode: affiliateCode.trim() || undefined,
-        voucher: appliedVoucher,
-        config: pricingConfig,
-      }),
-    [unitPrice, totalChildren, affiliateMatch, affiliateCode, appliedVoucher, pricingConfig],
-  );
-
-  // The voucher catalogue stays in the database: the browser only ever asks
-  // whether one typed code is usable for this cart.
-  async function applyVoucher(code: string) {
-    const trimmed = code.trim();
-    if (!trimmed) {
-      setAppliedVoucher(null);
-      setVoucherError(null);
-      return;
-    }
-    setVoucherChecking(true);
-    const result = await lookupVoucher(trimmed, totalChildren, event.id);
-    setVoucherChecking(false);
-    if (result.ok) {
-      setAppliedVoucher(result.voucher);
-      setVoucherError(null);
-    } else {
-      setAppliedVoucher(null);
-      setVoucherError(result.error);
-    }
+  /**
+   * Harga untuk keranjang ini dengan voucher tertentu (atau tanpa). Dihitung
+   * saat mengirim, karena voucher baru diperiksa ke database di saat itu juga.
+   */
+  function priceWith(voucher: VoucherDefinition | null) {
+    return calculateRegistrationPrice({
+      eventPrice: unitPrice,
+      childrenCount: totalChildren,
+      freeChildrenCount,
+      extraCompanions,
+      extraCompanionPrice,
+      hasActiveAffiliate: affiliateMatch?.status === "ACTIVE",
+      affiliateCode: affiliateCode.trim() || undefined,
+      voucher,
+      config: pricingConfig,
+    });
   }
 
-  // The stepper never shows "Pembayaran" for a path that can't reach it.
-  const steps = useMemo(
-    () => (isFree ? STEPS.filter((step) => step.key !== "payment") : STEPS),
-    [isFree],
-  );
+  const steps = STEPS;
   const currentIndex = Math.max(
     0,
     steps.findIndex((step) => step.key === stepKey),
@@ -280,6 +271,23 @@ export function RegistrationWizard({
               companionErrors: group.companionErrors[key]
                 ? { ...group.companionErrors, [key]: undefined }
                 : group.companionErrors,
+            }
+          : group,
+      ),
+    );
+  }
+
+  function setExtraCompanions(groupIndex: number, value: number) {
+    const next = Number.isFinite(value)
+      ? Math.min(MAX_EXTRA_COMPANIONS, Math.max(0, Math.floor(value)))
+      : 0;
+    setGroups((current) =>
+      current.map((group, i) =>
+        i === groupIndex
+          ? {
+              ...group,
+              companion: { ...group.companion, extraCompanions: next },
+              companionErrors: { ...group.companionErrors, extraCompanions: undefined },
             }
           : group,
       ),
@@ -386,23 +394,33 @@ export function RegistrationWizard({
       document.getElementById("heardFrom")?.focus();
       return;
     }
-    setStepKey("confirm");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Tidak ada lagi layar rekap sebelum mengirim: tombol ini langsung mencatat
+    // pendaftarannya dan pindah ke Konfirmasi. WhatsApp tidak dibuka di sini;
+    // itu baru terjadi saat orang tua menekan Selesai di halaman Konfirmasi.
+    void submitRegistration();
   }
 
   async function submitRegistration() {
-    if (!consent) {
-      setConsentError("Centang persetujuan untuk melanjutkan.");
-      return;
-    }
-    setConsentError(null);
     setFormError(null);
+    setVoucherError(null);
     setSubmitting(true);
 
-    // Claimed here, while this is still the click the parent made. A tab
-    // opened after the await is a popup, and browsers block it — so the tab
-    // is reserved now and pointed somewhere once the registration exists.
-    const handoff = window.open("", "_blank");
+    // Voucher diperiksa ke database di sini, bukan dipercaya dari browser:
+    // bisa saja sudah kedaluwarsa, habis, atau tidak cocok dengan jumlah anak.
+    let voucher: VoucherDefinition | null = null;
+    const typedVoucher = voucherCode.trim();
+    if (typedVoucher && !isFree) {
+      const checked = await lookupVoucher(typedVoucher, totalChildren, event.id);
+      if (!checked.ok) {
+        setSubmitting(false);
+        setVoucherError(checked.error);
+        document.getElementById("voucherCode")?.focus();
+        return;
+      }
+      voucher = checked.voucher;
+    }
+    const pricing = priceWith(voucher);
 
     // What the parent picked outranks the channel we inferred from the URL,
     // except when they scanned a QR — that is a fact, not a recollection.
@@ -412,20 +430,16 @@ export function RegistrationWizard({
       companion: {
         fullName: group.companion.fullName,
         whatsapp: group.companion.whatsapp,
-        email: group.companion.email.trim() || undefined,
         domicile: group.companion.domicile,
         source: attributed,
       },
+      extraCompanions: group.companion.extraCompanions,
       children: group.children.map((child) => ({
         fullName: child.fullName,
         nickname: child.nickname,
-        ageYears: Number(child.ageYears),
-        ageMonths: child.ageMonths.trim() === "" ? 0 : Number(child.ageMonths),
+        dateOfBirth: child.dateOfBirth,
         // Flagged for admin review, never blocks the submission (KONF-02).
-        // The reminder banner itself was removed from this step's UI, but
-        // admin still needs to know which sign-ups fall outside the class's
-        // stated age range.
-        ageOverride: Boolean(ageOutsideRange(child, event.ageRange)),
+        ageOverride: Boolean(ageOutsideRange(child, event.ageRange, event.startDate)),
       })),
     }));
 
@@ -441,8 +455,8 @@ export function RegistrationWizard({
 
     setSubmitting(false);
     if (!result.ok) {
-      handoff?.close();
       setFormError(result.error);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     // Recorded only now, against the registration that actually exists, so a
@@ -459,149 +473,80 @@ export function RegistrationWizard({
     // parent has already submitted.
     clearDraft(event.id);
 
-    // Straight into WhatsApp, carrying the link back to this registration.
-    // The page behind it still advances, so closing the chat does not strand
-    // anyone — and if the browser refused the tab, the button on the next
-    // step is the same link.
-    const lead = result.batch.registrations[0];
-    if (lead) {
-      const origin = window.location.origin;
-      const url = registrationWhatsappUrl({
-        registrationNumber: lead.registrationNumber,
-        companionName: groups[0]?.companion.fullName || "Orang tua",
-        childrenCount: totalChildren,
-        eventName: event.title,
-        formattedTotal: isFree ? "Gratis" : formatRupiah(result.batch.totalAmount),
-        statusUrl: isFree ? `${origin}/cek-tiket` : `${origin}/payment/${lead.accessToken}`,
-        needsPayment: !isFree,
-      });
-      if (handoff) handoff.location.href = url;
-      else window.open(url, "_blank", "noopener,noreferrer");
-    } else {
-      handoff?.close();
-    }
-
     setBatch(result.batch);
-    setStepKey(isFree ? "done" : "payment");
+    setStepKey("confirm");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * Pesan lengkap ke admin untuk pendaftaran yang sudah tercatat: data peserta,
+   * rincian harga, dan rekening tujuan transfer. Nomor pendaftaran dipasangkan
+   * ke anak menurut urutan dibuatnya (kelompok demi kelompok).
+   */
+  function buildWhatsappUrl(created: RegistrationBatch): string {
+    const lead = created.registrations[0];
+    const origin = window.location.origin;
+    let cursor = 0;
+
+    const companions: HandoffCompanion[] = groups.map((group, groupIndex) => ({
+      name: group.companion.fullName,
+      whatsapp: group.companion.whatsapp,
+      domicile: group.companion.domicile,
+      extraCompanions: group.companion.extraCompanions,
+      children: group.children.map((child, childIndex) => ({
+        name: child.fullName,
+        registrationNumber: created.registrations[cursor++]?.registrationNumber ?? "",
+        age: formatAgeFromBirthDate(child.dateOfBirth, event.startDate),
+        free: !isFree && Boolean(freeFlags[groupIndex]?.[childIndex]),
+      })),
+    }));
+
+    return registrationWhatsappUrl({
+      eventName: event.title,
+      eventDate: formatDateRange(event.startDate, event.endDate),
+      eventTime: `${event.timeStart} ${event.timezone}`,
+      eventLocation: `${event.location.venue}, ${event.location.city}`,
+      companions,
+      priceLines: pricingToLines(created.pricing),
+      formattedTotal: isFree ? "Gratis" : formatRupiah(created.totalAmount),
+      needsPayment: !isFree,
+      bankAccounts: paymentAccounts.map((account) => ({
+        bank: account.bank,
+        number: account.number,
+      })),
+      accountHolder: paymentAccounts[0]?.holder ?? "",
+      statusUrl: isFree ? `${origin}/cek-tiket` : `${origin}/payment/${lead.accessToken}`,
+    });
   }
 
   const leadCompanionName = groups[0]?.companion.fullName || "";
 
-  if (stepKey === "done" && batch) {
-    return (
-      <div className="space-y-6">
-        <StepProgress steps={steps} current={currentIndex} />
-        <RegistrationReceipt event={event} batch={batch} parentName={leadCompanionName} />
-        <div className="no-print">
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={() => setStepKey(isFree ? "confirm" : "payment")}
-            className="w-full sm:w-auto"
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-            Kembali ke {isFree ? "Konfirmasi" : "Pembayaran"}
-          </Button>
-        </div>
-      </div>
-    );
+  // Batas kalender: tidak bisa memilih hari esok, dan tidak lebih tua dari 18 tahun.
+  const today = todayIso();
+  const minBirthDate = `${Number(today.slice(0, 4)) - 18}${today.slice(4)}`;
+
+  function dobHint(birthDate: string, free: boolean | undefined): string {
+    if (!birthDate) return "Pilih dari kalender. Usia dihitung otomatis.";
+    const age = ageFromBirthDate(birthDate, event.startDate);
+    if (!age) return "";
+    const text = `Usia saat kelas: ${formatAgeFromBirthDate(birthDate, event.startDate)}.`;
+    return free
+      ? `${text} Gratis: di bawah ${FREE_CHILD_UNDER_AGE} tahun dan datang bersama anak yang membayar.`
+      : text;
   }
 
-  if (stepKey === "payment" && batch) {
-    const lead = batch.registrations[0];
+  // Langkah "Konfirmasi": isinya persis halaman rincian yang dulu bernama
+  // "Selesai". Hanya ada setelah pendaftarannya tercatat.
+  if (stepKey === "confirm" && batch) {
     return (
       <div className="space-y-6">
         <StepProgress steps={steps} current={currentIndex} />
-        <section aria-label="Pembayaran" className="space-y-5">
-          <header>
-            <h2 className="text-base font-extrabold text-ink">Pembayaran</h2>
-          </header>
-
-          <dl className="divide-y divide-line rounded-card border border-line bg-surface text-sm">
-            <Row label="Nama Event" value={event.title} />
-            <Row label="Jumlah peserta" value={`${totalChildren} anak`} />
-          </dl>
-
-          <PricingSummary pricing={batch.pricing} isFree={false} />
-
-          <BankTransferPanel
-            amount={batch.totalAmount}
-            registrationNumber={lead.registrationNumber}
-            eventTitle={event.title}
-            childName={groups[0]?.children[0]?.fullName}
-          />
-
-          {/* Mengunggah di sini sama persis dengan mengunggah di halaman
-              status nanti — satu baris pembayaran, satu komponen, satu aturan
-              (tidak pernah bisa menjadikan dirinya lunas). Admin melihatnya
-              di /admin/payments seketika, tidak perlu menunggu orang tua
-              membuka tautan WhatsApp dulu. */}
-          {lead.accessToken ? (
-            <ProofUploadPanel
-              accessToken={lead.accessToken}
-              registrationNumber={lead.registrationNumber}
-              companionName={groups[0]?.companion.fullName || "Orang tua"}
-              childName={groups[0]?.children[0]?.fullName || ""}
-            />
-          ) : null}
-
-          {/* The team works in WhatsApp, so that is where a parent is sent
-              next. The link carries their registration number, and the page
-              it points back to survives closing the tab. */}
-          <div className="space-y-3 rounded-card border border-brand/25 bg-brand-soft/35 p-5">
-            <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
-              <MessageCircle className="size-4 text-brand" aria-hidden />
-              Lanjutkan lewat WhatsApp
-            </h3>
-            <p className="text-sm leading-relaxed text-ink-soft">
-              Tim kami akan membalas dengan tautan halaman pembayaranmu. Simpan tautan itu —
-              lewat situ kamu mengirim bukti transfer dan memantau statusnya.
-            </p>
-            <a
-              href={registrationWhatsappUrl({
-                registrationNumber: lead.registrationNumber,
-                companionName: groups[0]?.companion.fullName || "Orang tua",
-                childrenCount: totalChildren,
-                eventName: event.title,
-                formattedTotal: formatRupiah(batch.totalAmount),
-                statusUrl:
-                  typeof window === "undefined"
-                    ? undefined
-                    : `${window.location.origin}/payment/${lead.accessToken}`,
-                needsPayment: true,
-              })}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setStepKey("done")}
-              className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}
-            >
-              <MessageCircle className="size-4" aria-hidden />
-              Lanjut ke Pembayaran
-            </a>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:justify-between">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => setStepKey("confirm")}
-              className="w-full sm:w-auto"
-            >
-              <ArrowLeft className="size-4" aria-hidden />
-              Kembali
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => setStepKey("done")}
-              className="w-full sm:w-auto"
-            >
-              Lanjut tanpa WhatsApp
-              <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </section>
+        <RegistrationReceipt
+          event={event}
+          batch={batch}
+          parentName={leadCompanionName}
+          whatsappUrl={buildWhatsappUrl(batch)}
+        />
       </div>
     );
   }
@@ -634,9 +579,8 @@ export function RegistrationWizard({
                 setModeState("PERSONAL");
                 setHeardFrom("");
                 setAffiliateCode("");
-                setAppliedVoucher(null);
+                setVoucherCode("");
                 setVoucherError(null);
-                setConsent(false);
                 setStepKey("participants");
                 setRestored(false);
               }}
@@ -757,23 +701,6 @@ export function RegistrationWizard({
                   </Field>
 
                   <Field
-                    label="Email"
-                    htmlFor={`companion-email-${groupIndex}`}
-                    error={group.companionErrors.email}
-                  >
-                    <TextInput
-                      id={`companion-email-${groupIndex}`}
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      placeholder="nama@email.com"
-                      value={group.companion.email}
-                      error={group.companionErrors.email}
-                      onChange={(e) => setCompanionField(groupIndex, "email", e.target.value)}
-                    />
-                  </Field>
-
-                  <Field
                     label="Domisili"
                     htmlFor={`companion-domicile-${groupIndex}`}
                     error={group.companionErrors.domicile}
@@ -788,6 +715,58 @@ export function RegistrationWizard({
                       error={group.companionErrors.domicile}
                       onChange={(e) => setCompanionField(groupIndex, "domicile", e.target.value)}
                     />
+                  </Field>
+
+                  <Field
+                    label="Pendamping Tambahan"
+                    htmlFor={`companion-extraCompanions-${groupIndex}`}
+                    error={group.companionErrors.extraCompanions}
+                    hint={
+                      extraCompanionPrice > 0
+                        ? `Pendamping lain yang ikut datang, cukup jumlahnya. Biaya ${formatRupiah(extraCompanionPrice)} per orang${
+                            group.companion.extraCompanions > 0
+                              ? ` — ${formatRupiah(extraCompanionPrice * group.companion.extraCompanions)} untuk ${group.companion.extraCompanions} orang`
+                              : ""
+                          }.`
+                        : "Pendamping lain yang ikut datang, cukup jumlahnya. Tanpa biaya tambahan."
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label="Kurangi pendamping tambahan"
+                        onClick={() =>
+                          setExtraCompanions(groupIndex, group.companion.extraCompanions - 1)
+                        }
+                        disabled={group.companion.extraCompanions <= 0}
+                        className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft transition-colors hover:border-brand/40 hover:text-brand disabled:opacity-40"
+                      >
+                        <Minus className="size-4" aria-hidden />
+                      </button>
+                      <TextInput
+                        id={`companion-extraCompanions-${groupIndex}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={MAX_EXTRA_COMPANIONS}
+                        className="w-20 text-center"
+                        value={String(group.companion.extraCompanions)}
+                        error={group.companionErrors.extraCompanions}
+                        onChange={(e) => setExtraCompanions(groupIndex, Number(e.target.value))}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Tambah pendamping tambahan"
+                        onClick={() =>
+                          setExtraCompanions(groupIndex, group.companion.extraCompanions + 1)
+                        }
+                        disabled={group.companion.extraCompanions >= MAX_EXTRA_COMPANIONS}
+                        className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft transition-colors hover:border-brand/40 hover:text-brand disabled:opacity-40"
+                      >
+                        <Plus className="size-4" aria-hidden />
+                      </button>
+                      <span className="text-sm text-muted">orang</span>
+                    </div>
                   </Field>
                 </div>
               </section>
@@ -863,52 +842,34 @@ export function RegistrationWizard({
                       </Field>
 
                       <Field
-                        label="Usia Anak"
-                        htmlFor={`ageYears-${groupIndex}-${childIndex}`}
-                        error={
-                          group.childErrors[childIndex]?.ageYears ??
-                          group.childErrors[childIndex]?.ageMonths
-                        }
-                        hint="Contoh: 3 tahun 8 bulan."
+                        label="Tanggal Lahir"
+                        htmlFor={`dateOfBirth-${groupIndex}-${childIndex}`}
+                        error={group.childErrors[childIndex]?.dateOfBirth}
+                        hint={dobHint(child.dateOfBirth, freeFlags[groupIndex]?.[childIndex])}
                         required
                       >
-                        <div className="flex items-center gap-2">
-                          <TextInput
-                            id={`ageYears-${groupIndex}-${childIndex}`}
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={17}
-                            placeholder="3"
-                            className="w-full"
-                            value={child.ageYears}
-                            error={group.childErrors[childIndex]?.ageYears}
-                            onChange={(e) =>
-                              setChildField(groupIndex, childIndex, "ageYears", e.target.value)
-                            }
-                          />
-                          <span className="shrink-0 text-sm text-muted">tahun</span>
-                          <TextInput
-                            id={`ageMonths-${groupIndex}-${childIndex}`}
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={11}
-                            placeholder="8"
-                            className="w-full"
-                            aria-label={`Usia anak ${childIndex + 1} dalam bulan`}
-                            value={child.ageMonths}
-                            error={group.childErrors[childIndex]?.ageMonths}
-                            onChange={(e) =>
-                              setChildField(groupIndex, childIndex, "ageMonths", e.target.value)
-                            }
-                          />
-                          <span className="shrink-0 text-sm text-muted">bulan</span>
-                        </div>
+                        <TextInput
+                          id={`dateOfBirth-${groupIndex}-${childIndex}`}
+                          type="date"
+                          min={minBirthDate}
+                          max={today}
+                          value={child.dateOfBirth}
+                          error={group.childErrors[childIndex]?.dateOfBirth}
+                          onChange={(e) =>
+                            setChildField(groupIndex, childIndex, "dateOfBirth", e.target.value)
+                          }
+                        />
                       </Field>
                     </div>
                   </fieldset>
                 ))}
+
+                {!isFree ? (
+                  <p className="text-xs text-muted">
+                    Anak di bawah {FREE_CHILD_UNDER_AGE} tahun gratis kalau datang bersama anak
+                    berusia {FREE_CHILD_UNDER_AGE} tahun ke atas. Usia dihitung pada hari kelas.
+                  </p>
+                ) : null}
 
                 {totalChildren < maxChildren ? (
                   <button
@@ -995,155 +956,60 @@ export function RegistrationWizard({
                   </p>
                 )}
               </Field>
+
+              {!isFree ? (
+                <Field
+                  label="Kode Voucher"
+                  htmlFor="voucherCode"
+                  error={voucherError ?? undefined}
+                  hint="Kalau punya. Diperiksa saat kamu menekan Lanjut."
+                >
+                  <TextInput
+                    id="voucherCode"
+                    placeholder="Contoh: KELASBERMAIN"
+                    autoCapitalize="characters"
+                    value={voucherCode}
+                    error={voucherError ?? undefined}
+                    onChange={(e) => {
+                      setVoucherCode(e.target.value.toUpperCase());
+                      setVoucherError(null);
+                    }}
+                  />
+                </Field>
+              ) : null}
             </div>
 
-            <div className="flex justify-end">
-              <Button size="lg" onClick={goToConfirm} className="w-full sm:w-auto">
-                Lanjut ke Konfirmasi
-                <ArrowRight className="size-4" aria-hidden />
-              </Button>
+            <div className="space-y-4">
+              <p className="text-xs leading-relaxed text-muted">
+                Dengan melanjutkan, kamu menyatakan data di atas benar dan bersedia dihubungi
+                panitia Kelas Bermain terkait {event.title}. Pembayaran dilakukan lewat
+                WhatsApp setelah ini.
+              </p>
+              <div className="flex justify-end">
+                <Button
+                  size="lg"
+                  onClick={goToConfirm}
+                  disabled={submitting}
+                  className="w-full sm:w-auto"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      Memproses…
+                    </>
+                  ) : (
+                    <>
+                      Lanjut
+                      <ArrowRight className="size-4" aria-hidden />
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </section>
         </div>
       ) : null}
 
-      {/* ---------------- Step 2: confirm — short, checkout-style ---------------- */}
-      {stepKey === "confirm" ? (
-        <section aria-label="Konfirmasi pendaftaran" className="space-y-4">
-          <h2 className="text-base font-extrabold text-ink">Konfirmasi Data</h2>
-
-          {mode === "PERSONAL" ? (
-            <>
-              <SummaryBlock title="Data Anak" onEdit={batch ? undefined : () => setStepKey("participants")}>
-                <ul className="space-y-1">
-                  {groups[0]?.children.map((child, index) => (
-                    <li key={index} className="text-sm text-ink">
-                      <span className="font-semibold">
-                        {child.fullName || "—"} {child.nickname ? `(${child.nickname})` : ""}
-                      </span>
-                      <span className="text-muted">
-                        {" "}
-                        · {formatAge(Number(child.ageYears) || 0, Number(child.ageMonths) || 0)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </SummaryBlock>
-
-              <SummaryBlock title="Pendamping" onEdit={batch ? undefined : () => setStepKey("participants")}>
-                <p className="text-sm font-semibold text-ink">{groups[0]?.companion.fullName}</p>
-                <p className="text-sm text-muted">{groups[0]?.companion.whatsapp}</p>
-                <p className="text-sm text-muted">{groups[0]?.companion.domicile}</p>
-              </SummaryBlock>
-            </>
-          ) : (
-            groups.map((group, groupIndex) => (
-              <SummaryBlock
-                key={groupIndex}
-                title={`Pendamping ${groupIndex + 1}`}
-                onEdit={batch ? undefined : () => setStepKey("participants")}
-              >
-                <p className="text-sm font-semibold text-ink">{group.companion.fullName}</p>
-                <p className="text-sm text-muted">{group.companion.whatsapp}</p>
-                <p className="text-sm text-muted">{group.companion.domicile}</p>
-                <ul className="mt-2 space-y-1 border-t border-line pt-2">
-                  {group.children.map((child, index) => (
-                    <li key={index} className="text-sm text-ink">
-                      <span className="font-semibold">
-                        {child.fullName || "—"} {child.nickname ? `(${child.nickname})` : ""}
-                      </span>
-                      <span className="text-muted">
-                        {" "}
-                        · {formatAge(Number(child.ageYears) || 0, Number(child.ageMonths) || 0)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </SummaryBlock>
-            ))
-          )}
-
-          <SummaryBlock title="Sumber Informasi" onEdit={batch ? undefined : () => setStepKey("participants")}>
-            <p className="text-sm text-ink">{heardFrom ? sourceLabel[heardFrom] : "—"}</p>
-            {affiliateCode.trim() ? (
-              <p className="mt-0.5 text-xs text-muted">Kode affiliate: {affiliateCode}</p>
-            ) : null}
-          </SummaryBlock>
-
-          <div className="flex items-center justify-between rounded-card border border-line bg-surface px-5 py-4">
-            <span className="text-sm font-bold text-ink">Jumlah Peserta</span>
-            <span className="text-sm font-semibold text-ink">{totalChildren} anak</span>
-          </div>
-
-          <PricingSummary
-            pricing={pricing}
-            isFree={isFree}
-            editable={!isFree}
-            onApplyVoucher={(code) => void applyVoucher(code)}
-            voucherError={voucherError}
-            voucherChecking={voucherChecking}
-          />
-
-          <Checkbox
-            id="consent"
-            checked={consent}
-            error={consentError ?? undefined}
-            onChange={(checked) => {
-              setConsent(checked);
-              if (checked) setConsentError(null);
-            }}
-            label={
-              <>
-                Saya orang tua/wali yang mendaftarkan anak di atas, menyatakan datanya benar,
-                dan bersedia dihubungi panitia Kelas Bermain terkait {event.title}.
-              </>
-            }
-          />
-
-          {batch ? (
-            <p className="rounded-card border border-line bg-canvas-deep/40 p-3 text-xs leading-relaxed text-ink-soft">
-              Pendaftaran ini sudah tercatat ({batch.registrations[0]?.registrationNumber}), jadi
-              datanya tidak bisa diubah di sini. Kalau ada yang salah, hubungi tim lewat
-              WhatsApp.
-            </p>
-          ) : null}
-
-          <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:justify-between">
-            {batch ? (
-              <span />
-            ) : (
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => setStepKey("participants")}
-                disabled={submitting}
-                className="w-full sm:w-auto"
-              >
-                Kembali
-              </Button>
-            )}
-            <Button
-              size="lg"
-              onClick={batch ? () => setStepKey(isFree ? "done" : "payment") : submitRegistration}
-              disabled={submitting}
-              className="w-full sm:w-auto"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Memproses…
-                </>
-              ) : batch ? (
-                "Lanjut"
-              ) : isFree ? (
-                "Daftar Sekarang"
-              ) : (
-                "Lanjut ke Pembayaran"
-              )}
-            </Button>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
@@ -1177,43 +1043,5 @@ function ModeCard({
       </span>
       <span className="text-xs text-muted">{description}</span>
     </button>
-  );
-}
-
-function SummaryBlock({
-  title,
-  onEdit,
-  children,
-}: {
-  title: string;
-  onEdit?: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted">{title}</p>
-        {onEdit ? (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
-          >
-            <Pencil className="size-3" aria-hidden />
-            Ubah
-          </button>
-        ) : null}
-      </div>
-      <div className="mt-2">{children}</div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 px-4 py-3">
-      <dt className="shrink-0 text-muted">{label}</dt>
-      <dd className="min-w-0 text-right font-semibold text-ink">{value}</dd>
-    </div>
   );
 }

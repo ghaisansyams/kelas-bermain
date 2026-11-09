@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { HeroSlider } from "@/components/home/hero-slider";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { Sticker } from "@/components/home/stickers";
 import { Reveal } from "@/components/ui/reveal";
 import type { HeroSlide } from "@/data/hero-slides";
 import type { HomeHeroContent } from "@/lib/services/cms";
@@ -35,6 +36,14 @@ export function Hero({
         <div className="absolute -left-24 -top-24 size-72 rounded-full bg-sun/18 blur-3xl sm:size-96" />
         <div className="absolute -right-20 top-40 size-72 rounded-full bg-brand/12 blur-3xl sm:size-96" />
         <div className="absolute bottom-0 left-1/3 size-64 rounded-full bg-pine/10 blur-3xl" />
+
+        {/* Stiker: hanya di sudut kosong, tidak pernah di atas teks atau tombol.
+            Di layar kecil cukup dua supaya halaman tidak ramai. */}
+        <Sticker kind="star" color="yellow" rotate={12} className="right-6 top-9 size-7 lg:right-[7%] lg:top-4 lg:size-11" />
+        <Sticker kind="confetti" className="right-[34%] top-3 hidden h-10 w-16 xl:block" delay={1.2} />
+        <Sticker kind="cloud" color="cyan" rotate={-6} className="left-[45%] top-8 hidden h-10 w-16 lg:block" delay={0.6} />
+        <Sticker kind="ball" color="green" rotate={-10} className="bottom-4 left-[1.5%] hidden size-11 xl:block" delay={2} />
+        <Sticker kind="pencil" color="yellow" rotate={-14} className="bottom-3 right-[5%] hidden h-8 w-24 lg:block" delay={1.6} />
       </div>
 
       <Container>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { events as catalogueEvents } from "@/data/events";
 import { Prisma } from "@prisma/client";
+import { ABOUT_IMAGE_HEIGHT, ABOUT_IMAGE_WIDTH } from "@/lib/utils/about-event";
 import { requireAdmin } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import { EVENT_STATUSES, eventRecordToRow, type EventStatus } from "@/lib/services/event-mapper";
@@ -61,10 +62,12 @@ function toEventData(row: EventRowInput) {
     tagline: row.tagline,
     summary: row.summary,
     description: json(row.description),
-    about_event: nullable("about_event" in row ? row.about_event : null),
+    about_event: nullable(row.about_event),
     category: row.category,
     cover: json(row.cover),
-    poster: nullable("poster" in row ? row.poster : null),
+    // Impor katalog tidak selalu membawa poster; tanpa pengecekan ini
+    // mengimpor ulang akan mengosongkan poster yang sudah diisi di admin.
+    ...("poster" in row ? { poster: nullable(row.poster) } : {}),
     start_date: new Date(row.start_date),
     end_date: new Date(row.end_date),
     time_start: row.time_start,
@@ -77,11 +80,10 @@ function toEventData(row: EventRowInput) {
     capacity: row.capacity,
     registration: json(row.registration),
     agenda: json(row.agenda),
-    speaker_ids: json("speaker_ids" in row ? row.speaker_ids : []),
+    ...("speaker_ids" in row ? { speaker_ids: json(row.speaker_ids) } : {}),
     facilities: json(row.facilities),
     requirements: json(row.requirements),
     certificate: json(row.certificate),
-    video: nullable(row.video),
     featured: row.featured,
     status: row.status,
   };
@@ -128,6 +130,21 @@ function lines(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+/** Kolom daftar di formulir: satu input per item dengan `name` yang sama. */
+function listValues(formData: FormData, name: string): string[] {
+  return formData
+    .getAll(name)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
+/** Pasangan input yang dikirim berurutan (jam + kegiatan, url + alt). */
+function pairedValues(formData: FormData, first: string, second: string): [string, string][] {
+  const a = formData.getAll(first).map((value) => String(value).trim());
+  const b = formData.getAll(second).map((value) => String(value).trim());
+  return a.map((value, index) => [value, b[index] ?? ""]);
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -139,17 +156,40 @@ function buildPayload(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim() || slugify(title);
   const priceRaw = Number(formData.get("price") ?? 0);
-  const youtubeUrl = String(formData.get("youtubeUrl") ?? "").trim();
-  const videoFileUrl = String(formData.get("videoFileUrl") ?? "").trim();
   const price = Number.isFinite(priceRaw) ? priceRaw : 0;
+  const extraRaw = Math.floor(Number(formData.get("extraCompanionPrice") ?? 0));
+  // Kelas gratis tidak menagih siapa pun, jadi biaya pendamping diabaikan di sana.
+  const extraCompanionPrice = price > 0 && Number.isFinite(extraRaw) && extraRaw > 0 ? extraRaw : undefined;
   const registrationType = price > 0 ? "PAID" : "FREE";
+  const aboutImages = pairedValues(formData, "aboutImageSrc", "aboutImageAlt")
+    .filter(([src]) => src.startsWith("/") || /^https?:\/\//.test(src))
+    .slice(0, 4)
+    .map(([src, alt]) => ({ src, alt, width: ABOUT_IMAGE_WIDTH, height: ABOUT_IMAGE_HEIGHT }));
+
+  const posterSrc = String(formData.get("posterSrc") ?? "").trim();
+  const posterWidth = Number(formData.get("posterWidth") ?? 0);
+  const posterHeight = Number(formData.get("posterHeight") ?? 0);
+  // Kosong berarti event ini tidak punya poster: bagian "Poster" tidak tampil.
+  const poster =
+    posterSrc.startsWith("/") || /^https?:\/\//.test(posterSrc)
+      ? {
+          src: posterSrc,
+          alt: String(formData.get("posterAlt") ?? "").trim(),
+          ...(posterWidth > 0 && posterHeight > 0
+            ? { width: Math.round(posterWidth), height: Math.round(posterHeight) }
+            : {}),
+        }
+      : null;
 
   return {
     slug,
     title,
+    poster,
     tagline: String(formData.get("tagline") ?? "").trim(),
     summary: String(formData.get("summary") ?? "").trim(),
     description: lines(formData.get("description")),
+    // Kosong berarti halaman detail memakai foto bawaan kategori.
+    about_event: aboutImages.length > 0 ? { images: aboutImages } : null,
     category: String(formData.get("category") ?? "Kegiatan"),
     cover: {
       src: String(formData.get("coverSrc") ?? "").trim(),
@@ -176,31 +216,22 @@ function buildPayload(formData: FormData) {
       type: registrationType,
       method: registrationType === "FREE" ? "NONE" : "WEBSITE",
       price: price > 0 ? price : undefined,
+      extraCompanionPrice,
       priceDisplay: String(formData.get("priceDisplay") ?? "SHOW_PRICE"),
       currency: "IDR" as const,
       deadline: String(formData.get("deadline") ?? "") || String(formData.get("startDate") ?? ""),
-      notes: lines(formData.get("registrationNotes")),
+      notes: listValues(formData, "registrationNotes"),
     },
-    agenda: lines(formData.get("agenda")).map((line) => {
-      const [time, ...rest] = line.split("|");
-      return { time: time.trim(), title: rest.join("|").trim() || time.trim() };
-    }),
-    facilities: lines(formData.get("facilities")),
-    requirements: lines(formData.get("requirements")),
+    agenda: pairedValues(formData, "agendaTime", "agendaTitle")
+      .filter(([time, title]) => time || title)
+      .map(([time, title]) => ({ time, title: title || time })),
+    facilities: listValues(formData, "facilities"),
+    requirements: listValues(formData, "requirements"),
     certificate: {
       available: formData.get("certificateAvailable") === "on",
       template: "classic" as const,
       requiresAttendance: true,
     },
-    // An uploaded file wins over a YouTube link when both are filled in.
-    video: videoFileUrl || youtubeUrl
-      ? {
-          youtubeUrl,
-          fileUrl: videoFileUrl || undefined,
-          title: String(formData.get("videoTitle") ?? "").trim() || undefined,
-          thumbnail: String(formData.get("videoThumbnail") ?? "").trim() || undefined,
-        }
-      : null,
     featured: formData.get("featured") === "on",
     status: String(formData.get("status") ?? "DRAFT") as EventStatus,
   };
@@ -306,7 +337,6 @@ export async function duplicateEventAction(formData: FormData) {
           // menerima bentuk baris, jadi tanggalnya dikembalikan ke teks dulu.
           start_date: source.start_date.toISOString().slice(0, 10),
           end_date: source.end_date.toISOString().slice(0, 10),
-          video: source.video as never,
           status: "DRAFT",
         } as never),
         id: newId,

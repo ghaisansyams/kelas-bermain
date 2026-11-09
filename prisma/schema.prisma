@@ -218,7 +218,6 @@ model customers {
   id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customer_number String          @unique @default(dbgenerated("('KB-CUS-'::text || lpad((nextval('customer_number_seq'::regclass))::text, 5, '0'::text))"))
   full_name       String
-  email           String          @default("")
   whatsapp        String
   domicile        String          @default("")
   address         String          @default("")
@@ -378,6 +377,7 @@ model registrations {
   qr_source           String?
   affiliate_code      String?
   age_override        Boolean               @default(false)
+  extra_companions    Int                   @default(0)
   notes               String?
   attendance_records  attendance_records?
   certificates        certificates[]

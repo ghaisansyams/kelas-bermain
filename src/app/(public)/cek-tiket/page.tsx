@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Ticket } from "lucide-react";
 import { TicketCheckForm } from "@/components/registration/ticket-check-form";
 import { Container } from "@/components/ui/container";
+import { certificatesEnabled } from "@/lib/features";
 
 export const metadata: Metadata = {
   title: "Cek Tiket",
@@ -29,6 +31,15 @@ export default function TiketPage() {
       <div className="mt-8 rounded-card border border-line bg-surface p-5 shadow-soft sm:p-7">
         <TicketCheckForm />
       </div>
+
+      {certificatesEnabled ? (
+        <p className="mt-6 text-center text-sm text-muted">
+          Sudah mengikuti kelas?{" "}
+          <Link href="/sertifikat" className="font-semibold text-brand hover:underline">
+            Unduh sertifikat anak
+          </Link>
+        </p>
+      ) : null}
     </Container>
   );
 }

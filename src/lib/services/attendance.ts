@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-
+import { phoneKey } from "@/lib/utils/validation";
 /**
  * Kehadiran.
  *
@@ -17,7 +17,7 @@ import { db } from "@/lib/db";
 
 export interface CheckInInput {
   registrationNumber: string;
-  /** Email or WhatsApp used at registration. */
+  /** Nomor WhatsApp yang dipakai saat mendaftar. */
   contact: string;
   eventId?: string;
   /** "qr" for a scanned check-in, "form" (default) for a typed one. */
@@ -44,7 +44,7 @@ export type CheckInResult = CheckInSuccess | CheckInFailure;
 export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
   try {
     const number = input.registrationNumber.trim().toUpperCase();
-    const contact = input.contact.trim().toLowerCase();
+    const contact = phoneKey(input.contact);
 
     const registration = await db.registrations.findFirst({
       where: { registration_number: { equals: number, mode: "insensitive" } },
@@ -54,7 +54,7 @@ export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
         child_id: true,
         attendance_status: true,
         certificate_status: true,
-        customers: { select: { email: true, whatsapp: true } },
+        customers: { select: { whatsapp: true } },
         children: { select: { full_name: true } },
       },
     });
@@ -68,15 +68,13 @@ export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
     }
 
     const customer = registration.customers;
-    const matches =
-      (customer?.email ?? "").toLowerCase() === contact ||
-      (customer?.whatsapp ?? "").toLowerCase() === contact;
+    const matches = contact !== "" && phoneKey(customer?.whatsapp ?? "") === contact;
 
     if (!matches) {
       return {
         ok: false,
         field: "contact",
-        error: "Email atau nomor WhatsApp tidak cocok dengan data pendaftaran.",
+        error: "Nomor WhatsApp tidak cocok dengan data pendaftaran.",
       };
     }
 

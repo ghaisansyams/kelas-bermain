@@ -1,7 +1,11 @@
 import Image from "next/image";
 import { Reveal } from "@/components/ui/reveal";
 import type { EventRecord } from "@/lib/types";
-import { resolveAboutEvent } from "@/lib/utils/about-event";
+import {
+  ABOUT_IMAGE_HEIGHT,
+  ABOUT_IMAGE_WIDTH,
+  resolveAboutEvent,
+} from "@/lib/utils/about-event";
 
 /**
  * Visual-first "Tentang Event": a photo (or a small gallery of them) before
@@ -27,12 +31,14 @@ export function AboutEvent({
       >
         {images.map((image, index) => (
           <Reveal key={image.src} delay={index * 90} className="group overflow-hidden rounded-card">
-            <div className="aspect-[16/9] overflow-hidden sm:aspect-[3/2]">
+            {/* 1350 × 1080 (5:4) di semua layar. Foto dengan rasio lain dipotong
+                dari tengah, jadi bentuknya seragam di semua event. */}
+            <div className="aspect-[1350/1080] overflow-hidden">
               <Image
                 src={image.src}
                 alt={image.alt}
-                width={image.width ?? 1200}
-                height={image.height ?? 800}
+                width={ABOUT_IMAGE_WIDTH}
+                height={ABOUT_IMAGE_HEIGHT}
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 priority={index === 0}
                 loading={index === 0 ? undefined : "lazy"}

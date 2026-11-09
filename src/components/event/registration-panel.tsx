@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Award,
   CalendarCheck,
-  CircleCheck,
   Clock3,
   Info,
   Users,
@@ -163,17 +162,6 @@ export function RegistrationPanel({ event }: { event: EventView }) {
             Kuota sudah terpenuhi. Pantau Instagram @kelasbermain untuk pengumuman kursi
             tambahan atau gelaran berikutnya.
           </p>
-        ) : null}
-
-        {event.registration.notes && event.registration.notes.length > 0 ? (
-          <ul className="space-y-2 border-t border-line pt-4">
-            {event.registration.notes.map((note) => (
-              <li key={note} className="flex items-start gap-2 text-xs leading-relaxed text-muted">
-                <CircleCheck className="mt-px size-3.5 shrink-0 text-pine" aria-hidden />
-                {note}
-              </li>
-            ))}
-          </ul>
         ) : null}
       </div>
     </div>

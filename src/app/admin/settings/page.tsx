@@ -24,7 +24,19 @@ export default async function AdminSettingsPage({
   const sample = (children: number) =>
     calculateRegistrationPrice({ eventPrice: 150_000, childrenCount: children, config });
 
-  const examples = [sample(1), sample(2), sample(config.groupMinChildren)];
+  // Dua anak dengan kode, supaya terlihat bahwa Affiliate menggantikan Sibling.
+  const affiliateSample = calculateRegistrationPrice({
+    eventPrice: 150_000,
+    childrenCount: config.siblingMinChildren,
+    hasActiveAffiliate: true,
+    config,
+  });
+  const examples = [
+    sample(1),
+    sample(config.siblingMinChildren),
+    affiliateSample,
+    sample(config.groupMinChildren),
+  ];
 
   return (
     <div className="space-y-5">
@@ -38,7 +50,7 @@ export default async function AdminSettingsPage({
 
       <Card>
         <form action={savePricingSettingsAction} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
               Diskon Sibling per anak (Rp)
               <input
@@ -49,10 +61,35 @@ export default async function AdminSettingsPage({
                 className={inputClass}
               />
               <span className="text-xs font-medium text-muted">
-                Berlaku otomatis mulai 2 anak dalam satu pendaftaran.
+                Dipotong dari tiap anak yang membayar, mulai dari jumlah anak di kolom sebelah.
               </span>
             </label>
-
+            <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
+              Minimal anak untuk Sibling
+              <input
+                name="siblingMinChildren"
+                type="number"
+                min={2}
+                defaultValue={config.siblingMinChildren}
+                className={inputClass}
+              />
+              <span className="text-xs font-medium text-muted">
+                2 = berlaku mulai 2 anak. Isi 3 kalau baru berlaku untuk lebih dari 2 anak.
+              </span>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
+              Diskon Affiliate per anak (Rp)
+              <input
+                name="affiliateDiscountPerChild"
+                type="number"
+                min={0}
+                defaultValue={config.affiliateDiscountPerChild}
+                className={inputClass}
+              />
+              <span className="text-xs font-medium text-muted">
+                Berlaku saat orang tua memasukkan kode affiliate yang aktif.
+              </span>
+            </label>
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
               Minimal anak untuk Group
               <input
@@ -66,7 +103,6 @@ export default async function AdminSettingsPage({
                 Di bawah angka ini, pendaftaran dihitung sebagai Sibling.
               </span>
             </label>
-
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
               Diskon Group per anak (Rp)
               <input
@@ -77,7 +113,7 @@ export default async function AdminSettingsPage({
                 className={inputClass}
               />
               <span className="text-xs font-medium text-muted">
-                Dipakai juga untuk pendaftaran lewat kode affiliate.
+                Berlaku untuk pendaftaran rombongan.
               </span>
             </label>
           </div>
@@ -100,17 +136,20 @@ export default async function AdminSettingsPage({
         <div className="mt-3 space-y-2 text-sm">
           {examples.map((example) => (
             <div
-              key={example.childrenCount}
+              key={`${example.registrationType}-${example.childrenCount}-${example.discountAmount}`}
               className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-2 last:border-0"
             >
               <span className="font-semibold text-ink">
-                {example.childrenCount} anak — {example.registrationType}
+                {example.childrenCount} anak
+                {example.registrationType === "AFFILIATE" ? " + kode affiliate" : ""}
+                {" — "}
+                {example.registrationType}
               </span>
               <span className="text-ink-soft">
                 {formatRupiah(example.subtotal)}
-                {example.discountAmount > 0
-                  ? ` − ${formatRupiah(example.discountAmount)} (${example.discountLabel})`
-                  : ""}
+                {example.discounts.map(
+                  (discount) => ` − ${formatRupiah(discount.amount)} (${discount.label})`,
+                )}
                 {" = "}
                 <strong className="font-extrabold text-brand">
                   {formatRupiah(example.total)}
@@ -120,8 +159,9 @@ export default async function AdminSettingsPage({
           ))}
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Hanya satu diskon dasar yang berlaku per pendaftaran — Sibling, Group, atau Affiliate,
-          tidak ditumpuk. Voucher dihitung terakhir, di atas hasil tersebut.
+          Hanya satu diskon dasar yang berlaku per pendaftaran. Tanpa kode: Sibling atau Group
+          menurut jumlah anak. Dengan kode affiliate yang aktif: Diskon Affiliate saja, yang
+          menggantikan Sibling dan Group. Voucher dihitung terakhir, di atas hasil tersebut.
         </p>
       </Card>
     </div>

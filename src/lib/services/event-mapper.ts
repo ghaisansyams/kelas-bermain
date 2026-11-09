@@ -39,7 +39,6 @@ export interface EventRow {
   facilities: string[] | null;
   requirements: string[] | null;
   certificate: EventRecord["certificate"];
-  video: EventRecord["video"] | null;
   featured: boolean;
   status: string;
 }
@@ -93,7 +92,6 @@ export function rowToEventRecord(row: EventRow): EventRecord {
     facilities: row.facilities ?? [],
     requirements: row.requirements ?? [],
     certificate: row.certificate,
-    video: row.video ?? undefined,
     featured: row.featured,
     published: row.status === "PUBLISHED" || row.status === "ONGOING",
   };
@@ -129,7 +127,6 @@ export function eventRecordToRow(record: EventRecord, status: EventStatus) {
     facilities: record.facilities,
     requirements: record.requirements,
     certificate: record.certificate,
-    video: record.video ?? null,
     featured: record.featured,
     status,
   };

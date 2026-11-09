@@ -1,4 +1,4 @@
-import { LogoMark } from "@/components/brand/logo";
+import { LogoLockup } from "@/components/brand/logo";
 import type { CertificateRecord } from "@/lib/repositories/types";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/date";
@@ -59,11 +59,8 @@ export function CertificateCard({
         />
 
         <div className="relative flex h-full flex-col items-center px-[3.2em] py-[2.4em] text-center">
-          <header className="flex items-center gap-[0.55em]">
-            <LogoMark className="size-[2.2em]" />
-            <span className="text-[0.95em] font-extrabold tracking-tight text-ink">
-              Kelas <span className="text-accent font-semibold text-brand">Bermain</span>
-            </span>
+          <header className="flex items-center">
+            <LogoLockup className="h-[3em]" />
           </header>
 
           {/* Body is centred in the space left between header and footer. */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, SearchX, ShieldCheck } from "lucide-react";
 import { CertificateCard } from "@/components/certificate/certificate-card";
+import { CertificateDownloadButtons } from "@/components/certificate/download-buttons";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -88,18 +89,32 @@ export function CertificateViewer({ number }: { number: string }) {
         Geser ke samping untuk melihat seluruh sertifikat.
       </p>
 
-      <div className="no-print flex flex-col gap-2.5 sm:flex-row">
-        <Button onClick={() => window.print()} className="w-full sm:w-auto">
-          <Printer className="size-4" aria-hidden />
-          Unduh / Cetak
-        </Button>
-        <Link
-          href="/sertifikat"
-          className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Cek Sertifikat Lain
-        </Link>
+      <div className="no-print space-y-2.5">
+        {template ? (
+          <CertificateDownloadButtons
+            number={certificate.number}
+            participantName={certificate.participantName}
+            templateName={certificate.template}
+            template={template}
+          />
+        ) : null}
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <Button
+            variant={template ? "ghost" : "primary"}
+            onClick={() => window.print()}
+            className="w-full sm:w-auto"
+          >
+            <Printer className="size-4" aria-hidden />
+            Cetak
+          </Button>
+          <Link
+            href="/sertifikat"
+            className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Unduh Sertifikat Lain
+          </Link>
+        </div>
       </div>
 
       <dl className="no-print grid gap-4 rounded-card border border-line bg-surface p-5 sm:grid-cols-2">

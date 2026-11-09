@@ -188,14 +188,22 @@ export function SelectField({
   );
 }
 
-export function SearchField({ name = "q", value }: { name?: string; value?: string }) {
+export function SearchField({
+  name = "q",
+  value,
+  placeholder = "Nama, nomor, atau invoice",
+}: {
+  name?: string;
+  value?: string;
+  placeholder?: string;
+}) {
   return (
     <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
       Cari
       <input
         name={name}
         defaultValue={value ?? ""}
-        placeholder="Nama, nomor, atau invoice"
+        placeholder={placeholder}
         className="h-11 w-full min-w-[14rem] rounded-xl border border-line bg-surface px-3 text-[0.9375rem] text-ink"
       />
     </label>

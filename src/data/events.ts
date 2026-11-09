@@ -261,14 +261,6 @@ export const events: EventRecord[] = [
       "Informasikan alergi makanan saat mendaftar",
     ],
     certificate: { available: true, template: "classic", requiresAttendance: true },
-    // Dummy preview video — no footage of this specific class exists yet, so
-    // this is a real, on-topic public video (kids decorating cakes) standing
-    // in until Kelas Bermain's own recording is ready. Swap `youtubeUrl` here
-    // when it is; EventVideoCard needs no changes.
-    video: {
-      youtubeUrl: "https://www.youtube.com/watch?v=fi4n4Ix8MgU",
-      title: "Keseruan Menghias Mini Cake",
-    },
     featured: true,
     published: true,
   },

@@ -5,6 +5,7 @@ import { Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/forms/field";
 import type { PricingResult } from "@/lib/pricing";
+import { FREE_CHILD_UNDER_AGE } from "@/lib/utils/age";
 import { formatRupiah } from "@/lib/utils/format";
 
 /**
@@ -54,19 +55,37 @@ export function PricingSummary({
       <dl className="mt-3 space-y-2 text-sm">
         <Row label="Harga per anak" value={formatRupiah(pricing.unitPrice)} />
         <Row label="Jumlah peserta" value={`${pricing.childrenCount} anak`} />
-        <Row label="Subtotal" value={formatRupiah(pricing.subtotal)} />
-        {pricing.discountLabel ? (
+        {pricing.freeChildrenCount > 0 ? (
           <Row
-            label={pricing.discountLabel}
-            value={`- ${formatRupiah(pricing.discountAmount)}`}
+            label={`Anak di bawah ${FREE_CHILD_UNDER_AGE} tahun (${pricing.freeChildrenCount} anak)`}
+            value="Gratis"
             tone="discount"
           />
         ) : null}
+        <Row label="Subtotal" value={formatRupiah(pricing.subtotal)} />
+        {pricing.discounts.map((discount) => (
+          <Row
+            key={discount.label}
+            label={discount.label}
+            value={`- ${formatRupiah(discount.amount)}`}
+            tone="discount"
+          />
+        ))}
         {pricing.voucher ? (
           <Row
             label={pricing.voucher.label}
             value={`- ${formatRupiah(pricing.voucher.amount)}`}
             tone="discount"
+          />
+        ) : null}
+        {pricing.extraCompanions > 0 ? (
+          <Row
+            label={
+              pricing.extraCompanionPrice > 0
+                ? `Pendamping tambahan (${pricing.extraCompanions} × ${formatRupiah(pricing.extraCompanionPrice)})`
+                : `Pendamping tambahan (${pricing.extraCompanions} orang)`
+            }
+            value={pricing.extraCompanionPrice > 0 ? formatRupiah(pricing.extraCompanionTotal) : "Gratis"}
           />
         ) : null}
       </dl>

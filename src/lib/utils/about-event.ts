@@ -1,6 +1,14 @@
 import type { AboutEventContent, EventCategory, EventRecord, ImageAsset } from "@/lib/types";
 
 /**
+ * Ukuran foto "Tentang Event" (rasio 5:4). Halaman publik, pratinjau admin,
+ * dan data yang disimpan semuanya memakai angka ini, supaya foto selalu
+ * tampil dengan bentuk yang sama di semua event.
+ */
+export const ABOUT_IMAGE_WIDTH = 1350;
+export const ABOUT_IMAGE_HEIGHT = 1080;
+
+/**
  * Category fallback for events that haven't been given a bespoke
  * `aboutEvent.images` yet — real photos from the gallery library, never an
  * event's own cover/poster, so "Tentang Event" always shows a different

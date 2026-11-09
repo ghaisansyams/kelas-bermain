@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { describeChildAge } from "@/lib/utils/age";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { setCustomerStatusAction } from "@/app/admin/customers/actions";
@@ -39,7 +40,6 @@ export default async function CustomerDetailPage({
         customer_number: true,
         full_name: true,
         whatsapp: true,
-        email: true,
         domicile: true,
         occupation: true,
         source: true,
@@ -54,6 +54,7 @@ export default async function CustomerDetailPage({
         child_number: true,
         full_name: true,
         nickname: true,
+        date_of_birth: true,
         age_years: true,
         age_months: true,
         status: true,
@@ -163,7 +164,6 @@ export default async function CustomerDetailPage({
       <Card>
         <h2 className="text-base font-extrabold text-ink">Data pendamping</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-          <Line label="Email" value={customer.email || "—"} />
           <Line label="Domisili" value={customer.domicile || "—"} />
           <Line label="Pekerjaan" value={customer.occupation || "—"} />
           <Line label="Mengetahui dari" value={customer.source || "—"} />
@@ -181,6 +181,7 @@ export default async function CustomerDetailPage({
                 <Th>Kode</Th>
                 <Th>Nama</Th>
                 <Th>Panggilan</Th>
+                <Th>Tanggal lahir</Th>
                 <Th>Usia</Th>
                 <Th>Status</Th>
               </tr>
@@ -188,7 +189,7 @@ export default async function CustomerDetailPage({
             <tbody className="divide-y divide-line">
               {children.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted">
+                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted">
                     Belum ada anak terdaftar.
                   </td>
                 </tr>
@@ -198,11 +199,12 @@ export default async function CustomerDetailPage({
                     <Td className="font-mono text-xs font-bold text-ink">{child.child_number}</Td>
                     <Td className="font-semibold text-ink">{child.full_name}</Td>
                     <Td>{child.nickname || "—"}</Td>
-                    <Td>
-                      {child.age_years !== null
-                        ? `${child.age_years} tahun${child.age_months ? ` ${child.age_months} bulan` : ""}`
+                    <Td className="whitespace-nowrap">
+                      {describeChildAge(child).birth
+                        ? formatDate(describeChildAge(child).birth as string)
                         : "—"}
                     </Td>
+                    <Td className="whitespace-nowrap">{describeChildAge(child).age}</Td>
                     <Td>{child.status === "active" ? "Aktif" : "Nonaktif"}</Td>
                   </tr>
                 ))

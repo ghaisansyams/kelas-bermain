@@ -14,7 +14,6 @@ import {
 import { AboutEvent } from "@/components/event/about-event";
 import { CheckList, EventAgenda, SectionBlock } from "@/components/event/event-detail-sections";
 import { EventTimeline } from "@/components/event/event-timeline";
-import { EventVideoCard } from "@/components/event/event-video-card";
 import {
   MobileRegistrationBar,
   RegistrationPanel,
@@ -197,7 +196,6 @@ export default async function EventDetailPage({
             {/* Registration panel sits inline on mobile, sticky in the sidebar on desktop */}
             <div className="mt-8 lg:hidden">
               <RegistrationPanel event={event} />
-              {event.video ? <EventVideoCard video={event.video} className="mt-4" /> : null}
             </div>
 
             <div className="mt-10 space-y-8">
@@ -207,6 +205,14 @@ export default async function EventDetailPage({
                   <AboutEvent event={event} />
                 </div>
               </section>
+
+              {/* Catatan pendaftaran dulu ada di kartu biaya; di sini terbaca
+                  sebagai bagian dari penjelasan event, tepat sebelum rundown. */}
+              {event.registration.notes && event.registration.notes.length > 0 ? (
+                <SectionBlock id="catatan" title="Catatan Pendaftaran">
+                  <CheckList items={event.registration.notes} />
+                </SectionBlock>
+              ) : null}
 
               {event.poster ? (
                 <SectionBlock id="poster" title="Poster Kegiatan">
@@ -219,14 +225,14 @@ export default async function EventDetailPage({
                       alt={event.poster.alt}
                       width={event.poster.width ?? 1080}
                       height={event.poster.height ?? 1350}
-                      sizes="(max-width: 640px) 90vw, 460px"
-                      className="mx-auto w-full max-w-[460px] rounded-xl shadow-soft"
+                      sizes="(max-width: 640px) 90vw, 560px"
+                      className="mx-auto h-auto w-full max-w-[560px] rounded-xl shadow-soft"
                     />
                   </figure>
                 </SectionBlock>
               ) : null}
 
-              <SectionBlock id="agenda" title="Agenda Kegiatan">
+              <SectionBlock id="agenda" title="Rundown">
                 <EventAgenda items={event.agenda} />
               </SectionBlock>
 
@@ -269,7 +275,6 @@ export default async function EventDetailPage({
           <aside className="hidden lg:col-span-5 lg:block xl:col-span-4">
             <div className="sticky top-24">
               <RegistrationPanel event={event} />
-              {event.video ? <EventVideoCard video={event.video} className="mt-4" /> : null}
             </div>
           </aside>
         </div>

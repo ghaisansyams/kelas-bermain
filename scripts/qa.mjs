@@ -121,15 +121,17 @@ if (hasForm) {
 
 // 5. Certificate checker is reachable and rejects a bogus number cleanly.
 await go("/sertifikat");
-const certInput = await page.$("input");
+const certInput = await page.$("#whatsapp");
 record("Sertifikat: halaman aktif", Boolean(certInput));
 if (certInput) {
-  await certInput.type("KB-2026-99999");
+  // Pasangan palsu: nomor WhatsApp yang tidak terdaftar dan nomor pendaftaran asing.
+  await certInput.type("081200000000");
+  await page.type("#reference", "KB-REG-2026-99999");
   const handles = await page.$$("button");
   const pairs = await Promise.all(
     handles.map(async (el) => [el, await el.evaluate((e) => e.textContent.trim())]),
   );
-  const btn = (pairs.find(([, t]) => /cek|cari|verifik/i.test(t)) ?? [])[0];
+  const btn = (pairs.find(([, t]) => /cari|cek|verifik/i.test(t)) ?? [])[0];
   if (btn) {
     await btn.click();
     await new Promise((r) => setTimeout(r, 2500));

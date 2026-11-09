@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Compass, Home } from "lucide-react";
-import { LogoMark } from "@/components/brand/logo";
+import { LogoLockup } from "@/components/brand/logo";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { buttonStyles } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default async function NotFound() {
         as="main"
         className="flex min-h-[70vh] max-w-2xl flex-1 flex-col items-center justify-center py-16 text-center"
       >
-      <LogoMark className="size-14 motion-safe:animate-float-slow" />
+      <LogoLockup className="h-24 motion-safe:animate-float-slow" />
 
       <p className="mt-8 text-6xl font-extrabold tracking-tight text-brand sm:text-7xl">404</p>
       <h1 className="mt-3 text-2xl font-extrabold text-ink sm:text-3xl">

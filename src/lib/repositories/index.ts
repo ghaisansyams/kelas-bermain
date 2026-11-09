@@ -125,11 +125,6 @@ function normalizeWhatsapp(value: string): string {
 
 /** Look-ups that span repositories but stay too small to deserve a service. */
 export const lookups = {
-  customerByEmail(email: string): Customer | null {
-    const needle = email.trim().toLowerCase();
-    if (!needle) return null;
-    return customersRepo.all().find((c) => c.email.toLowerCase() === needle) ?? null;
-  },
   /**
    * Families are deduplicated on WhatsApp now that the intake form no longer
    * asks for an email. Compared in normalised form so 0812…, +62812… and

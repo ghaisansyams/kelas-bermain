@@ -133,8 +133,8 @@ export function TicketCheckForm() {
           </dl>
 
           <p className="mt-4 text-xs leading-relaxed text-muted">
-            Ingin melihat detail lengkap pendaftaran? Masukkan juga email atau nomor WhatsApp
-            yang dipakai saat mendaftar.
+            Ingin melihat detail lengkap pendaftaran? Masukkan juga nomor WhatsApp yang
+            dipakai saat mendaftar.
           </p>
         </div>
 
@@ -190,15 +190,17 @@ export function TicketCheckForm() {
       </Field>
 
       <Field
-        label="Email atau Nomor WhatsApp (opsional)"
+        label="Nomor WhatsApp (opsional)"
         htmlFor="contact"
         error={errors.contact}
-        hint="Isi kontak yang sama seperti saat mendaftar untuk melihat detail lengkap. Kalau dikosongkan, kami hanya menampilkan status pembayaran."
+        hint="Isi nomor yang sama seperti saat mendaftar untuk melihat detail lengkap. Kalau dikosongkan, kami hanya menampilkan status pembayaran."
       >
         <TextInput
           id="contact"
-          autoComplete="email"
-          placeholder="nama@email.com atau 08123456789"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="08123456789"
           value={values.contact}
           error={errors.contact}
           disabled={submitting}

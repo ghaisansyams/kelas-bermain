@@ -1,3 +1,5 @@
+import { describeChildAge } from "@/lib/utils/age";
+import { formatDate } from "@/lib/utils/date";
 import { Card, Notice, PageHeader } from "@/components/admin/admin-ui";
 import {
   EmptyRow,
@@ -55,6 +57,7 @@ export default async function AdminChildrenPage({
     child_number: string;
     full_name: string;
     nickname: string;
+    date_of_birth: Date | null;
     age_years: number | null;
     age_months: number | null;
     school: string;
@@ -77,6 +80,7 @@ export default async function AdminChildrenPage({
           child_number: true,
           full_name: true,
           nickname: true,
+          date_of_birth: true,
           age_years: true,
           age_months: true,
           school: true,
@@ -130,6 +134,7 @@ export default async function AdminChildrenPage({
                 <Th>Kode</Th>
                 <Th>Nama</Th>
                 <Th>Panggilan</Th>
+                <Th>Tanggal lahir</Th>
                 <Th>Usia</Th>
                 <Th>Pendamping</Th>
                 <Th>Status</Th>
@@ -138,7 +143,7 @@ export default async function AdminChildrenPage({
             </thead>
             <tbody className="divide-y divide-line">
               {rows.length === 0 ? (
-                <EmptyRow colSpan={7}>Belum ada data anak.</EmptyRow>
+                <EmptyRow colSpan={8}>Belum ada data anak.</EmptyRow>
               ) : (
                 rows.map((row) => (
                   <tr key={row.id}>
@@ -147,11 +152,12 @@ export default async function AdminChildrenPage({
                     </Td>
                     <Td className="font-semibold text-ink">{row.full_name}</Td>
                     <Td>{row.nickname || "—"}</Td>
-                    <Td>
-                      {row.age_years !== null
-                        ? `${row.age_years} tahun${row.age_months ? ` ${row.age_months} bulan` : ""}`
+                    <Td className="whitespace-nowrap">
+                      {describeChildAge(row).birth
+                        ? formatDate(describeChildAge(row).birth as string)
                         : "—"}
                     </Td>
+                    <Td className="whitespace-nowrap">{describeChildAge(row).age}</Td>
                     <Td>
                       <Link
                         href={`/admin/customers/${row.customer_id}`}

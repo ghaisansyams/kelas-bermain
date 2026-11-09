@@ -19,6 +19,8 @@ function coerce(value: unknown): PricingConfig {
   };
   return {
     siblingDiscountPerChild: num("siblingDiscountPerChild"),
+    siblingMinChildren: Math.max(2, Math.round(num("siblingMinChildren"))),
+    affiliateDiscountPerChild: num("affiliateDiscountPerChild"),
     groupMinChildren: Math.max(2, Math.round(num("groupMinChildren"))),
     groupDiscountPerChild: num("groupDiscountPerChild"),
   };

@@ -26,24 +26,16 @@ export default async function AdminDashboardPage() {
   const startOfToday = new Date(`${wibDate}T00:00:00+07:00`);
 
   let failed = false;
-  let customers = 0;
   let children = 0;
-  let registrations = 0;
   let todayRegistrations = 0;
-  let pendingPayments = 0;
   let paidTotal = 0;
   let recentRows: RecentRegistration[] = [];
   const events = await getUpcomingEvents(5);
 
   try {
-    const [c, ch, r, today, pending, paid, recent] = await Promise.all([
-      db.customers.count(),
+    const [ch, today, paid, recent] = await Promise.all([
       db.children.count(),
-      db.registrations.count(),
       db.registrations.count({ where: { registration_date: { gte: startOfToday } } }),
-      // Menunggu dicek ikut dihitung: itu pembayaran yang butuh tindakan admin,
-      // dan tanpa ini angkanya tidak naik tepat saat ada pekerjaan menunggu.
-      db.payments.count({ where: { status: { in: ["PENDING", "WAITING_VERIFICATION"] } } }),
       db.payments.aggregate({ _sum: { amount: true }, where: { status: "PAID" } }),
       db.registrations.findMany({
         select: {
@@ -58,11 +50,8 @@ export default async function AdminDashboardPage() {
         take: 5,
       }),
     ]);
-    customers = c;
     children = ch;
-    registrations = r;
     todayRegistrations = today;
-    pendingPayments = pending;
     paidTotal = Number(paid._sum.amount ?? 0);
     recentRows = recent;
   } catch {
@@ -78,12 +67,9 @@ export default async function AdminDashboardPage() {
 
       {failed ? <Notice tone="error">Sebagian data gagal dimuat. Muat ulang halaman.</Notice> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Pendamping" value={String(customers)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard label="Anak" value={String(children)} />
-        <StatCard label="Registrasi" value={String(registrations)} />
         <StatCard label="Registrasi hari ini" value={String(todayRegistrations)} />
-        <StatCard label="Pembayaran pending" value={String(pendingPayments)} />
         <StatCard
           label="Pembayaran lunas"
           value={formatRupiah(paidTotal)}

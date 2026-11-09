@@ -20,7 +20,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { LogoMark } from "@/components/brand/logo";
+import { LogoLockup } from "@/components/brand/logo";
 import type { AdminSession } from "@/lib/admin/auth";
 import { signOutAction } from "@/app/admin/actions";
 
@@ -80,8 +80,10 @@ export function AdminShell({
     <div className="flex min-h-screen bg-canvas-deep/40">
       <aside className="hidden w-64 shrink-0 border-r border-line bg-surface lg:block">
         <div className="flex h-16 items-center gap-2.5 border-b border-line px-5">
-          <LogoMark className="size-7" />
-          <span className="text-sm font-extrabold text-ink">Admin Kelas Bermain</span>
+          <LogoLockup className="h-10" />
+          <span className="rounded-pill bg-canvas-deep px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wider text-muted">
+            Admin
+          </span>
         </div>
         <nav className="space-y-6 p-4" aria-label="Navigasi admin">
           {NAV_GROUPS.map((group) => (

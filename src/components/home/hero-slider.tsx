@@ -123,7 +123,7 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
             <div
               role="tablist"
               aria-label="Pilih slide hero"
-              className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5"
+              className="absolute bottom-6 right-4 flex gap-1.5 sm:bottom-7"
             >
               {slides.map((slide, i) => (
                 <button
@@ -142,34 +142,40 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
             </div>
           </>
         ) : null}
+
+        {/* Kartu kelas terdekat di dalam banner. Latarnya gelap-transparan, bukan
+            putih, supaya menyatu dengan foto; lebar dibatasi agar tidak pernah
+            menimpa titik-titik slide di kanan bawah. */}
+        <Link
+          href={`/event/${active.eventSlug}`}
+          className={cn(
+            "group absolute bottom-3 left-3 flex max-w-[calc(100%-6rem)] items-center gap-3 rounded-2xl border border-white/20 bg-ink/40 p-3 text-white backdrop-blur-md",
+            "transition-colors duration-300 hover:bg-ink/55",
+            "sm:bottom-4 sm:left-4 sm:max-w-xs sm:p-3.5",
+          )}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white sm:size-11">
+            <CalendarDays className="size-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.625rem] font-bold uppercase tracking-[0.14em] text-sun-soft">
+              Kelas terdekat
+            </span>
+            <span className="mt-0.5 block truncate text-sm font-bold">{active.title}</span>
+            <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-white/75">
+              <MapPin className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">
+                {active.date} · {active.location}
+              </span>
+            </span>
+          </span>
+          <ArrowRight
+            className="size-4 shrink-0 text-white/70 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          />
+        </Link>
       </div>
 
-      <Link
-        href={`/event/${active.eventSlug}`}
-        className={cn(
-          "group absolute -bottom-5 left-3 right-3 flex items-center gap-3 rounded-2xl border border-line bg-surface/95 p-3.5 shadow-lift backdrop-blur-md",
-          "transition-transform duration-300 hover:-translate-y-0.5",
-          "sm:left-5 sm:right-auto sm:max-w-xs",
-        )}
-      >
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-          <CalendarDays className="size-5" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[0.625rem] font-bold uppercase tracking-[0.14em] text-brand">
-            Kelas terdekat
-          </span>
-          <span className="mt-0.5 block truncate text-sm font-bold text-ink">{active.title}</span>
-          <span className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted">
-            <MapPin className="size-3" aria-hidden />
-            {active.date} · {active.location}
-          </span>
-        </span>
-        <ArrowRight
-          className="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5"
-          aria-hidden
-        />
-      </Link>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import type { Child, Customer, Gender, RegistrationSource } from "@/lib/repositories/types";
+import { ageFromBirthDate } from "@/lib/utils/age";
 
 /**
  * Data induk pendamping (orang tua/wali) dan anak.
@@ -21,7 +22,6 @@ export interface CustomerInput {
   fullName: string;
   whatsapp: string;
   domicile: string;
-  email?: string;
   address?: string;
   city?: string;
   occupation?: string;
@@ -31,11 +31,9 @@ export interface CustomerInput {
 export interface ChildInput {
   fullName: string;
   nickname?: string;
-  /** Usia yang disebut orang tua di formulir. */
-  ageYears: number;
-  ageMonths?: number;
+  /** "YYYY-MM-DD". Usia tahun/bulan dihitung darinya, bukan diketik orang tua. */
+  dateOfBirth: string;
   gender?: Gender | "";
-  dateOfBirth?: string;
   school?: string;
   grade?: string;
   specialNotes?: string;
@@ -49,7 +47,6 @@ function mapCustomer(row: {
   id: string;
   customer_number: string;
   full_name: string;
-  email: string;
   whatsapp: string;
   domicile: string;
   address: string;
@@ -64,7 +61,6 @@ function mapCustomer(row: {
     id: row.id,
     customerNumber: row.customer_number,
     fullName: row.full_name,
-    email: row.email ?? "",
     whatsapp: row.whatsapp,
     domicile: row.domicile ?? "",
     address: row.address ?? "",
@@ -121,7 +117,6 @@ export async function upsertCustomer(
   input: CustomerInput,
 ): Promise<{ customer: Customer; created: boolean }> {
   const whatsapp = input.whatsapp.trim();
-  const email = input.email?.trim().toLowerCase() ?? "";
   const domicile = input.domicile.trim();
   const occupation = input.occupation?.trim() ?? "";
 
@@ -129,14 +124,12 @@ export async function upsertCustomer(
 
   if (existing) {
     // Nama selalu diperbarui; kolom lain hanya kalau formulir kali ini
-    // mengisinya — pendaftaran kedua tanpa email tidak boleh menghapus email
-    // yang sudah tercatat dari pendaftaran pertama.
+    // mengisinya, supaya pendaftaran kedua tidak menghapus data pertama.
     const updated = await tx.customers.update({
       where: { id: existing.id },
       data: {
         full_name: input.fullName.trim(),
         ...(domicile ? { domicile } : {}),
-        ...(email ? { email } : {}),
         ...(occupation ? { occupation } : {}),
       },
     });
@@ -149,7 +142,6 @@ export async function upsertCustomer(
       full_name: input.fullName.trim(),
       whatsapp,
       domicile,
-      email,
       address: input.address?.trim() ?? "",
       city,
       occupation: occupation || "—",
@@ -159,7 +151,13 @@ export async function upsertCustomer(
   return { customer: mapCustomer(created), created: true };
 }
 
-/** Mencocokkan anak dari keluarga yang sama lewat nama sebelum membuat baru. */
+/**
+ * Mencocokkan anak dari keluarga yang sama lewat nama DAN tanggal lahir
+ * sebelum membuat baru. Nama saja tidak cukup: dua anak bisa kebetulan senama
+ * (saudara, sepupu, atau orang tua yang sama mendaftarkan dua anak), dan
+ * menggabungkan mereka membuat anak kedua ditolak sebagai "sudah terdaftar".
+ * Catatan lama yang belum punya tanggal lahir tetap dianggap anak yang sama.
+ */
 export async function upsertChild(
   tx: Tx,
   customerId: string,
@@ -167,10 +165,31 @@ export async function upsertChild(
 ): Promise<Child> {
   const fullName = input.fullName.trim();
 
+  // Usia tahun/bulan disimpan sebagai cuplikan saat mendaftar; halaman admin
+  // selalu menghitungnya ulang dari tanggal lahir, jadi tidak pernah basi.
+  const age = ageFromBirthDate(input.dateOfBirth);
+  const birth = {
+    date_of_birth: new Date(`${input.dateOfBirth}T00:00:00.000Z`),
+    age_years: age?.years ?? null,
+    age_months: age?.months ?? null,
+    age_recorded_at: new Date(),
+  };
+
   const existing = await tx.children.findFirst({
-    where: { customer_id: customerId, full_name: { equals: fullName, mode: "insensitive" } },
+    where: {
+      customer_id: customerId,
+      full_name: { equals: fullName, mode: "insensitive" },
+      OR: [{ date_of_birth: birth.date_of_birth }, { date_of_birth: null }],
+    },
+    // Yang tanggal lahirnya cocok persis didahulukan dari catatan lama tanpa tanggal.
+    orderBy: { date_of_birth: { sort: "desc", nulls: "last" } },
   });
-  if (existing) return mapChild(existing);
+  if (existing) {
+    // Anak yang sama mendaftar lagi: catatan lama tanpa tanggal lahir
+    // dilengkapi, yang sudah lengkap tidak berubah.
+    const updated = await tx.children.update({ where: { id: existing.id }, data: birth });
+    return mapChild(updated);
+  }
 
   const customer = await tx.customers.findUnique({
     where: { id: customerId },
@@ -182,9 +201,7 @@ export async function upsertChild(
       customer_id: customerId,
       full_name: fullName,
       nickname: input.nickname?.trim() || fullName.split(" ")[0],
-      age_years: input.ageYears,
-      age_months: input.ageMonths ?? 0,
-      age_recorded_at: new Date(),
+      ...birth,
       emergency_contact: customer?.whatsapp ?? "—",
     },
   });

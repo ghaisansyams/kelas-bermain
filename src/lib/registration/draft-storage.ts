@@ -23,7 +23,7 @@ const PREFIX = "kb.registration.draft.";
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 3;
 
 export interface RegistrationDraft {
-  version: 1;
+  version: 2;
   savedAt: number;
   mode: "PERSONAL" | "GROUP";
   groups: { companion: ParentFormValues; children: ChildFormValues[] }[];
@@ -41,7 +41,7 @@ function keyFor(eventId: string): string {
 
 export function saveDraft(eventId: string, draft: Omit<RegistrationDraft, "version" | "savedAt">) {
   try {
-    const payload: RegistrationDraft = { ...draft, version: 1, savedAt: Date.now() };
+    const payload: RegistrationDraft = { ...draft, version: 2, savedAt: Date.now() };
     window.localStorage.setItem(keyFor(eventId), JSON.stringify(payload));
   } catch {
     // Private mode, blocked storage, quota — the form still works, it just
@@ -55,7 +55,7 @@ export function loadDraft(eventId: string): RegistrationDraft | null {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as RegistrationDraft;
-    if (parsed.version !== 1 || !Array.isArray(parsed.groups) || parsed.groups.length === 0) {
+    if (parsed.version !== 2 || !Array.isArray(parsed.groups) || parsed.groups.length === 0) {
       return null;
     }
     if (Date.now() - parsed.savedAt > MAX_AGE_MS) {

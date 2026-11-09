@@ -62,7 +62,6 @@ export default async function AdminCustomersPage({
     customer_number: string;
     full_name: string;
     whatsapp: string;
-    email: string;
     domicile: string;
     source: string;
     status: string;
@@ -83,7 +82,6 @@ export default async function AdminCustomersPage({
           customer_number: true,
           full_name: true,
           whatsapp: true,
-          email: true,
           domicile: true,
           source: true,
           status: true,

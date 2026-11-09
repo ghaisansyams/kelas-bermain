@@ -51,6 +51,7 @@ export default async function AdminRegistrationsPage({
     /** Tagihan sebenarnya setelah diskon/voucher; hanya ada di pendaftaran utama paket. */
     billed: number | null;
     affiliate_code: string | null;
+    extra_companions: number;
     customers: { id: string; full_name: string } | null;
     children: { full_name: string } | null;
   };
@@ -73,6 +74,7 @@ export default async function AdminRegistrationsPage({
           attendance_status: true,
           amount: true,
           affiliate_code: true,
+          extra_companions: true,
           payments: { select: { amount: true }, take: 1 },
           customers: { select: { id: true, full_name: true } },
           children: { select: { full_name: true } },
@@ -174,11 +176,16 @@ export default async function AdminRegistrationsPage({
                         ) : (
                           "—"
                         )}
+                        {row.extra_companions > 0 ? (
+                          <span className="block text-xs text-muted">
+                            + {row.extra_companions} pendamping tambahan
+                          </span>
+                        ) : null}
                       </Td>
                       <Td>{eventTitle(row.event_id)}</Td>
                       <Td>{formatDate(row.registration_date.toISOString())}</Td>
                       <Td>
-                        {formatRupiah(row.billed ?? row.amount)}
+                        {(row.billed ?? row.amount) === 0 ? "Gratis" : formatRupiah(row.billed ?? row.amount)}
                         {row.billed !== null && row.billed !== row.amount ? (
                           <span className="block text-xs text-muted line-through">
                             {formatRupiah(row.amount)}

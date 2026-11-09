@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { phoneKey } from "@/lib/utils/validation";
 
 /**
  * Registration status by number, with the detail level set by the contact.
@@ -34,7 +35,7 @@ export async function checkTicketStatus(
 ): Promise<TicketStatusResult> {
   try {
     const number = registrationNumber.trim().toUpperCase();
-    const given = (contact ?? "").trim().toLowerCase();
+    const given = phoneKey(contact ?? "");
 
     const registration = await db.registrations.findFirst({
       where: { registration_number: { equals: number, mode: "insensitive" } },
@@ -44,7 +45,7 @@ export async function checkTicketStatus(
         payment_status: true,
         customer_id: true,
         event_id: true,
-        customers: { select: { full_name: true, email: true, whatsapp: true } },
+        customers: { select: { full_name: true, whatsapp: true } },
         // events tidak punya foreign key ke registrations, jadi judulnya
         // diambil terpisah lewat event_id.
         payments: {
@@ -61,8 +62,7 @@ export async function checkTicketStatus(
     const customer = registration.customers;
     const verified =
       given !== "" &&
-      ((customer?.email ?? "").toLowerCase() === given ||
-        (customer?.whatsapp ?? "").toLowerCase() === given);
+      phoneKey(customer?.whatsapp ?? "") === given;
 
     // Satu pendamping bisa mendaftarkan beberapa anak lewat nomor berbeda,
     // jadi hitungannya per pendamping dan event yang sama.

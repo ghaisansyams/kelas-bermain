@@ -93,8 +93,6 @@ export interface Customer {
   /** KB-CUS-00001 */
   customerNumber: string;
   fullName: string;
-  /** Optional since v2.0 — the real intake form does not ask for it. */
-  email: string;
   whatsapp: string;
   /** Free-text "Domisili", e.g. "Pekayon, Jakarta Timur". */
   domicile: string;

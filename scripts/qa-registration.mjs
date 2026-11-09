@@ -32,6 +32,20 @@ async function type(page, id, value) {
   await page.type(`#${id}`, value);
 }
 
+/** Input tanggal diisi lewat setter bawaan supaya React menganggapnya diketik. */
+async function setDate(page, id, value) {
+  await page.waitForSelector(`#${id}`, { timeout: 15000 });
+  await page.evaluate(
+    (selector, next) => {
+      const input = document.getElementById(selector);
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    id,
+    value,
+  );
+}
+
 /** Every field the first step refuses to pass without. */
 async function fillStepOne(page) {
   await type(page, "companion-fullName-0", COMPANION);
@@ -39,7 +53,7 @@ async function fillStepOne(page) {
   await type(page, "companion-domicile-0", "Pekayon, Jakarta Timur");
   await type(page, "fullName-0-0", CHILD);
   await type(page, "nickname-0-0", "Qa");
-  await type(page, "ageYears-0-0", "6");
+  await setDate(page, "dateOfBirth-0-0", "2020-01-15");
   await page.evaluate(() => {
     const select = document.querySelector("select");
     if (select && select.options.length > 1) {
@@ -134,45 +148,25 @@ try {
   );
   record("Mulai Baru: draft benar-benar terhapus", cleared === "", cleared || "kosong");
 
-  // TEST 3 — the confirmation step hands off to payment, and says so.
-  await fillStepOne(page);
-  await page.evaluate(() => {
-    const next = [...document.querySelectorAll("button")].find((node) =>
-      node.textContent.includes("Lanjut ke Konfirmasi"),
-    );
-    next?.click();
-  });
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-
-  const confirmText = await page.evaluate(() => document.body.innerText);
-  // A free class has no payment step, so its button says something else.
-  // Both labels are correct; the old vague one is not.
-  const label = confirmText.includes("Lanjut ke Pembayaran")
-    ? "Lanjut ke Pembayaran"
-    : confirmText.includes("Daftar Sekarang")
-      ? "Daftar Sekarang"
-      : null;
-  record("Konfirmasi: tombol menyebut langkah berikutnya", Boolean(label), label ?? "tidak ada");
+  // TEST 3 — the form has exactly two steps. Clicking "Lanjut"
+  // now records a real registration, so this only inspects the page and
+  // never presses it: the script stays safe to point at production.
+  const stepText = await page.evaluate(() => document.body.innerText);
+  record("Langkah: hanya Data Peserta dan Konfirmasi", /Data Peserta/.test(stepText) && /Konfirmasi/.test(stepText));
   record(
-    "Konfirmasi: label lama sudah tidak dipakai",
-    !confirmText.includes("Konfirmasi & Lanjut Pembayaran"),
+    "Langkah: Pembayaran dan Selesai sudah tidak ada",
+    !/\bPembayaran\b/.test(stepText.split("Tipe Pendaftaran")[0]) &&
+      !/\bSelesai\b/.test(stepText.split("Tipe Pendaftaran")[0]),
   );
-  record(
-    "Konfirmasi: belum ada klaim pembayaran berhasil",
-    !/pembayaran berhasil|berhasil dibayar|lunas/i.test(confirmText),
+  const nextButton = await page.evaluate(() =>
+    [...document.querySelectorAll("button")].some((node) =>
+      node.textContent.trim() === "Lanjut",
+    ),
   );
-  const consent = await page.evaluate(() => {
-    const box = document.querySelector("#consent");
-    return {
-      present: Boolean(box),
-      unchecked: box ? box.checked === false : false,
-      label: box?.closest("label")?.innerText ?? document.body.innerText,
-    };
-  });
-  record("Konfirmasi: ada centang persetujuan", consent.present && consent.unchecked);
+  record("Data Peserta: tombol Lanjut ada", nextButton);
   record(
-    "Konfirmasi: persetujuan menyebut orang tua/wali",
-    /orang tua\/wali/i.test(consent.label),
+    "Data Peserta: tidak ada lagi centang persetujuan terpisah",
+    await page.evaluate(() => !document.querySelector("#consent")),
   );
 
   // TEST 4 — the ticket check works on the registration number alone.

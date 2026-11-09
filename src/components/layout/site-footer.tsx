@@ -11,6 +11,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/ui/container";
 import { footerNav, siteConfig, socialLinks } from "@/data/site";
+import { certificatesEnabled } from "@/lib/features";
 
 const socialIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   instagram: InstagramIcon,
@@ -88,7 +89,13 @@ export function SiteFooter({
             </div>
           </div>
 
-          {footerNav.map((group) => (
+          {footerNav.map((group) => ({
+            ...group,
+            // Halaman unduh sertifikat hanya ada kalau fiturnya dinyalakan.
+            links: certificatesEnabled
+              ? [...group.links, { href: "/sertifikat", label: "Unduh Sertifikat" }]
+              : group.links,
+          })).map((group) => (
             <nav key={group.title} className="md:col-span-3 lg:col-span-2" aria-label={group.title}>
               <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-ink">
                 {group.title}

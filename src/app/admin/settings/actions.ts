@@ -26,6 +26,15 @@ export async function savePricingSettingsAction(formData: FormData) {
       "siblingDiscountPerChild",
       PRICING_CONFIG.siblingDiscountPerChild,
     ),
+    siblingMinChildren: Math.max(
+      2,
+      Math.round(positive(formData, "siblingMinChildren", PRICING_CONFIG.siblingMinChildren)),
+    ),
+    affiliateDiscountPerChild: positive(
+      formData,
+      "affiliateDiscountPerChild",
+      PRICING_CONFIG.affiliateDiscountPerChild,
+    ),
     groupMinChildren: Math.max(
       2,
       Math.round(positive(formData, "groupMinChildren", PRICING_CONFIG.groupMinChildren)),

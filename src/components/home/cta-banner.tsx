@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { Sticker } from "@/components/home/stickers";
 import { Reveal } from "@/components/ui/reveal";
 
 export function CtaBanner() {
@@ -14,6 +15,10 @@ export function CtaBanner() {
               <div className="absolute -left-16 -top-16 size-64 rounded-full bg-brand/35 blur-3xl" />
               <div className="absolute -bottom-20 -right-10 size-72 rounded-full bg-sun/25 blur-3xl" />
             </div>
+
+            <Sticker kind="star" color="yellow" rotate={14} className="right-4 top-4 size-6 sm:right-[8%] sm:top-8 sm:size-10" />
+            <Sticker kind="ball" color="green" rotate={-12} className="bottom-8 left-[6%] hidden size-10 sm:block" delay={1.1} />
+            <Sticker kind="confetti" className="bottom-6 right-[7%] hidden h-10 w-16 sm:block" delay={2} />
 
             <div className="relative mx-auto max-w-2xl">
               <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-sun">

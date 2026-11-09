@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { phoneKey } from "@/lib/utils/validation";
 
 /**
  * Pencarian "Cek Tiket" — aturan yang sama dengan check-in kehadiran (nomor
@@ -15,7 +16,7 @@ import { db } from "@/lib/db";
 
 export interface TicketLookupInput {
   registrationNumber: string;
-  /** Email atau WhatsApp yang dipakai saat mendaftar. */
+  /** Nomor WhatsApp yang dipakai saat mendaftar. */
   contact: string;
 }
 
@@ -34,22 +35,20 @@ export async function findTicketAccessToken(
 ): Promise<TicketLookupResult> {
   try {
     const number = input.registrationNumber.trim().toUpperCase();
-    const contact = input.contact.trim().toLowerCase();
+    const contact = phoneKey(input.contact);
 
     const registration = await db.registrations.findFirst({
       where: { registration_number: { equals: number, mode: "insensitive" } },
       select: {
         access_token: true,
-        customers: { select: { email: true, whatsapp: true } },
+        customers: { select: { whatsapp: true } },
       },
     });
 
     if (!registration) return NOT_FOUND;
 
     const customer = registration.customers;
-    const matches =
-      (customer?.email ?? "").toLowerCase() === contact ||
-      (customer?.whatsapp ?? "").toLowerCase() === contact;
+    const matches = contact !== "" && phoneKey(customer?.whatsapp ?? "") === contact;
 
     // Nomor pendaftaran berurutan, jadi tanpa pemeriksaan ini siapa pun bisa
     // menghitung naik dan membuka pendaftaran keluarga lain.
@@ -57,7 +56,7 @@ export async function findTicketAccessToken(
       return {
         ok: false,
         field: "contact",
-        error: "Email atau nomor WhatsApp tidak cocok dengan data pendaftaran.",
+        error: "Nomor WhatsApp tidak cocok dengan data pendaftaran.",
       };
     }
 
@@ -83,12 +82,6 @@ export type ForgottenLookupResult =
       registrations: { registrationNumber: string; eventTitle: string; accessToken: string }[];
     }
   | { ok: false; error: string };
-
-/** 0812…, +62812…, 62812… dan 0812-345 semuanya menjadi 812… */
-function phoneKey(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  return digits.replace(/^(62|0)/, "");
-}
 
 // Pembatas sederhana per proses: nomor WhatsApp mudah ditebak, jadi pencarian
 // ini dibatasi supaya tidak bisa dipakai menebak data keluarga lain.

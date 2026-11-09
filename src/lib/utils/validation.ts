@@ -1,3 +1,5 @@
+import { ageFromBirthDate, birthDateError } from "@/lib/utils/age";
+
 export type FieldErrors<T> = Partial<Record<keyof T, string>>;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -6,6 +8,11 @@ const PHONE = /^(\+?62|0)8[1-9][0-9]{6,11}$/;
 
 export function normalizePhone(value: string): string {
   return value.replace(/[\s\-().]/g, "");
+}
+
+/** 0812…, +62812…, 62812… dan 0812-345 semuanya menjadi 812… — untuk membandingkan nomor. */
+export function phoneKey(value: string): string {
+  return value.replace(/\D/g, "").replace(/^(62|0)/, "");
 }
 
 export function isEmail(value: string): boolean {
@@ -20,24 +27,27 @@ export function isPhone(value: string): boolean {
 /* Pendamping / orang tua                                              */
 /* ------------------------------------------------------------------ */
 
+/** Berapa pendamping tambahan yang bisa diisi dalam satu kelompok. */
+export const MAX_EXTRA_COMPANIONS = 10;
+
 /**
  * Mirrors the intake form the team actually uses in WhatsApp. Email,
- * pekerjaan and the split alamat/kota fields were dropped in PRD v2.0 (R-02)
- * because that form never asked for them.
+ * pekerjaan and the split alamat/kota fields were dropped because that form
+ * never asked for them.
  */
 export interface ParentFormValues {
   fullName: string;
   whatsapp: string;
-  /** Optional — kept off the required list per the team's intake sheet. */
-  email: string;
   domicile: string;
+  /** Pendamping lain yang ikut datang, hanya jumlahnya. Bisa dikenai biaya per event. */
+  extraCompanions: number;
 }
 
 export const emptyParent: ParentFormValues = {
   fullName: "",
   whatsapp: "",
-  email: "",
   domicile: "",
+  extraCompanions: 0,
 };
 
 export function validateParent(values: ParentFormValues): FieldErrors<ParentFormValues> {
@@ -49,11 +59,15 @@ export function validateParent(values: ParentFormValues): FieldErrors<ParentForm
   if (!isPhone(values.whatsapp)) {
     errors.whatsapp = "Gunakan format nomor Indonesia, contoh 08123456789.";
   }
-  if (values.email.trim() !== "" && !isEmail(values.email)) {
-    errors.email = "Masukkan alamat email yang valid, atau kosongkan.";
-  }
   if (values.domicile.trim().length < 3) {
     errors.domicile = "Isi domisili, contoh: Pekayon, Jakarta Timur.";
+  }
+  if (
+    !Number.isInteger(values.extraCompanions) ||
+    values.extraCompanions < 0 ||
+    values.extraCompanions > MAX_EXTRA_COMPANIONS
+  ) {
+    errors.extraCompanions = `Jumlah pendamping tambahan antara 0 dan ${MAX_EXTRA_COMPANIONS}.`;
   }
   return errors;
 }
@@ -65,19 +79,15 @@ export function validateParent(values: ParentFormValues): FieldErrors<ParentForm
 export interface ChildFormValues {
   fullName: string;
   nickname: string;
-  /** Stated in years + months, the way the intake form asks for it. */
-  ageYears: string;
-  ageMonths: string;
+  /** "YYYY-MM-DD", dari pemilih tanggal. Usia dihitung darinya, tidak pernah diketik. */
+  dateOfBirth: string;
 }
 
 export const emptyChild: ChildFormValues = {
   fullName: "",
   nickname: "",
-  ageYears: "",
-  ageMonths: "",
+  dateOfBirth: "",
 };
-
-export const MAX_AGE_YEARS = 17;
 
 export function validateChild(values: ChildFormValues): FieldErrors<ChildFormValues> {
   const errors: FieldErrors<ChildFormValues> = {};
@@ -89,19 +99,8 @@ export function validateChild(values: ChildFormValues): FieldErrors<ChildFormVal
     errors.nickname = "Isi nama panggilan anak.";
   }
 
-  const years = Number(values.ageYears);
-  if (values.ageYears.trim() === "") {
-    errors.ageYears = "Usia anak wajib diisi.";
-  } else if (!Number.isInteger(years) || years < 0 || years > MAX_AGE_YEARS) {
-    errors.ageYears = `Usia dalam tahun, antara 0 dan ${MAX_AGE_YEARS}.`;
-  }
-
-  if (values.ageMonths.trim() !== "") {
-    const months = Number(values.ageMonths);
-    if (!Number.isInteger(months) || months < 0 || months > 11) {
-      errors.ageMonths = "Bulan antara 0 dan 11.";
-    }
-  }
+  const dobError = birthDateError(values.dateOfBirth);
+  if (dobError) errors.dateOfBirth = dobError;
   return errors;
 }
 
@@ -116,12 +115,14 @@ export function validateChild(values: ChildFormValues): FieldErrors<ChildFormVal
 export function ageOutsideRange(
   values: ChildFormValues,
   ageRange?: [number, number],
+  /** Hari kelas ("YYYY-MM-DD"); usia dihitung pada hari itu. Kosong = hari ini. */
+  onDate?: string,
 ): string | null {
-  if (!ageRange || values.ageYears.trim() === "") return null;
-  const years = Number(values.ageYears);
-  if (!Number.isFinite(years)) return null;
-  if (years >= ageRange[0] && years <= ageRange[1]) return null;
-  return `Kelas ini untuk usia ${ageRange[0]}–${ageRange[1]} tahun, sedangkan usia yang diisi ${years} tahun. Pendaftaran tetap bisa dilanjutkan dan akan ditinjau tim kami.`;
+  if (!ageRange) return null;
+  const age = ageFromBirthDate(values.dateOfBirth, onDate);
+  if (!age) return null;
+  if (age.years >= ageRange[0] && age.years <= ageRange[1]) return null;
+  return `Kelas ini untuk usia ${ageRange[0]}–${ageRange[1]} tahun, sedangkan usia anak ${age.years} tahun. Pendaftaran tetap bisa dilanjutkan dan akan ditinjau tim kami.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,8 +202,8 @@ export function validateCheckIn(
   // never a name — registration numbers are sequential, so anyone could walk
   // them and read other families' details otherwise.
   const contact = values.contact.trim();
-  if (contact && !isEmail(contact) && !isPhone(contact)) {
-    errors.contact = "Kalau diisi, gunakan email atau nomor WhatsApp yang valid.";
+  if (contact && !isPhone(contact)) {
+    errors.contact = "Kalau diisi, gunakan nomor WhatsApp yang valid, contoh 08123456789.";
   }
   if (!values.confirmed) {
     errors.confirmed = "Konfirmasi kehadiran terlebih dahulu.";
@@ -230,8 +231,8 @@ export function validateTicketLookup(
   // never a name — registration numbers are sequential, so anyone could walk
   // them and read other families' details otherwise.
   const contact = values.contact.trim();
-  if (contact && !isEmail(contact) && !isPhone(contact)) {
-    errors.contact = "Kalau diisi, gunakan email atau nomor WhatsApp yang valid.";
+  if (contact && !isPhone(contact)) {
+    errors.contact = "Kalau diisi, gunakan nomor WhatsApp yang valid, contoh 08123456789.";
   }
   return errors;
 }

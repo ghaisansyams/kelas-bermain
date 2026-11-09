@@ -225,19 +225,21 @@ export function CheckInForm({
       </Field>
 
       <Field
-        label="Email atau Nomor WhatsApp Orang Tua"
+        label="Nomor WhatsApp Orang Tua"
         htmlFor="contact"
         error={errors.contact}
-        hint="Gunakan kontak yang sama seperti saat mendaftar."
+        hint="Gunakan nomor yang sama seperti saat mendaftar."
         required
       >
         <TextInput
           id="contact"
-          autoComplete="email"
-          placeholder="nama@email.com atau 08123456789"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="08123456789"
           value={values.contact}
           error={errors.contact}
-          hint="Gunakan kontak yang sama seperti saat mendaftar."
+          hint="Gunakan nomor yang sama seperti saat mendaftar."
           disabled={submitting}
           onChange={(e) => set("contact", e.target.value)}
         />

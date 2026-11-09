@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/admin/login-form";
 import { getAdminSession } from "@/lib/auth/session";
-import { LogoMark } from "@/components/brand/logo";
+import { LogoLockup } from "@/components/brand/logo";
 
 export const metadata: Metadata = {
   title: "Masuk Admin",
@@ -24,7 +24,7 @@ export default async function AdminLoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas-deep/40 p-5">
       <div className="w-full max-w-sm rounded-card border border-line bg-surface p-6 shadow-soft sm:p-8">
-        <LogoMark className="size-9" />
+        <LogoLockup className="h-14" />
         <h1 className="mt-5 text-xl font-extrabold text-ink">Masuk ke Admin</h1>
         <p className="mt-1.5 text-sm text-muted">
           Khusus tim Kelas Bermain. Gunakan akun yang sudah didaftarkan.

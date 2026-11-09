@@ -76,8 +76,8 @@ export const GUIDE: GuideChapter[] = [
         body: "Event baru berstatus Draf dan belum terlihat publik. Ubah statusnya jadi Tayang agar muncul di website. Setelah kegiatan selesai, ubah ke Selesai supaya masuk bagian Yang Sudah Kami Jalankan.",
       },
       {
-        title: "Menambahkan video",
-        body: "Di form event ada dua pilihan: tempel tautan YouTube, atau unggah berkas MP4 maksimal 50 MB. Kalau keduanya diisi, berkas unggahan yang dipakai. Videonya muncul di bawah kartu pendaftaran di halaman event.",
+        title: "Foto Tentang Event dan daftar ketentuan",
+        body: "Bagian Foto Tentang Event mengisi gambar di atas deskripsi pada halaman event, maksimal 4 foto. Kalau dikosongkan, dipakai foto bawaan kategori. Rundown, fasilitas, ketentuan peserta, dan catatan pendaftaran diisi satu kolom per item: tekan Tambah atau Enter untuk menambah baris, ikon tempat sampah untuk menghapus.",
       },
     ],
   },

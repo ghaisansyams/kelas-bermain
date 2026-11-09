@@ -55,6 +55,7 @@
   --animate-fade-up: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-float-slow: float-slow 9s ease-in-out infinite;
+  --animate-sticker: sticker-bob 6.5s ease-in-out infinite;
 
   @keyframes reveal {
     from {
@@ -82,6 +83,16 @@
     }
     to {
       background-position: 260% 0;
+    }
+  }
+  /* Hanya bergeser naik-turun; kemiringan stiker dipegang properti `rotate`. */
+  @keyframes sticker-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
     }
   }
   @keyframes float-slow {
