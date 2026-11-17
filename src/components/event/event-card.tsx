@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ArrowRight, Baby, CalendarDays, Clock, MapPin } from "lucide-react";
 import {
   Badge,
-  categoryTone,
   LifecycleBadge,
 } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
@@ -34,10 +33,10 @@ export function EventCard({
   return (
     <article
       className={cn(
-        "group relative flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface",
+        "kb-card-tilt group relative flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface",
         "shadow-soft transition-[transform,box-shadow,border-color] duration-300",
-        "hover:-translate-y-1 hover:border-brand/25 hover:shadow-lift",
-        "focus-within:-translate-y-1 focus-within:shadow-lift",
+        "hover:border-brand/25 hover:shadow-lift",
+        "focus-within:shadow-lift",
         className,
       )}
     >
@@ -80,7 +79,7 @@ export function EventCard({
           className="absolute inset-0 bg-gradient-to-t from-ink/45 via-ink/5 to-transparent"
         />
 
-        <div className="absolute left-3 top-3 flex flex-col items-center rounded-2xl bg-surface/95 px-3 py-2 shadow-soft backdrop-blur-sm">
+        <div className="absolute left-3 top-3 flex -rotate-3 flex-col items-center rounded-2xl bg-surface/95 px-3 py-2 shadow-soft backdrop-blur-sm">
           <span className="text-lg leading-none font-extrabold text-ink">{chip.day}</span>
           <span className="mt-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-brand">
             {chip.month}
@@ -92,7 +91,7 @@ export function EventCard({
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
-          <Badge tone={categoryTone[event.category]} className="bg-surface/95 backdrop-blur-sm">
+          <Badge tone={event.categoryTone} className="kb-sticker-chip bg-surface/95 backdrop-blur-sm">
             {event.category}
           </Badge>
           {priceHidden ? null : (

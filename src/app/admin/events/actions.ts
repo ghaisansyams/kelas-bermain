@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { events as catalogueEvents } from "@/data/events";
 import { Prisma } from "@prisma/client";
 import { ABOUT_IMAGE_HEIGHT, ABOUT_IMAGE_WIDTH } from "@/lib/utils/about-event";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requireAdmin, requireRole } from "@/lib/admin/auth";
+import { confirmationMatches } from "@/lib/admin/delete-records";
+import { moveEventToBin, purgeExpired } from "@/lib/admin/recycle-bin";
 import { db } from "@/lib/db";
 import { EVENT_STATUSES, eventRecordToRow, type EventStatus } from "@/lib/services/event-mapper";
 
@@ -154,7 +156,11 @@ function slugify(value: string): string {
 
 function buildPayload(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim() || slugify(title);
+  // Slug yang diketik admin ikut dibersihkan: "testing 1" menjadi "testing-1".
+  // Slug berspasi tidak bisa dibuka di halaman publik (alamatnya dikirim browser
+  // sebagai "testing%201", yang tidak dikenali sebagai "testing 1").
+  const slug =
+    slugify(String(formData.get("slug") ?? "")) || slugify(title) || `event-${Date.now()}`;
   const priceRaw = Number(formData.get("price") ?? 0);
   const price = Number.isFinite(priceRaw) ? priceRaw : 0;
   const extraRaw = Math.floor(Number(formData.get("extraCompanionPrice") ?? 0));
@@ -190,7 +196,7 @@ function buildPayload(formData: FormData) {
     description: lines(formData.get("description")),
     // Kosong berarti halaman detail memakai foto bawaan kategori.
     about_event: aboutImages.length > 0 ? { images: aboutImages } : null,
-    category: String(formData.get("category") ?? "Kegiatan"),
+    category: String(formData.get("category") ?? "").trim(),
     cover: {
       src: String(formData.get("coverSrc") ?? "").trim(),
       alt: String(formData.get("coverAlt") ?? "").trim(),
@@ -233,8 +239,33 @@ function buildPayload(formData: FormData) {
       requiresAttendance: true,
     },
     featured: formData.get("featured") === "on",
-    status: String(formData.get("status") ?? "DRAFT") as EventStatus,
+    status: parseStatus(formData.get("status")),
   };
+}
+
+/** Status dari formulir bukan nilai tepercaya; yang tidak dikenal jadi DRAFT. */
+function parseStatus(value: FormDataEntryValue | null): EventStatus {
+  const status = String(value ?? "");
+  return (EVENT_STATUSES as readonly string[]).includes(status) ? (status as EventStatus) : "DRAFT";
+}
+
+/** Tampil di website publik: Tayang dan Berlangsung. */
+function isLive(status: string): boolean {
+  return status === "PUBLISHED" || status === "ONGOING";
+}
+
+/**
+ * Kategori harus salah satu yang diatur di Event → Kategori. Event lama yang
+ * kategorinya sudah tidak ada di daftar boleh tetap memakainya sampai diganti.
+ */
+async function categoryAllowed(category: string, current?: string): Promise<boolean> {
+  if (!category) return false;
+  if (category === current) return true;
+  try {
+    return (await db.event_categories.count({ where: { name: category } })) > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function createEventAction(formData: FormData) {
@@ -242,6 +273,7 @@ export async function createEventAction(formData: FormData) {
   const payload = buildPayload(formData);
 
   if (!payload.title || !payload.start_date) redirect("/admin/events/new?status=invalid");
+  if (!(await categoryAllowed(payload.category))) redirect("/admin/events/new?status=bad-category");
 
   const id = `evt-${Date.now().toString(36)}`;
   let failed = false;
@@ -258,7 +290,7 @@ export async function createEventAction(formData: FormData) {
   if (failed) redirect("/admin/events/new?status=error");
 
   revalidatePublicEventPages(payload.slug);
-  redirect(`/admin/events/${id}?status=created`);
+  redirect(`/admin/events/${id}?status=${isLive(payload.status) ? "created-live" : "created-draft"}`);
 }
 
 export async function updateEventAction(formData: FormData) {
@@ -267,6 +299,8 @@ export async function updateEventAction(formData: FormData) {
   if (!id) redirect("/admin/events?status=error");
 
   const payload = buildPayload(formData);
+  const currentCategory = (await db.events.findUnique({ where: { id }, select: { category: true } }))?.category;
+  if (!(await categoryAllowed(payload.category, currentCategory))) redirect(`/admin/events/${id}?status=bad-category`);
   let before: { title: string; status: string; slug: string } | null = null;
   let failed = false;
   try {
@@ -289,7 +323,61 @@ export async function updateEventAction(formData: FormData) {
 
   revalidatePublicEventPages(payload.slug);
   if (before?.slug && before.slug !== payload.slug) revalidatePublicEventPages(before.slug);
-  redirect(`/admin/events/${id}?status=saved`);
+  redirect(`/admin/events/${id}?status=${isLive(payload.status) ? "saved" : "saved-draft"}`);
+}
+
+/**
+ * Memindahkan event beserta seluruh pendaftarannya ke Terhapus.
+ *
+ * Hanya SUPER_ADMIN, dan judul yang diketik admin dicocokkan lagi di server.
+ * Pendaftaran event ini (beserta pembayaran, bukti transfer, kehadiran,
+ * sertifikat, dan catatan keuangannya) ikut dipindahkan; data pendamping dan
+ * anak tetap ada karena mereka bisa mendaftar di event lain. Salinannya bisa
+ * dipulihkan dari menu Terhapus selama 30 hari.
+ */
+export async function deleteEventAction(formData: FormData) {
+  const session = await requireRole("SUPER_ADMIN");
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/admin/events?status=error");
+
+  let outcome = "deleted";
+  let slug = "";
+  try {
+    const event = await db.events.findUnique({
+      where: { id },
+      select: { title: true, slug: true, status: true },
+    });
+    if (!event) {
+      outcome = "error";
+    } else if (!confirmationMatches(formData.get("confirm"), event.title)) {
+      outcome = "wrong-confirm";
+    } else {
+      slug = event.slug;
+      const stats = await db.$transaction((tx) => moveEventToBin(tx, id, session.fullName), {
+        timeout: 60_000,
+      });
+      await logActivity(
+        session.userId,
+        "DELETE_EVENT",
+        id,
+        null,
+        { title: event.title, slug: event.slug, status: event.status, movedToBin: true, ...(stats ?? {}) },
+      );
+      await purgeExpired();
+    }
+  } catch {
+    outcome = "error";
+  }
+
+  if (outcome === "deleted") {
+    revalidatePublicEventPages(slug);
+    for (const path of ["/admin", "/admin/registrations", "/admin/payments", "/admin/finance", "/admin/customers", "/admin/children", "/admin/trash"]) {
+      revalidatePath(path);
+    }
+    revalidatePath("/register", "layout");
+    redirect("/admin/events?status=deleted");
+  }
+  redirect(`/admin/events?status=${outcome}`);
 }
 
 export async function setEventStatusAction(formData: FormData) {
@@ -312,6 +400,10 @@ export async function setEventStatusAction(formData: FormData) {
   if (failed) redirect("/admin/events?status=error");
 
   revalidatePublicEventPages(before?.slug);
+  // Tombol di halaman detail event kembali ke halaman itu, bukan ke daftar.
+  if (formData.get("next") === "detail") {
+    redirect(`/admin/events/${id}?status=${isLive(status) ? "now-live" : "now-hidden"}`);
+  }
   redirect("/admin/events?status=status-changed");
 }
 
@@ -353,5 +445,5 @@ export async function duplicateEventAction(formData: FormData) {
   }
   if (failed) redirect("/admin/events?status=error");
 
-  redirect(`/admin/events/${newId}?status=created`);
+  redirect(`/admin/events/${newId}?status=created-draft`);
 }

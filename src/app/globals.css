@@ -56,6 +56,7 @@
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-float-slow: float-slow 9s ease-in-out infinite;
   --animate-sticker: sticker-bob 6.5s ease-in-out infinite;
+  --animate-wiggle: kb-wiggle 0.7s ease-in-out;
 
   @keyframes reveal {
     from {
@@ -93,6 +94,18 @@
     }
     50% {
       transform: translateY(-7px);
+    }
+  }
+  @keyframes kb-wiggle {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(-9deg);
+    }
+    75% {
+      transform: rotate(9deg);
     }
   }
   @keyframes float-slow {
@@ -400,4 +413,112 @@
   .kb-down {
     animation: none;
   }
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Nuansa ramah anak — hanya halaman publik (.kb-public)                */
+/* ------------------------------------------------------------------ */
+
+/* Tombol utama seperti mainan: tebal di bawah, menekan saat diklik. */
+.kb-public .kb-btn-primary {
+  box-shadow:
+    0 3px 0 0 var(--color-brand-dark),
+    0 12px 20px -12px rgb(217 58 43 / 0.6);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.2s ease;
+}
+.kb-public .kb-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 5px 0 0 var(--color-brand-dark),
+    0 16px 24px -12px rgb(217 58 43 / 0.6);
+}
+.kb-public .kb-btn-primary:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 0 var(--color-brand-dark);
+}
+
+/* Kartu sedikit miring saat disentuh, seperti stiker yang ditepuk. */
+.kb-public .kb-card-tilt {
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+.kb-public .kb-card-tilt:hover {
+  transform: translateY(-5px) rotate(-0.8deg);
+}
+.kb-public .kb-card-tilt:nth-child(even):hover {
+  transform: translateY(-5px) rotate(0.8deg);
+}
+
+/* Label seperti stiker tempel: tepi putih tebal dan agak miring. */
+.kb-sticker-chip {
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px -1px rgb(30 27 24 / 0.22);
+  transform: rotate(-3deg);
+}
+
+/* Ikon yang bergoyang waktu induknya disentuh. */
+.kb-public .group:hover .kb-wiggle-icon,
+.kb-public a:hover .kb-wiggle-icon {
+  animation: kb-wiggle 0.7s ease-in-out;
+}
+
+/* Latar titik-titik halus, seperti kertas gambar anak. */
+.kb-dots {
+  background-image: radial-gradient(rgb(30 27 24 / 0.07) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+/* Konfeti: tiap keping terbang ke arahnya, berputar, lalu memudar. */
+@keyframes kb-confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg) scale(0.3);
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), calc(var(--dy) + 70px)) rotate(calc(var(--rot) + 120deg)) scale(0.9);
+  }
+}
+.kb-confetti-piece {
+  opacity: 0;
+  animation: kb-confetti-pop 1.7s ease-out 0.15s 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-public .kb-btn-primary:hover,
+  .kb-public .kb-card-tilt:hover {
+    transform: none;
+  }
+}
+
+/* Awan yang melintas pelan. */
+@keyframes kb-drift {
+  from {
+    transform: translateX(-20vw);
+  }
+  to {
+    transform: translateX(110vw);
+  }
+}
+.kb-drift {
+  animation: kb-drift 70s linear infinite;
+}
+
+/* Teks yang disorot berwarna cerah, bukan biru bawaan browser. */
+.kb-public ::selection {
+  background: var(--color-sun);
+  color: var(--color-ink);
 }

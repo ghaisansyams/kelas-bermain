@@ -1,3 +1,4 @@
+import { DecorScene } from "@/components/ui/playful";
 import { JoinStepsCollage } from "@/components/home/join-steps-collage";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
@@ -6,7 +7,9 @@ import { joinSteps } from "@/data/site";
 
 export function JoinSteps() {
   return (
-    <section className="py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden py-16 sm:py-20">
+      <DecorScene name="sectionD" />
+
       <Container>
         <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">

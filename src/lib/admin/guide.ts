@@ -72,8 +72,13 @@ export const GUIDE: GuideChapter[] = [
         body: "Tampilkan Harga untuk kelas berbayar biasa. Sembunyikan kalau harga hanya diberi lewat WhatsApp — pengunjung melihat tulisan Hubungi kami. Gratis untuk kegiatan tanpa biaya, dan pendaftarnya langsung terkonfirmasi tanpa tahap pembayaran.",
       },
       {
+        title: "Menambah kategori event baru",
+        body: "Menu Event → tombol Kategori (atau tautan Kelola kategori di bawah pilihan Kategori pada form event). Isi nama, pilih warna lencana, dan boleh unggah foto cadangan untuk bagian Tentang Event. Kategori baru langsung bisa dipilih di form event dan otomatis muncul sebagai tombol filter di halaman Event begitu ada event yang memakainya. Tombol panah mengatur urutan filter. Mengganti nama ikut mengganti nama di semua event yang memakainya; kategori yang masih dipakai event tidak bisa dihapus.",
+        href: "/admin/events/kategori",
+      },
+      {
         title: "Menayangkan event",
-        body: "Event baru berstatus Draf dan belum terlihat publik. Ubah statusnya jadi Tayang agar muncul di website. Setelah kegiatan selesai, ubah ke Selesai supaya masuk bagian Yang Sudah Kami Jalankan.",
+        body: "Saat menekan Simpan Event pada event baru, akan muncul pertanyaan: Tayangkan sekarang atau Simpan sebagai draft dulu. Tayangkan sekarang membuat event langsung tampil di website. Draft belum terlihat pengunjung. Event draft bisa ditayangkan kapan saja lewat tombol Tayangkan di website di bagian atas halaman event, dan event yang sudah tampil bisa disembunyikan lagi dengan tombol di tempat yang sama. Setelah kegiatan selesai, buka Status lainnya di bagian Tampil di website dan pilih Selesai supaya masuk bagian Yang Sudah Kami Jalankan.",
       },
       {
         title: "Foto Tentang Event dan daftar ketentuan",
@@ -158,6 +163,11 @@ export const GUIDE: GuideChapter[] = [
         body: "Tulis {{participant_name}}, {{event_name}}, {{event_date}}, atau {{certificate_number}} di elemen teks. Saat sertifikat diterbitkan, semuanya diganti data asli. Untuk gambar tanda tangan, isi sumber gambarnya dengan {{signature}}.",
       },
       {
+        title: "Sertifikat massal dari Excel (sekolah/instansi)",
+        body: "Untuk pelanggan yang datanya sudah di Excel dan tidak mendaftar lewat website. CMS Website → tab Sertifikat → bagian paling atas. Pilih desain (atau unggah desain Canva yang kosong di bagian nama), unggah Excel (.xlsx atau .csv), periksa daftar nama, geser posisi nama bila perlu, lalu klik Buat sertifikat. Hasilnya satu PDF siap cetak (dipecah per 100 halaman) atau ZIP berisi satu PDF per nama. Hanya nama yang diisi, tanpa nomor; berkas diproses di browser dan tidak disimpan di database.",
+        href: "/admin/cms?tab=certificates",
+      },
+      {
         title: "Sertifikat lama tidak ikut berubah",
         body: "Mengubah desain atau penanda tangan hanya berlaku untuk sertifikat berikutnya. Yang sudah diterbitkan tetap seperti saat dicetak — dokumen yang sudah dipegang orang tidak boleh berubah diam-diam.",
       },
@@ -179,9 +189,14 @@ export const GUIDE: GuideChapter[] = [
         body: "Hanya Super Admin yang bisa. Di menu Pengguna, isi email, nama, peran, dan kata sandi awal (minimal 10 karakter), lalu sampaikan kata sandinya langsung kepada orangnya. Tidak ada email pemulihan: kalau seseorang lupa kata sandi, Super Admin menggantinya lewat tombol Ganti kata sandi di baris orang itu, dan semua sesi lamanya otomatis berakhir.",
       },
       {
-        title: "Menghapus data pendamping",
-        body: "Pendamping yang punya riwayat pendaftaran tidak bisa dihapus — menghapusnya akan memutus catatan pembayaran. Nonaktifkan saja lewat halaman Detail; datanya tetap utuh dan bisa diaktifkan lagi.",
-        href: "/admin/customers",
+        title: "Menghapus event, pendamping, atau anak",
+        body: "Hanya Super Admin yang bisa. Klik Hapus, baca daftar apa saja yang ikut dipindahkan (pendaftaran, pembayaran, bukti transfer, sertifikat), lalu ketik tulisan yang diminta persis sama, yaitu judul event, kode KB-CUS pendamping, atau kode KB-CHD anak. Data tidak langsung hilang: ia pindah ke menu Terhapus dan bisa dipulihkan selama 30 hari. Kalau hanya ingin menyembunyikan pendamping atau anak dari daftar, pakai Nonaktifkan di halaman Detail.",
+        href: "/admin/trash",
+      },
+      {
+        title: "Memulihkan data dari Terhapus",
+        body: "Menu Sistem → Terhapus menampilkan semua yang dihapus beserta sisa harinya. Klik Pulihkan untuk mengembalikan persis seperti semula, termasuk pendaftaran, pembayaran, kehadiran, dan sertifikatnya. Setelah 30 hari data dibuang otomatis dan tidak bisa kembali. Tombol Buang membuang lebih cepat, dengan mengetik HAPUS. Kalau event atau orang yang berkaitan sudah dihapus juga, pendaftaran yang bergantung padanya tidak ikut pulih dan kamu diberi tahu.",
+        href: "/admin/trash",
       },
       {
         title: "Semua perubahan tercatat",

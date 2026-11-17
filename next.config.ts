@@ -23,7 +23,11 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "55mb" },
   },
   images: {
-    formats: ["image/avif", "image/webp"],
+    // Hanya WebP. AVIF ukurannya lebih kecil, tetapi memakan CPU berkali lipat
+    // untuk mengonversinya: pada server berspesifikasi sedang, pengunjung yang
+    // pertama membuka sebuah foto menunggu puluhan detik dan halamannya tidak
+    // pernah selesai dimuat. Selisih ukuran file tidak sepadan dengan itu.
+    formats: ["image/webp"],
     // Media diunggah dan dilayani dari server sendiri lewat /uploads — tidak
     // ada host luar yang perlu diizinkan.
   },

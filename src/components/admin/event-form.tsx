@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { ImageDropArea } from "@/components/admin/image-drop-area";
 import { MediaPicker } from "@/components/admin/media-picker";
 import { Card } from "@/components/admin/admin-ui";
@@ -13,8 +17,8 @@ import {
 } from "@/components/admin/event-list-inputs";
 import { Field, Select, TextArea, TextInput } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
-import { EVENT_STATUSES } from "@/lib/services/event-mapper";
-import { EVENT_CATEGORIES } from "@/lib/types";
+import { EVENT_STATUSES, EVENT_STATUS_LABEL } from "@/lib/services/event-mapper";
+import { cn } from "@/lib/utils/cn";
 
 export interface EventFormValues {
   id?: string;
@@ -65,11 +69,19 @@ export function EventForm({
   initial,
   action,
   submitLabel,
+  categories,
 }: {
   initial: EventFormValues;
   action: (formData: FormData) => void | Promise<void>;
   submitLabel: string;
+  /** Nama kategori sesuai urutan yang diatur admin (Event → Kategori). */
+  categories: string[];
 }) {
+  const formId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const isNew = !initial.id;
+  const [status, setStatus] = useState(initial.status);
+  const [askPublish, setAskPublish] = useState(false);
   const [cover, setCover] = useState({ src: initial.coverSrc, alt: initial.coverAlt });
   const [poster, setPoster] = useState({
     src: initial.posterSrc,
@@ -100,8 +112,22 @@ export function EventForm({
   }, [poster.src, poster.width, poster.height]);
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      id={formId}
+      ref={formRef}
+      action={action}
+      className="space-y-5"
+      onSubmit={(event) => {
+        // Event baru: tekan Enter di kolom mana pun tidak boleh menyimpan diam-diam
+        // sebagai draft. Pilihan tayang/draft selalu lewat pop-up.
+        if (isNew && !(event.nativeEvent as SubmitEvent).submitter) {
+          event.preventDefault();
+          setAskPublish(true);
+        }
+      }}
+    >
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
+      {!isNew ? <input type="hidden" name="status" value={status} /> : null}
       <input type="hidden" name="coverSrc" value={cover.src} />
 
       <Card>
@@ -110,12 +136,27 @@ export function EventForm({
           <Field label="Judul" htmlFor="title" required className="sm:col-span-2">
             <TextInput id="title" name="title" defaultValue={initial.title} required />
           </Field>
-          <Field label="Slug URL" htmlFor="slug" hint="Kosongkan untuk dibuat otomatis dari judul.">
+          <Field label="Slug URL" htmlFor="slug" hint="Kosongkan untuk dibuat otomatis dari judul. Spasi dan simbol otomatis menjadi tanda hubung (-).">
             <TextInput id="slug" name="slug" defaultValue={initial.slug} />
           </Field>
-          <Field label="Kategori" htmlFor="category">
+          <Field
+            label="Kategori"
+            htmlFor="category"
+            hint={
+              <>
+                Ada kategori baru?{" "}
+                <Link href="/admin/events/kategori" className="font-semibold text-brand hover:underline">
+                  Kelola kategori
+                </Link>{" "}
+                (simpan event ini dulu kalau ada perubahan).
+              </>
+            }
+          >
             <Select id="category" name="category" defaultValue={initial.category}>
-              {EVENT_CATEGORIES.map((category) => (
+              {(categories.includes(initial.category) || !initial.category
+                ? categories
+                : [initial.category, ...categories]
+              ).map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>
@@ -371,48 +412,219 @@ export function EventForm({
       </Card>
 
       <Card>
-        <h2 className="text-base font-extrabold text-ink">Publikasi</h2>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <Field label="Status" htmlFor="status">
-            <Select id="status" name="status" defaultValue={initial.status}>
-              {EVENT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div className="flex flex-col justify-center gap-3 pt-6">
-            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <input
-                type="checkbox"
-                name="featured"
-                defaultChecked={initial.featured}
-                className="size-4"
-              />
-              Tampilkan sebagai unggulan
-            </label>
-            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <input
-                type="checkbox"
-                name="certificateAvailable"
-                defaultChecked={initial.certificateAvailable}
-                className="size-4"
-              />
-              Menerbitkan sertifikat
-            </label>
-          </div>
+        <h2 className="text-base font-extrabold text-ink">Tampil di website</h2>
+        {isNew ? (
+          <p className="mt-1.5 text-sm text-muted">
+            Saat menekan <strong className="text-ink">{submitLabel}</strong>, kamu akan ditanya: langsung
+            ditayangkan di website, atau disimpan sebagai draft dulu.
+          </p>
+        ) : (
+          <PublishChoice status={status} onChange={setStatus} />
+        )}
+        <div className="mt-5 flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <input type="checkbox" name="featured" defaultChecked={initial.featured} className="size-4" />
+            Tampilkan sebagai unggulan
+          </label>
+          <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <input
+              type="checkbox"
+              name="certificateAvailable"
+              defaultChecked={initial.certificateAvailable}
+              className="size-4"
+            />
+            Menerbitkan sertifikat
+          </label>
         </div>
-        <p className="mt-3 text-xs text-muted">
-          Hanya status Tayang (PUBLISHED) dan Berlangsung (ONGOING) yang muncul di website.
-        </p>
       </Card>
 
       <div className="flex justify-end">
-        <Button type="submit" size="lg">
-          {submitLabel}
-        </Button>
+        {isNew ? (
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => {
+              if (formRef.current?.reportValidity()) setAskPublish(true);
+            }}
+          >
+            {submitLabel}
+          </Button>
+        ) : (
+          <Button type="submit" size="lg">
+            {submitLabel}
+          </Button>
+        )}
       </div>
+
+      {askPublish ? <PublishDialog formId={formId} onClose={() => setAskPublish(false)} /> : null}
     </form>
+  );
+}
+
+const CHOICES = [
+  {
+    value: "PUBLISHED",
+    title: "Tampil di website",
+    text: "Pengunjung langsung bisa melihat dan mendaftar.",
+    icon: Eye,
+  },
+  {
+    value: "DRAFT",
+    title: "Disembunyikan (draft)",
+    text: "Belum tampil di website. Hanya terlihat di halaman admin ini.",
+    icon: EyeOff,
+  },
+] as const;
+
+const OTHER_STATUS_HINT: Record<string, string> = {
+  ONGOING: "tampil di website sebagai event yang sedang berjalan",
+  COMPLETED: "tampil di bagian Yang Sudah Kami Jalankan",
+  CANCELLED: "tidak tampil di website",
+  ARCHIVED: "tidak tampil di website",
+};
+
+/** Dua pilihan besar untuk event yang sudah ada; status lain disimpan di "lainnya". */
+function PublishChoice({ status, onChange }: { status: string; onChange: (value: string) => void }) {
+  const isOther = status !== "PUBLISHED" && status !== "DRAFT";
+  const others = EVENT_STATUSES.filter((item) => item !== "PUBLISHED" && item !== "DRAFT");
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div role="radiogroup" aria-label="Tampil di website" className="grid gap-3 sm:grid-cols-2">
+        {CHOICES.map((choice) => {
+          const active = status === choice.value;
+          const Icon = choice.icon;
+          return (
+            <label
+              key={choice.value}
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-card border-2 p-4 transition-colors",
+                active
+                  ? choice.value === "PUBLISHED"
+                    ? "border-pine bg-pine-soft/60"
+                    : "border-sun bg-sun-soft"
+                  : "border-line bg-surface hover:border-brand/40",
+              )}
+            >
+              <input
+                type="radio"
+                name="status-choice"
+                value={choice.value}
+                checked={active}
+                onChange={() => onChange(choice.value)}
+                className="mt-1 size-4"
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-extrabold text-ink">
+                  <Icon className="size-4" aria-hidden />
+                  {choice.title}
+                </span>
+                <span className="mt-0.5 block text-sm text-muted">{choice.text}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <details open={isOther} className="text-sm">
+        <summary className="cursor-pointer font-semibold text-ink-soft hover:text-brand">
+          Status lainnya (berlangsung, selesai, dibatalkan, diarsipkan)
+        </summary>
+        <div className="mt-3 max-w-sm">
+          <Select
+            id="status-other"
+            aria-label="Status lainnya"
+            value={isOther ? status : ""}
+            onChange={(event) => event.target.value && onChange(event.target.value)}
+          >
+            <option value="">Pilih status lain…</option>
+            {others.map((item) => (
+              <option key={item} value={item}>
+                {EVENT_STATUS_LABEL[item]?.text ?? item}
+              </option>
+            ))}
+          </Select>
+          {isOther ? (
+            <p className="mt-1.5 text-xs text-muted">
+              {EVENT_STATUS_LABEL[status]?.text}: {OTHER_STATUS_HINT[status]}.
+            </p>
+          ) : null}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * Pertanyaan sebelum event baru disimpan. Tombolnya memakai atribut `form`
+ * karena pop-up dirender di luar <form>; nilai tombol yang ditekan menjadi
+ * status event.
+ */
+function PublishDialog({ formId, onClose }: { formId: string; onClose: () => void }) {
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="publish-dialog-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-card bg-canvas p-5 shadow-lift sm:p-6"
+      >
+        <h2 id="publish-dialog-title" className="text-lg font-extrabold text-ink">
+          Tampilkan event ini di website?
+        </h2>
+        <p className="mt-1.5 text-sm text-muted">
+          Pilih sekarang. Kamu tetap bisa mengubahnya kapan saja dari halaman event ini.
+        </p>
+        <DialogButtons formId={formId} onClose={onClose} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function DialogButtons({ formId, onClose }: { formId: string; onClose: () => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <div className="mt-5 grid gap-3">
+      <button
+        type="submit"
+        form={formId}
+        name="status"
+        value="PUBLISHED"
+        disabled={pending}
+        className="flex min-h-14 flex-col items-start justify-center rounded-card bg-brand px-4 py-2.5 text-left text-white transition-colors hover:bg-brand-dark disabled:opacity-60"
+      >
+        <span className="flex items-center gap-2 text-base font-extrabold">
+          {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+          Ya, tayangkan sekarang
+        </span>
+        <span className="text-sm font-medium text-white/85">Langsung tampil dan bisa didaftar pengunjung.</span>
+      </button>
+      <button
+        type="submit"
+        form={formId}
+        name="status"
+        value="DRAFT"
+        disabled={pending}
+        className="flex min-h-14 flex-col items-start justify-center rounded-card border-2 border-line bg-surface px-4 py-2.5 text-left transition-colors hover:border-brand/40 disabled:opacity-60"
+      >
+        <span className="flex items-center gap-2 text-base font-extrabold text-ink">
+          <EyeOff className="size-4" aria-hidden />
+          Simpan sebagai draft dulu
+        </span>
+        <span className="text-sm font-medium text-muted">Belum tampil di website. Bisa ditayangkan nanti.</span>
+      </button>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={pending}
+        className="min-h-10 text-sm font-semibold text-muted hover:text-ink"
+      >
+        Kembali mengisi
+      </button>
+    </div>
   );
 }

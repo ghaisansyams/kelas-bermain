@@ -5,7 +5,7 @@ import { CalendarX2, SlidersHorizontal } from "lucide-react";
 import { EventCard } from "@/components/event/event-card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { EVENT_CATEGORIES, type EventCategory, type EventView } from "@/lib/types";
+import type { EventCategory, EventView } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -13,7 +13,14 @@ import { cn } from "@/lib/utils/cn";
  * lifecycle tabs (Semua/Akan Datang/Sedang Berlangsung/Selesai) that used to
  * sit above this were removed; category is now the page's one filter.
  */
-export function EventExplorer({ events }: { events: EventView[] }) {
+export function EventExplorer({
+  events,
+  categories,
+}: {
+  events: EventView[];
+  /** Nama kategori sesuai urutan yang diatur admin. */
+  categories: string[];
+}) {
   const [category, setCategory] = useState<EventCategory | "all">("all");
 
   const filtered = useMemo(
@@ -23,8 +30,12 @@ export function EventExplorer({ events }: { events: EventView[] }) {
 
   const availableCategories = useMemo(() => {
     const present = new Set(events.map((event) => event.category));
-    return EVENT_CATEGORIES.filter((item) => present.has(item));
-  }, [events]);
+    // Kategori yang tidak lagi ada di daftar admin tetap muncul di akhir
+    // selama masih ada event yang memakainya.
+    return [...categories, ...[...present].filter((item) => !categories.includes(item))].filter((item) =>
+      present.has(item),
+    );
+  }, [events, categories]);
 
   const resetAll = () => setCategory("all");
 

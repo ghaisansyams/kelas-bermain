@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
-import type { EventCategory, EventLifecycle, RegistrationAvailability } from "@/lib/types";
+import type { EventLifecycle, RegistrationAvailability } from "@/lib/types";
 
 const tones = {
   neutral: "bg-canvas-deep text-ink-soft ring-line",
@@ -36,16 +36,6 @@ export function Badge({
     </span>
   );
 }
-
-/** One hue per category, used consistently across cards, filters and detail pages. */
-export const categoryTone: Record<EventCategory, BadgeTone> = {
-  Profesi: "brand",
-  Kuliner: "sun",
-  Alam: "leaf",
-  Kreatif: "grape",
-  Eksplorasi: "sky",
-  Outdoor: "pine",
-};
 
 export const lifecycleLabel: Record<EventLifecycle, string> = {
   upcoming: "Akan Datang",

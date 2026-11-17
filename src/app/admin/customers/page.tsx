@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/data-table";
 import { deleteCustomerAction } from "@/app/admin/customers/actions";
 import { DeleteDialog } from "@/components/admin/delete-dialog";
+import { describeStats, statsByOwner, type DeletionStats } from "@/lib/admin/delete-records";
 import { requireAdmin } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils/date";
@@ -21,10 +22,10 @@ export const dynamic = "force-dynamic";
 
 /** Outcome messages. Uses `msg` because `status` is already the list filter. */
 const STATUS_NOTICE: Record<string, { tone: "success" | "error" | "info"; text: string }> = {
-  deleted: { tone: "success", text: "Data dihapus permanen." },
-  "has-registrations": {
+  deleted: { tone: "success", text: "Data dipindahkan ke menu Terhapus. Masih bisa dipulihkan selama 30 hari." },
+  "wrong-confirm": {
     tone: "error",
-    text: "Tidak jadi dihapus: data ini punya riwayat pendaftaran. Menghapusnya akan memutus catatan pembayaran dan kehadiran.",
+    text: "Tulisan konfirmasi tidak cocok, jadi tidak ada yang dihapus.",
   },
   deactivated: { tone: "success", text: "Data dinonaktifkan." },
   activated: { tone: "success", text: "Data diaktifkan kembali." },
@@ -71,7 +72,8 @@ export default async function AdminCustomersPage({
   let rows: CustomerRow[] = [];
   let count = 0;
   let error = false;
-  const registrationCount = new Map<string, number>();
+  const stats = new Map<string, DeletionStats>();
+  const childCount = new Map<string, number>();
 
   try {
     const [list, total] = await Promise.all([
@@ -96,14 +98,16 @@ export default async function AdminCustomersPage({
     rows = list;
     count = total;
 
-    // Satu kueri tambahan, bukan satu per baris: pendamping mana yang sudah
-    // punya pendaftaran, sehingga tidak bisa dihapus.
-    const grouped = await db.registrations.groupBy({
+    // Hitungan untuk dialog hapus: dua kueri untuk seluruh halaman, bukan satu
+    // per baris.
+    const ids = rows.map((row) => row.id);
+    for (const [id, value] of await statsByOwner("customer_id", ids)) stats.set(id, value);
+    const kids = await db.children.groupBy({
       by: ["customer_id"],
       _count: { _all: true },
-      where: { customer_id: { in: rows.map((row) => row.id) } },
+      where: { customer_id: { in: ids } },
     });
-    for (const row of grouped) registrationCount.set(row.customer_id, row._count._all);
+    for (const row of kids) childCount.set(row.customer_id, row._count._all);
   } catch {
     error = true;
   }
@@ -186,18 +190,15 @@ export default async function AdminCustomersPage({
                               { label: "WhatsApp", value: row.whatsapp },
                               {
                                 label: "Riwayat pendaftaran",
-                                value: `${registrationCount.get(row.id) ?? 0}`,
+                                value: `${stats.get(row.id)?.registrations ?? 0}`,
                               },
                             ]}
                             consequences={[
                               "Data pendamping ini",
-                              "Semua data anak yang terdaftar atas namanya",
+                              `${childCount.get(row.id) ?? 0} data anak yang terdaftar atas namanya`,
+                              ...describeStats(stats.get(row.id)),
+                              "Kalau cuma ingin menyembunyikan dari daftar, pakai Nonaktifkan di halaman Detail",
                             ]}
-                            blockedReason={
-                              (registrationCount.get(row.id) ?? 0) > 0
-                                ? `Pendamping ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Buka Detail pendamping ini untuk menonaktifkannya — datanya tetap tersimpan utuh.`
-                                : undefined
-                            }
                           />
                         ) : null}
                       </div>

@@ -1,3 +1,4 @@
+import { DecorScene } from "@/components/ui/playful";
 import {
   Compass,
   Footprints,
@@ -38,7 +39,9 @@ export function Pillars({
   if (items.length === 0) return null;
 
   return (
-    <section className="py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden py-16 sm:py-20">
+      <DecorScene name="sectionA" />
+
       <Container>
         <SectionHeading
           eyebrow={heading.eyebrow}
@@ -58,7 +61,7 @@ export function Pillars({
                   <span
                     className={`inline-flex size-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105 ${accent}`}
                   >
-                    <Icon className="size-6" aria-hidden />
+                    <Icon className="kb-wiggle-icon size-6" aria-hidden />
                   </span>
                   <h3 className="mt-5 text-lg font-extrabold text-ink">{pillar.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted">

@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/data-table";
 import Link from "next/link";
 import { deleteChildAction } from "@/app/admin/children/actions";
+import { describeStats, statsByOwner, type DeletionStats } from "@/lib/admin/delete-records";
 import { DeleteDialog } from "@/components/admin/delete-dialog";
 import { requireAdmin } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
@@ -21,10 +22,10 @@ export const dynamic = "force-dynamic";
 
 /** Outcome messages. Uses `msg` because `status` is already the list filter. */
 const STATUS_NOTICE: Record<string, { tone: "success" | "error" | "info"; text: string }> = {
-  deleted: { tone: "success", text: "Data dihapus permanen." },
-  "has-registrations": {
+  deleted: { tone: "success", text: "Data dipindahkan ke menu Terhapus. Masih bisa dipulihkan selama 30 hari." },
+  "wrong-confirm": {
     tone: "error",
-    text: "Tidak jadi dihapus: data ini punya riwayat pendaftaran. Menghapusnya akan memutus catatan pembayaran dan kehadiran.",
+    text: "Tulisan konfirmasi tidak cocok, jadi tidak ada yang dihapus.",
   },
   deactivated: { tone: "success", text: "Data dinonaktifkan." },
   activated: { tone: "success", text: "Data diaktifkan kembali." },
@@ -69,7 +70,7 @@ export default async function AdminChildrenPage({
   let rows: ChildRow[] = [];
   let count = 0;
   let error = false;
-  const registrationCount = new Map<string, number>();
+  const stats = new Map<string, DeletionStats>();
 
   try {
     const [list, total] = await Promise.all([
@@ -97,15 +98,10 @@ export default async function AdminChildrenPage({
     rows = list;
     count = total;
 
-    // Satu kueri tambahan, bukan satu per baris: anak mana yang sudah punya
-    // pendaftaran, sehingga tidak bisa dihapus tanpa memutus catatan
-    // pembayaran dan kehadiran.
-    const grouped = await db.registrations.groupBy({
-      by: ["child_id"],
-      _count: { _all: true },
-      where: { child_id: { in: rows.map((row) => row.id) } },
-    });
-    for (const row of grouped) registrationCount.set(row.child_id, row._count._all);
+    // Hitungan untuk dialog hapus: satu kueri untuk seluruh halaman.
+    for (const [id, value] of await statsByOwner("child_id", rows.map((row) => row.id))) {
+      stats.set(id, value);
+    }
   } catch {
     error = true;
   }
@@ -184,15 +180,19 @@ export default async function AdminChildrenPage({
                             { label: "Pendamping", value: row.customers?.full_name ?? "—" },
                             {
                               label: "Riwayat pendaftaran",
-                              value: `${registrationCount.get(row.id) ?? 0}`,
+                              value: `${stats.get(row.id)?.registrations ?? 0}`,
                             },
                           ]}
-                          consequences={["Data anak ini", "Catatan kehadiran dan sertifikatnya"]}
-                          blockedReason={
-                            (registrationCount.get(row.id) ?? 0) > 0
-                              ? `Anak ini punya ${registrationCount.get(row.id)} riwayat pendaftaran, jadi datanya tidak boleh dihapus — menghapusnya akan memutus catatan pembayaran dan kehadiran. Untuk membersihkan data percobaan beserta seluruh riwayatnya, minta tim teknis membersihkannya langsung di database.`
-                              : undefined
-                          }
+                          consequences={[
+                            "Data anak ini",
+                            ...describeStats(stats.get(row.id)),
+                            ...((stats.get(row.id)?.payments ?? 0) > 0
+                              ? [
+                                  "Kalau pendaftaran anak ini memegang tagihan paket satu keluarga, tagihan itu ikut hilang walau anak lain di paket yang sama masih ada",
+                                ]
+                              : []),
+                            "Kalau cuma ingin menyembunyikan dari daftar, nonaktifkan saja",
+                          ]}
                         />
                       ) : null}
                     </Td>

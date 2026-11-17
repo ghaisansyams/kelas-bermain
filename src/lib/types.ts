@@ -1,4 +1,5 @@
 import type { PaymentMethod } from "@/lib/repositories/types";
+import type { CategoryTone } from "@/lib/utils/event-categories";
 
 /**
  * Domain model for Kelas Bermain.
@@ -9,22 +10,20 @@ import type { PaymentMethod } from "@/lib/repositories/types";
  * these shapes, no component has to change.
  */
 
-export type EventCategory =
+/**
+ * Nama kategori event. Daftarnya diatur admin (tabel `event_categories`),
+ * jadi tipenya teks bebas. Warna dan foto cadangannya ada di `EventView`.
+ */
+export type EventCategory = string;
+
+/** Enam kategori awal. Kegiatan (data tetap di kode) hanya memakai ini. */
+export type BuiltinCategory =
   | "Profesi"
   | "Kuliner"
   | "Alam"
   | "Kreatif"
   | "Eksplorasi"
   | "Outdoor";
-
-export const EVENT_CATEGORIES: EventCategory[] = [
-  "Profesi",
-  "Kuliner",
-  "Alam",
-  "Kreatif",
-  "Eksplorasi",
-  "Outdoor",
-];
 
 /** How a participant pays to join. */
 export type RegistrationType = "FREE" | "PAID";
@@ -171,10 +170,14 @@ export interface EventView extends EventRecord {
   seatsLeft: number;
   /** 0–100, for the capacity meter. */
   filledPercent: number;
+  /** Warna lencana kategori, sesuai pengaturan admin. */
+  categoryTone: CategoryTone;
+  /** Foto cadangan kategori untuk "Tentang Event". */
+  categoryImage: ImageAsset;
 }
 
 /** Activities use the same taxonomy as events. */
-export type ActivityCategory = EventCategory;
+export type ActivityCategory = BuiltinCategory;
 
 export interface ActivityHighlight {
   label: string;

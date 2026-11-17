@@ -23,7 +23,7 @@ export function Field({
   label: string;
   htmlFor: string;
   error?: string;
-  hint?: string;
+  hint?: ReactNode;
   required?: boolean;
   /** Prefilled and not editable — neither "required" nor "(opsional)" fits. */
   fixed?: boolean;

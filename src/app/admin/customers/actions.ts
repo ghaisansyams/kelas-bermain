@@ -5,60 +5,85 @@ import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/admin/activity";
 import { requireRole } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
+import { confirmationMatches } from "@/lib/admin/delete-records";
+import { moveCustomerToBin, purgeExpired } from "@/lib/admin/recycle-bin";
 
 /**
  * Menghapus data orang.
  *
- * Tiga penjaga, karena ini menghapus data sungguhan:
+ * Penjaga, karena ini menghapus data sungguhan:
  *   1. Hanya SUPER_ADMIN.
- *   2. Aksi ini menghitung ulang pendaftaran di sini — pemeriksaan di tampilan
- *      tidak pernah dipercaya, sebab halaman yang basi bisa menawarkan hapus
- *      pada baris yang barusan mendaftar.
- *   3. Database memakai ON DELETE RESTRICT pada pendaftaran dan pembayaran,
- *      jadi kalau dua pemeriksaan di atas keliru pun, Postgres menolak.
- *      Diperiksa langsung: aturan itu sama persis dengan database asal.
+ *   2. Teks yang diketik admin dicocokkan lagi di server dengan kode aslinya.
+ *   3. Satu transaksi: pendaftaran beserta pembayaran, bukti transfer,
+ *      kehadiran, sertifikat, voucher, dan catatan keuangannya dipindahkan
+ *      ke Terhapus semuanya atau tidak sama sekali. Salinannya bisa
+ *      dipulihkan selama 30 hari (lihat lib/admin/recycle-bin.ts).
+ *   4. Setiap penghapusan dicatat di Activity Log beserta jumlah yang hilang.
  *
- * Kalau sebuah data tidak bisa dihapus, yang ditawarkan menonaktifkannya:
- * riwayat tetap utuh dan barisnya berhenti muncul di daftar aktif.
+ * Dulu data yang punya pendaftaran ditolak dan hanya bisa dinonaktifkan.
+ * Atas permintaan klien, sekarang boleh dihapus dengan konfirmasi ketik kode;
+ * menonaktifkan tetap tersedia di halaman Detail.
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Hitungan di dashboard, daftar, dan halaman publik ikut berubah. */
+function revalidateAfterDelete() {
+  for (const path of ["/admin", "/admin/customers", "/admin/children", "/admin/registrations", "/admin/payments", "/admin/finance"]) {
+    revalidatePath(path);
+  }
+  revalidatePath("/event", "layout");
+  revalidatePath("/register", "layout");
+}
 
 function back(path: string, status: string): never {
   redirect(`${path}?msg=${status}`);
 }
 
 export async function deleteCustomerAction(formData: FormData) {
-  await requireRole("SUPER_ADMIN");
+  const session = await requireRole("SUPER_ADMIN");
   const id = String(formData.get("customerId") ?? "");
-  const code = String(formData.get("code") ?? "");
   if (!UUID.test(id)) back("/admin/customers", "error");
 
   let outcome = "deleted";
   try {
-    const registrations = await db.registrations.count({ where: { customer_id: id } });
-    if (registrations > 0) {
-      outcome = "has-registrations";
+    const customer = await db.customers.findUnique({
+      where: { id },
+      select: { customer_number: true, full_name: true, whatsapp: true },
+    });
+    if (!customer) {
+      outcome = "error";
+    } else if (!confirmationMatches(formData.get("confirm"), customer.customer_number)) {
+      // Pemeriksaan kedua di server: teks yang diketik harus sama dengan kode
+      // aslinya, bukan dengan yang dikirim halaman.
+      outcome = "wrong-confirm";
     } else {
-      // Anak ikut terhapus bersama induknya (CASCADE), jadi catat berapa
-      // banyak yang ikut hilang.
-      const childCount = await db.children.count({ where: { customer_id: id } });
-      await db.customers.delete({ where: { id } });
+      // Pendamping, anak-anaknya, dan seluruh pendaftarannya dipindahkan ke Terhapus.
+      const details = await db.$transaction((tx) => moveCustomerToBin(tx, id, session.fullName), {
+        timeout: 60_000,
+      });
       await logActivity(
         "DELETE_CUSTOMER",
         "customers",
-        code || id,
-        { code, childrenDeleted: childCount },
+        customer.customer_number,
+        {
+          code: customer.customer_number,
+          name: customer.full_name,
+          whatsapp: customer.whatsapp,
+          movedToBin: true,
+          ...(details ?? {}),
+        },
         null,
       );
+      await purgeExpired();
     }
   } catch {
     outcome = "error";
   }
 
   if (outcome === "deleted") {
-    revalidatePath("/admin/customers");
-    revalidatePath("/admin/children");
+    revalidateAfterDelete();
+    revalidatePath("/admin/trash");
   }
   back("/admin/customers", outcome);
 }

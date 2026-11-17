@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, MapPin } from "lucide-react";
-import { Badge, categoryTone } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { EventPrice } from "@/components/event/event-price";
 import { Reveal } from "@/components/ui/reveal";
@@ -79,7 +79,7 @@ export function EventTimeline({ events }: { events: EventView[] }) {
                         Event Terdekat
                       </span>
                     ) : null}
-                    <Badge tone={categoryTone[event.category]}>{event.category}</Badge>
+                    <Badge tone={event.categoryTone}>{event.category}</Badge>
                   </div>
 
                   <h3 className="mt-2 text-base font-extrabold text-ink sm:text-lg">

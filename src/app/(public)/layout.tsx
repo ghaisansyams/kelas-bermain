@@ -25,7 +25,7 @@ export default async function PublicLayout({ children }: { children: React.React
   const themeStyle = toThemeStyle(global.sections.theme);
 
   return (
-    <div style={themeStyle as React.CSSProperties} className="contents">
+    <div style={themeStyle as React.CSSProperties} className="kb-public contents">
       {preview ? <PreviewBanner /> : null}
       <SiteHeader navItems={navItems} identity={identity} />
       <main id="konten" className="flex-1">

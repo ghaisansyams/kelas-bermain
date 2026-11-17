@@ -1,3 +1,5 @@
+import { DecorScene } from "@/components/ui/playful";
+import { Sticker } from "@/components/home/stickers";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,7 +7,7 @@ import type { Metadata } from "next";
 import { Baby, CalendarDays, Clock, MapPin, QrCode, Ticket } from "lucide-react";
 import { EventPrice } from "@/components/event/event-price";
 import { RegistrationWizard } from "@/components/registration/registration-wizard";
-import { Badge, categoryTone } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -86,6 +88,8 @@ export default async function RegisterPage({
   const artwork = event.poster ?? event.cover;
 
   return (
+    <div className="relative isolate">
+      <DecorScene name="form" />
     <Container className="max-w-3xl py-8 sm:py-12">
       {qrSource ? (
         <p className="mb-5 inline-flex items-center gap-2 rounded-pill bg-pine-soft px-3.5 py-1.5 text-xs font-semibold text-pine-dark">
@@ -116,11 +120,13 @@ export default async function RegisterPage({
             />
           ) : null}
           <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
+          <Sticker kind="star" color="yellow" rotate={14} className="right-3 top-3 size-9 sm:size-11" />
+          <Sticker kind="smile" color="yellow" rotate={-10} className="bottom-3 left-3 hidden size-9 sm:block" delay={0.7} />
         </div>
 
         <div className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={categoryTone[event.category]}>{event.category}</Badge>
+            <Badge tone={event.categoryTone}>{event.category}</Badge>
             {resolvePriceDisplay(event.registration) === "HIDDEN" ? null : (
               <Badge tone={isFree ? "pine" : "sun"}>
                 <EventPrice event={event} />
@@ -180,6 +186,7 @@ export default async function RegisterPage({
         )}
       </section>
     </Container>
+    </div>
   );
 }
 

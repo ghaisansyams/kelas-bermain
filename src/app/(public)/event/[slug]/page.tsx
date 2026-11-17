@@ -1,3 +1,4 @@
+import { Sticker } from "@/components/home/stickers";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ import {
   MobileRegistrationBar,
   RegistrationPanel,
 } from "@/components/event/registration-panel";
-import { Badge, categoryTone, LifecycleBadge } from "@/components/ui/badge";
+import { Badge, LifecycleBadge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
@@ -128,6 +129,10 @@ export default async function EventDetailPage({
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-ink/92 via-ink/65 to-ink/40" />
+          {/* Stiker "tertempel" di foto: pojok kanan atas, jauh dari judul. */}
+          <Sticker kind="star" color="yellow" rotate={14} className="right-5 top-5 size-9 sm:right-[6%] sm:top-8 sm:size-14" />
+          <Sticker kind="sparkle" color="cyan" className="right-[18%] top-10 hidden size-8 sm:block" delay={0.9} />
+          <Sticker kind="balloon" color="red" rotate={10} className="right-[8%] top-[38%] hidden h-24 w-14 lg:block" delay={0.4} />
         </div>
 
         <Container className="flex flex-col justify-end pb-8 pt-10 sm:min-h-[24rem] sm:pb-12 sm:pt-14 lg:min-h-[28rem]">
@@ -140,7 +145,7 @@ export default async function EventDetailPage({
           </Link>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Badge tone={categoryTone[event.category]} className="bg-surface/95">
+            <Badge tone={event.categoryTone} className="bg-surface/95">
               {event.category}
             </Badge>
             <LifecycleBadge lifecycle={event.lifecycle} className="bg-surface/95" />

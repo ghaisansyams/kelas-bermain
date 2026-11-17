@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { getEvents } from "@/lib/services/content";
+import { getEventCategories } from "@/lib/services/event-categories";
 
 /**
  * Event status is derived from the current date, so regenerate hourly to keep
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export default async function EventPage() {
-  const events = await getEvents();
+  const [events, categories] = await Promise.all([getEvents(), getEventCategories()]);
   const openCount = events.filter((event) => event.availability === "open").length;
 
   return (
@@ -43,7 +44,7 @@ export default async function EventPage() {
       />
 
       <Container className="py-10 sm:py-14">
-        <EventExplorer events={events} />
+        <EventExplorer events={events} categories={categories.map((item) => item.name)} />
       </Container>
     </>
   );

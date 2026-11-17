@@ -2,12 +2,20 @@ import type { ReactNode } from "react";
 import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils/cn";
 
+/**
+ * Label kecil di atas judul. Hanya teks: tanpa ikon dan tanpa kotak, supaya
+ * terbaca sebagai bagian dari tata huruf halaman, bukan komponen tempelan.
+ * `plain` membuang garis tipis di depannya (dipakai di hero, yang sudah
+ * punya judul besar di bawahnya).
+ */
 export function Eyebrow({
   children,
   className,
+  plain = false,
 }: {
   children: ReactNode;
   className?: string;
+  plain?: boolean;
 }) {
   return (
     <span
@@ -16,7 +24,7 @@ export function Eyebrow({
         className,
       )}
     >
-      <span aria-hidden className="h-px w-6 bg-brand/50" />
+      {plain ? null : <span aria-hidden className="h-px w-6 bg-brand/50" />}
       {children}
     </span>
   );

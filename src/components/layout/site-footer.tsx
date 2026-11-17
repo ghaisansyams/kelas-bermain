@@ -10,6 +10,7 @@ import {
 } from "@/components/brand/social-icons";
 import { Logo } from "@/components/brand/logo";
 import { Container } from "@/components/ui/container";
+import { DecorScene, WaveEdge } from "@/components/ui/playful";
 import { footerNav, siteConfig, socialLinks } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
 
@@ -45,8 +46,10 @@ export function SiteFooter({
   const email = identity?.email || siteConfig.email;
 
   return (
-    <footer className="mt-24 border-t border-line bg-canvas-deep/60">
-      <Container className="py-14 lg:py-16">
+    <footer className="relative isolate mt-24 overflow-hidden bg-canvas-deep/60">
+      <DecorScene name="footer" />
+      <WaveEdge edge="top" shape="scallop" />
+      <Container className="pb-14 pt-20 lg:pb-16 lg:pt-24">
         <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-5 lg:col-span-4">
             <Logo imageUrl={identity?.logoUrl} name={identity?.name} />
@@ -65,7 +68,7 @@ export function SiteFooter({
                 if (!social.href) {
                   return (
                     <span key={social.label} className={tile} title={label}>
-                      <Icon className="size-[1.125rem]" aria-hidden />
+                      <Icon className="kb-wiggle-icon size-[1.125rem]" aria-hidden />
                       <span className="sr-only">{label}</span>
                     </span>
                   );
@@ -82,7 +85,7 @@ export function SiteFooter({
                       : {})}
                     className={`${tile} transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand-ink`}
                   >
-                    <Icon className="size-[1.125rem]" aria-hidden />
+                    <Icon className="kb-wiggle-icon size-[1.125rem]" aria-hidden />
                   </a>
                 );
               })}

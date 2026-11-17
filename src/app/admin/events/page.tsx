@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Tags } from "lucide-react";
 import {
+  deleteEventAction,
   duplicateEventAction,
   importCatalogueAction,
   setEventStatusAction,
 } from "@/app/admin/events/actions";
+import { DeleteDialog } from "@/components/admin/delete-dialog";
+import { describeStats, statsByOwner, type DeletionStats } from "@/lib/admin/delete-records";
 import { Card, Notice, PageHeader } from "@/components/admin/admin-ui";
 import { EmptyRow, StatusBadge, TableShell, Td, Th } from "@/components/admin/data-table";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -18,6 +21,8 @@ const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
   imported: { tone: "success", text: "Katalog event berhasil diimpor ke database." },
   "status-changed": { tone: "success", text: "Status event diperbarui dan website disegarkan." },
   created: { tone: "success", text: "Event dibuat." },
+  deleted: { tone: "success", text: "Event dan seluruh pendaftarannya dipindahkan ke menu Terhapus. Masih bisa dipulihkan selama 30 hari." },
+  "wrong-confirm": { tone: "error", text: "Tulisan konfirmasi tidak cocok, jadi tidak ada yang dihapus." },
   error: { tone: "error", text: "Aksi gagal. Coba lagi." },
 };
 
@@ -26,7 +31,7 @@ export default async function AdminEventsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { status } = await searchParams;
 
   let rows: {
@@ -41,6 +46,7 @@ export default async function AdminEventsPage({
     featured: boolean;
   }[] = [];
   let error = false;
+  let stats = new Map<string, DeletionStats>();
 
   try {
     const list = await db.events.findMany({
@@ -59,6 +65,7 @@ export default async function AdminEventsPage({
       take: 200,
     });
     rows = list.map((row) => ({ ...row, start_date: row.start_date.toISOString().slice(0, 10) }));
+    stats = await statsByOwner("event_id", rows.map((row) => row.id));
   } catch {
     error = true;
   }
@@ -71,13 +78,22 @@ export default async function AdminEventsPage({
         title="Event"
         description="Sumber data event untuk website, registrasi, kehadiran, dan keuangan."
         action={
-          <Link
-            href="/admin/events/new"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-semibold text-white"
-          >
-            <Plus className="size-4" aria-hidden />
-            Event Baru
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/events/kategori"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-pill border border-line bg-surface px-4 text-sm font-semibold text-ink-soft hover:border-brand/40 hover:text-brand"
+            >
+              <Tags className="size-4" aria-hidden />
+              Kategori
+            </Link>
+            <Link
+              href="/admin/events/new"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-brand px-4 text-sm font-semibold text-white"
+            >
+              <Plus className="size-4" aria-hidden />
+              Event Baru
+            </Link>
+          </div>
         }
       />
 
@@ -169,6 +185,29 @@ export default async function AdminEventsPage({
                             Duplikat
                           </button>
                         </form>
+                        {session.role === "SUPER_ADMIN" ? (
+                          <DeleteDialog
+                            action={deleteEventAction}
+                            hidden={{ id: row.id }}
+                            code={row.title}
+                            title="Hapus event?"
+                            summary={[
+                              { label: "Judul", value: row.title },
+                              { label: "Tanggal", value: formatDate(row.start_date) },
+                              { label: "Terdaftar", value: `${row.registered}/${row.capacity}` },
+                            ]}
+                            consequences={[
+                              "Event ini dan halamannya di website",
+                              ...describeStats(stats.get(row.id)),
+                              "Data pendamping dan anak tetap ada",
+                              ...(rows.length === 1
+                                ? [
+                                    "Ini event terakhir: setelah dihapus, website kembali menampilkan katalog bawaan sampai ada event baru",
+                                  ]
+                                : []),
+                            ]}
+                          />
+                        ) : null}
                       </div>
                     </Td>
                   </tr>

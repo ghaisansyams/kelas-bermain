@@ -16,11 +16,13 @@ import {
   Receipt,
   Settings,
   Ticket,
+  Trash2,
   UserCog,
   Users,
   Wallet,
 } from "lucide-react";
 import { LogoLockup } from "@/components/brand/logo";
+import { MobileAdminMenu } from "@/components/admin/mobile-admin-menu";
 import type { AdminSession } from "@/lib/admin/auth";
 import { signOutAction } from "@/app/admin/actions";
 
@@ -64,6 +66,7 @@ const NAV_GROUPS: { title: string; items: { href: string; label: string; icon: t
       { href: "/admin/users", label: "Pengguna", icon: UserCog },
       { href: "/admin/settings", label: "Pengaturan Diskon", icon: Settings },
       { href: "/admin/activity-log", label: "Activity Log", icon: History },
+      { href: "/admin/trash", label: "Terhapus", icon: Trash2 },
     ],
   },
 ];
@@ -111,17 +114,12 @@ export function AdminShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between gap-4 border-b border-line bg-surface px-5">
-          <nav className="flex gap-3 lg:hidden" aria-label="Navigasi admin (ringkas)">
-            {NAV_GROUPS.flatMap((group) => group.items).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm font-semibold text-ink-soft hover:text-brand"
-              >
-                {item.label.replace("CMS — ", "")}
-              </Link>
-            ))}
-          </nav>
+          <MobileAdminMenu
+            groups={NAV_GROUPS.map((group) => ({
+              title: group.title,
+              items: group.items.map((item) => ({ href: item.href, label: item.label })),
+            }))}
+          />
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-right sm:block">
               <span className="block text-sm font-bold text-ink">{session.fullName}</span>

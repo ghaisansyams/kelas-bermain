@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
+import { Confetti } from "@/components/ui/playful";
 import type { RegistrationBatch } from "@/lib/services/registration";
 import type { EventView } from "@/lib/types";
 import { formatDateRange } from "@/lib/utils/date";
@@ -52,7 +53,9 @@ export function RegistrationReceipt({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
+      <div className="relative rounded-card border border-sun/40 bg-sun-soft/60 p-6 text-center sm:p-8">
+        {/* Letusan konfeti sekali, tepat saat pendaftaran berhasil tercatat. */}
+        <Confetti />
         <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-sun-dark text-white motion-safe:animate-fade-up">
           <Clock className="size-8" aria-hidden />
         </span>

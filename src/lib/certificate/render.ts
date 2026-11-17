@@ -20,14 +20,24 @@ import {
 /** Lebar kanvas dalam piksel: A4 pada sekitar 200 dpi. */
 const LONG_SIDE_PX = 2339;
 
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
+
+/** Gambar latar dimuat sekali per alamat, supaya ratusan sertifikat tidak memuatnya ratusan kali. */
 function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+  const cached = imageCache.get(src);
+  if (cached) return cached;
+  const loading = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Gambar sertifikat gagal dimuat."));
+    image.onerror = () => {
+      imageCache.delete(src);
+      reject(new Error("Gambar sertifikat gagal dimuat."));
+    };
     image.src = src;
   });
+  imageCache.set(src, loading);
+  return loading;
 }
 
 /** Keluarga huruf bawaan website, sebagaimana dipakai CSS halaman ini. */
@@ -52,9 +62,19 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, maxWidth: nu
   return lines;
 }
 
+export interface RenderOptions {
+  /**
+   * Nama panjang dikecilkan sampai muat satu baris (paling kecil 55% dari
+   * ukuran yang diatur), baru dipecah ke dua baris kalau masih tidak muat.
+   * Dipakai untuk sertifikat massal, di mana tidak ada yang memeriksa satu-satu.
+   */
+  fitNameToOneLine?: boolean;
+}
+
 export async function renderCertificateCanvas(
   template: CertificateTemplate,
   data: CertificateData,
+  options: RenderOptions = {},
 ): Promise<HTMLCanvasElement> {
   const page = PAGE_SIZE[template.orientation];
   const scale = LONG_SIDE_PX / Math.max(page.width, page.height);
@@ -87,7 +107,7 @@ export async function renderCertificateCanvas(
     if (!field.enabled) continue;
 
     const family = field.fontFamily || siteFontFamily();
-    const fontPx = (field.fontSize / page.width) * width;
+    let fontPx = (field.fontSize / page.width) * width;
     const font = `${field.fontWeight} ${fontPx}px ${family}`;
     // Huruf yang belum pernah dipakai di halaman ini belum terunduh; tanpa
     // menunggu, teks tergambar dengan huruf cadangan.
@@ -108,7 +128,16 @@ export async function renderCertificateCanvas(
           ? centerX + boxWidth / 2
           : centerX;
 
-    const lines = wrapLines(context, fieldText(field, values[key]), boxWidth);
+    const text = fieldText(field, values[key]);
+    if (options.fitNameToOneLine && key === "participantName") {
+      const smallest = fontPx * 0.55;
+      while (fontPx > smallest && context.measureText(text).width > boxWidth) {
+        fontPx *= 0.95;
+        context.font = `${field.fontWeight} ${fontPx}px ${family}`;
+      }
+    }
+
+    const lines = wrapLines(context, text, boxWidth);
     const lineHeight = fontPx * 1.2;
     const top = centerY - (lines.length * lineHeight) / 2;
     lines.forEach((line, index) => {
@@ -129,9 +158,14 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number)
   });
 }
 
-/** PDF satu halaman A4 yang isinya satu gambar JPEG penuh. */
-async function canvasToPdf(canvas: HTMLCanvasElement, orientation: "LANDSCAPE" | "PORTRAIT") {
-  const jpeg = new Uint8Array(await (await canvasToBlob(canvas, "image/jpeg", 0.92)).arrayBuffer());
+export interface PdfPage {
+  jpeg: Uint8Array;
+  width: number;
+  height: number;
+}
+
+/** PDF A4 dengan satu gambar JPEG penuh per halaman. */
+export function buildPdf(pages: PdfPage[], orientation: "LANDSCAPE" | "PORTRAIT"): Blob {
   const page = PAGE_SIZE[orientation];
   // Milimeter ke poin PDF (1 poin = 1/72 inci).
   const pw = ((page.width / 25.4) * 72).toFixed(2);
@@ -152,47 +186,72 @@ async function canvasToPdf(canvas: HTMLCanvasElement, orientation: "LANDSCAPE" |
   };
 
   const content = `q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`;
+  // Objek 1 = katalog, 2 = daftar halaman; tiap halaman memakai tiga objek
+  // berurutan: halaman, gambar, isi.
+  const pageId = (index: number) => 3 + index * 3;
 
   push("%PDF-1.4\n");
   startObject(1);
   push("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
   startObject(2);
-  push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
-  startObject(3);
   push(
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] ` +
-      "/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
+    `<< /Type /Pages /Kids [${pages.map((_, i) => `${pageId(i)} 0 R`).join(" ")}] /Count ${pages.length} >>\nendobj\n`,
   );
-  startObject(4);
-  push(
-    `<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} ` +
-      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`,
-  );
-  push(jpeg);
-  push("\nendstream\nendobj\n");
-  startObject(5);
-  push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
 
+  pages.forEach((item, index) => {
+    const id = pageId(index);
+    startObject(id);
+    push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] ` +
+        `/Resources << /XObject << /Im0 ${id + 1} 0 R >> >> /Contents ${id + 2} 0 R >>\nendobj\n`,
+    );
+    startObject(id + 1);
+    push(
+      `<< /Type /XObject /Subtype /Image /Width ${item.width} /Height ${item.height} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${item.jpeg.length} >>\nstream\n`,
+    );
+    push(item.jpeg);
+    push("\nendstream\nendobj\n");
+    startObject(id + 2);
+    push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+  });
+
+  const objectCount = 3 + pages.length * 3;
   const xrefAt = length;
-  push("xref\n0 6\n0000000000 65535 f \n");
-  for (let id = 1; id <= 5; id += 1) {
+  push(`xref\n0 ${objectCount}\n0000000000 65535 f \n`);
+  for (let id = 1; id < objectCount; id += 1) {
     push(`${String(offsets[id]).padStart(10, "0")} 00000 n \n`);
   }
-  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`);
+  push(`trailer\n<< /Size ${objectCount} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`);
 
   return new Blob(chunks as BlobPart[], { type: "application/pdf" });
 }
 
-function safeFileName(name: string, number: string, extension: string): string {
-  const slug = name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `Sertifikat-${slug || "Peserta"}-${number}.${extension}`;
+export async function canvasToJpegPage(canvas: HTMLCanvasElement, quality = 0.92): Promise<PdfPage> {
+  const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+  return { jpeg: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }
 
-function saveBlob(blob: Blob, fileName: string) {
+async function canvasToPdf(canvas: HTMLCanvasElement, orientation: "LANDSCAPE" | "PORTRAIT") {
+  return buildPdf([await canvasToJpegPage(canvas)], orientation);
+}
+
+/** Nama orang menjadi bagian nama berkas: tanpa aksen, spasi, atau tanda baca. */
+export function fileSlug(name: string): string {
+  return (
+    name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "Peserta"
+  );
+}
+
+export function safeFileName(name: string, number: string, extension: string): string {
+  return `Sertifikat-${fileSlug(name)}-${number}.${extension}`;
+}
+
+export function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

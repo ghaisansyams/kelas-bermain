@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Reveal } from "@/components/ui/reveal";
-import type { EventRecord } from "@/lib/types";
+import type { EventView } from "@/lib/types";
 import {
   ABOUT_IMAGE_HEIGHT,
   ABOUT_IMAGE_WIDTH,
@@ -16,7 +16,7 @@ import {
 export function AboutEvent({
   event,
 }: {
-  event: Pick<EventRecord, "description" | "category" | "aboutEvent">;
+  event: Pick<EventView, "description" | "aboutEvent" | "categoryImage">;
 }) {
   const { description, images } = resolveAboutEvent(event);
 

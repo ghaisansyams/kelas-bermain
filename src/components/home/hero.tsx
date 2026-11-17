@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { HeroSlider } from "@/components/home/hero-slider";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Sticker } from "@/components/home/stickers";
+import { Drifter } from "@/components/ui/playful";
 import { Reveal } from "@/components/ui/reveal";
+import { Eyebrow } from "@/components/ui/section-heading";
 import type { HeroSlide } from "@/data/hero-slides";
 import type { HomeHeroContent } from "@/lib/services/cms";
 
@@ -44,16 +46,23 @@ export function Hero({
         <Sticker kind="cloud" color="cyan" rotate={-6} className="left-[45%] top-8 hidden h-10 w-16 lg:block" delay={0.6} />
         <Sticker kind="ball" color="green" rotate={-10} className="bottom-4 left-[1.5%] hidden size-11 xl:block" delay={2} />
         <Sticker kind="pencil" color="yellow" rotate={-14} className="bottom-3 right-[5%] hidden h-8 w-24 lg:block" delay={1.6} />
+        {/* Lapisan ke dua: mengintip dari balik banner dan di tepi layar lebar. */}
+        <Sticker kind="balloon" color="red" rotate={-12} className="left-[42%] top-[26%] hidden h-24 w-14 xl:block" delay={0.5} />
+        <Sticker kind="rainbow" className="left-[1.5%] top-[44%] hidden h-14 w-28 2xl:block" delay={1.1} />
+        <Sticker kind="butterfly" color="blue" rotate={10} className="right-[1%] top-[52%] hidden h-11 w-14 2xl:block" delay={0.9} />
+        <Sticker kind="rocket" color="yellow" rotate={22} className="right-[3%] top-[22%] hidden h-24 w-14 2xl:block" delay={1.8} />
+        <Sticker kind="crayon" color="blue" rotate={-8} className="bottom-[14%] left-[38%] hidden h-7 w-20 xl:block" delay={2.2} />
+        <Drifter top="2%" seconds={80} offset={20} />
+        <Drifter top="90%" seconds={95} offset={55} className="h-7 w-11" />
       </div>
 
       <Container>
         <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-6 xl:col-span-5">
             <Reveal>
-              <span className="inline-flex items-center gap-2 rounded-pill border border-brand/20 bg-brand-soft px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-brand-ink">
-                <Sparkles className="size-3.5" aria-hidden />
+              <Eyebrow plain className="text-[0.8125rem] sm:text-sm">
                 {content.eyebrow}
-              </span>
+              </Eyebrow>
             </Reveal>
 
             <Reveal delay={80}>

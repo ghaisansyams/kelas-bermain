@@ -1,3 +1,4 @@
+import { DecorScene } from "@/components/ui/playful";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ActivityCard } from "@/components/kegiatan/activity-card";
@@ -9,7 +10,9 @@ import type { ActivityRecord } from "@/lib/types";
 
 export function ActivityPreview({ activities }: { activities: ActivityRecord[] }) {
   return (
-    <section className="py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden py-16 sm:py-20">
+      <DecorScene name="sectionA" />
+
       <Container>
         <SectionHeading
           eyebrow="Kegiatan terbaru"

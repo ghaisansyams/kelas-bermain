@@ -35,6 +35,7 @@ import {
   EventVisibility,
   type EventVisibilityRow,
 } from "@/components/admin/cms/event-visibility";
+import { BulkCertificates } from "@/components/admin/cms/bulk-certificates";
 import { CertificateDesigner } from "@/components/admin/cms/certificate-designer";
 import { normaliseConfig, type CertificateTemplate } from "@/lib/cms/certificate-template";
 import { SectionCard } from "@/components/admin/cms/section-card";
@@ -464,6 +465,12 @@ export default async function CmsWebsitePage({
             Template baru tidak mengubah sertifikat yang sudah terbit. Sertifikat lama tetap
             tampil dengan desain saat diterbitkan.
           </Notice>
+
+          <Card>
+            <BulkCertificates
+              designs={templates.filter((item) => item.status !== "ARCHIVED")}
+            />
+          </Card>
 
           {templates.length > 0 ? (
             <Card>

@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
+import { DecorScene } from "@/components/ui/playful";
 import { mainNav } from "@/data/site";
 import { getNavigationItems } from "@/lib/services/cms";
 
@@ -12,8 +13,10 @@ export default async function NotFound() {
   const navItems = await getNavigationItems();
 
   return (
-    <>
+    <div className="kb-public contents">
       <SiteHeader navItems={navItems} />
+      <div className="relative isolate flex-1 overflow-hidden">
+      <DecorScene name="lost" />
       <Container
         as="main"
         className="flex min-h-[70vh] max-w-2xl flex-1 flex-col items-center justify-center py-16 text-center"
@@ -62,7 +65,8 @@ export default async function NotFound() {
         </ul>
       </nav>
       </Container>
+      </div>
       <SiteFooter />
-    </>
+    </div>
   );
 }

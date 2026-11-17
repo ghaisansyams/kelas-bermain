@@ -1,3 +1,4 @@
+import { DecorScene, WaveEdge } from "@/components/ui/playful";
 import { Play } from "lucide-react";
 import { YoutubeModal } from "@/components/media/youtube-modal";
 import { Container } from "@/components/ui/container";
@@ -10,7 +11,11 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
   const withVideo = items.filter((item) => item.video);
 
   return (
-    <section className="bg-canvas-deep/50 py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden bg-canvas-deep/50 py-20 sm:py-24">
+      <DecorScene name="sectionB" />
+      <WaveEdge edge="top" shape="scallop" />
+      <WaveEdge edge="bottom" shape="wave" />
+
       <Container>
         <SectionHeading
           eyebrow="Kata orang tua"

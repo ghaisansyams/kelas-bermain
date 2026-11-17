@@ -171,12 +171,14 @@ export function SelectField({
   options: { value: string; label: string }[];
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm font-semibold text-ink">
+    // max-w-full: pilihan dengan teks panjang (judul event + tanggal) tidak
+    // boleh melebarkan halaman di HP; teksnya dipotong di dalam kotaknya.
+    <label className="flex max-w-full min-w-0 flex-col gap-1.5 text-sm font-semibold text-ink">
       {label}
       <select
         name={name}
         defaultValue={value ?? ""}
-        className="h-11 min-w-[10rem] rounded-xl border border-line bg-surface px-3 text-[0.9375rem] text-ink"
+        className="h-11 min-w-[10rem] max-w-full rounded-xl border border-line bg-surface px-3 text-[0.9375rem] text-ink"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

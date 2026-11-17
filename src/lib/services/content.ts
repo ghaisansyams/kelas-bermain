@@ -6,6 +6,8 @@ import { getCmsGallery, getCmsTestimonials } from "@/lib/services/cms-content";
 import { getGalleryDriveSettings } from "@/lib/services/gallery-settings";
 import { db } from "@/lib/db";
 import { rowToEventRecord, type EventRow } from "./event-mapper";
+import { getEventCategories } from "@/lib/services/event-categories";
+import { resolveCategoryStyle, type CategoryDef } from "@/lib/utils/event-categories";
 import { galleryDrive, galleryFeatured, galleryItems } from "@/data/gallery";
 import { speakers } from "@/data/speakers";
 import { testimonials } from "@/data/testimonials";
@@ -44,15 +46,18 @@ function resolveAvailability(
   return "open";
 }
 
-function toEventView(record: EventRecord, now: Date): EventView {
+function toEventView(record: EventRecord, now: Date, categories: readonly CategoryDef[]): EventView {
   const lifecycle = resolveLifecycle(record.startDate, record.endDate, now);
   const seatsLeft = Math.max(0, record.capacity - record.registered);
   const filledPercent =
     record.capacity > 0
       ? Math.min(100, Math.round((record.registered / record.capacity) * 100))
       : 0;
+  const style = resolveCategoryStyle(record.category, categories);
   return {
     ...record,
+    categoryTone: style.tone,
+    categoryImage: style.image,
     lifecycle,
     availability: resolveAvailability(record, lifecycle, now),
     seatsLeft,
@@ -107,8 +112,8 @@ async function loadEventRecords(): Promise<EventRecord[]> {
 }
 
 export async function getEvents(now: Date = new Date()): Promise<EventView[]> {
-  const records = await loadEventRecords();
-  return records.map((event) => toEventView(event, now)).sort(sortEvents);
+  const [records, categories] = await Promise.all([loadEventRecords(), getEventCategories()]);
+  return records.map((event) => toEventView(event, now, categories)).sort(sortEvents);
 }
 
 export async function getUpcomingEvents(
@@ -122,13 +127,27 @@ export async function getUpcomingEvents(
   return list.slice(0, limit);
 }
 
+/**
+ * Parameter alamat di Next datang masih berbentuk persen ("testing%201"), jadi
+ * dibuka dulu sebelum dibandingkan. Tanpa ini, event yang slug-nya berisi spasi
+ * atau karakter khusus muncul di daftar tetapi halamannya "tidak ditemukan".
+ */
+function decodeSlug(slug: string): string {
+  try {
+    return decodeURIComponent(slug);
+  } catch {
+    return slug;
+  }
+}
+
 export async function getEventBySlug(
   slug: string,
   now: Date = new Date(),
 ): Promise<EventView | null> {
-  const records = await loadEventRecords();
-  const record = records.find((event) => event.slug === slug);
-  return record ? toEventView(record, now) : null;
+  const wanted = decodeSlug(slug);
+  const [records, categories] = await Promise.all([loadEventRecords(), getEventCategories()]);
+  const record = records.find((event) => event.slug === wanted || event.slug === slug);
+  return record ? toEventView(record, now, categories) : null;
 }
 
 export async function getEventSlugs(): Promise<string[]> {

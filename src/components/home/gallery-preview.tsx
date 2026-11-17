@@ -1,3 +1,4 @@
+import { DecorScene, WaveEdge } from "@/components/ui/playful";
 import Link from "next/link";
 import { ArrowRight, FolderOpen } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
@@ -23,7 +24,11 @@ export function GalleryPreview({
   if (!drive.url.trim()) return null;
 
   return (
-    <section className="bg-canvas-deep/50 py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden bg-canvas-deep/50 py-20 sm:py-24">
+      <DecorScene name="sectionC" />
+      <WaveEdge edge="top" shape="scallop" />
+      <WaveEdge edge="bottom" shape="wave" />
+
       <Container>
         <SectionHeading
           eyebrow={heading.eyebrow}

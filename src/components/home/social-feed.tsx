@@ -1,3 +1,4 @@
+import { DecorScene } from "@/components/ui/playful";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
@@ -16,7 +17,9 @@ import { formatDateShort } from "@/lib/utils/date";
  */
 export function SocialFeed({ updates }: { updates: UpdatesResult }) {
   return (
-    <section className="py-16 sm:py-20">
+    <section className="relative isolate overflow-hidden py-16 sm:py-20">
+      <DecorScene name="sectionB" />
+
       <Container>
         <SectionHeading
           eyebrow="Update terbaru"

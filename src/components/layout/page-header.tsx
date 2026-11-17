@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Container } from "@/components/ui/container";
+import { DecorScene, WaveEdge, headerSceneFor } from "@/components/ui/playful";
 import { Eyebrow } from "@/components/ui/section-heading";
 
 export function PageHeader({
@@ -14,7 +15,15 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden border-b border-line bg-canvas-deep/40 py-12 sm:py-16">
+    <section className="relative isolate overflow-hidden bg-canvas-deep/40 pb-16 pt-12 sm:pb-20 sm:pt-16">
+      {/* Latar titik-titik yang memudar ke bawah, seperti kertas gambar. */}
+      <div
+        aria-hidden
+        className="kb-dots pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]"
+      />
+      {/* Stiker berbeda untuk tiap halaman, dipilih tetap dari judul halamannya. */}
+      <DecorScene name={headerSceneFor(eyebrow)} />
+      <WaveEdge shape="wave" />
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -right-24 -top-24 size-72 rounded-full bg-brand/10 blur-3xl" />
         <div className="absolute -left-20 bottom-0 size-64 rounded-full bg-sun/12 blur-3xl" />

@@ -1,18 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
-import { updateEventAction } from "@/app/admin/events/actions";
+import { ArrowLeft, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { deleteEventAction, setEventStatusAction, updateEventAction } from "@/app/admin/events/actions";
+import { DeleteDialog } from "@/components/admin/delete-dialog";
+import { describeStats, statsByOwner } from "@/lib/admin/delete-records";
 import { Notice, PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { EventForm, type EventFormValues } from "@/components/admin/event-form";
 import { requireAdmin } from "@/lib/admin/auth";
-import type { EventRow } from "@/lib/services/event-mapper";
+import { EVENT_STATUS_LABEL, type EventRow } from "@/lib/services/event-mapper";
 import { db } from "@/lib/db";
+import { getEventCategories } from "@/lib/services/event-categories";
 import { formatRupiah } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
 const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
-  saved: { tone: "success", text: "Event tersimpan. Website publik sudah disegarkan." },
+  saved: { tone: "success", text: "Perubahan tersimpan. Website publik sudah disegarkan." },
+  "saved-draft": { tone: "success", text: "Perubahan tersimpan. Event ini masih draft, jadi belum tampil di website." },
+  "created-live": { tone: "success", text: "Event dibuat dan sudah tampil di website." },
+  "created-draft": { tone: "success", text: "Event disimpan sebagai draft. Belum tampil di website; tekan Tayangkan di website kalau sudah siap." },
+  "now-live": { tone: "success", text: "Selesai. Event ini sekarang tampil di website." },
+  "now-hidden": { tone: "success", text: "Event disembunyikan dari website. Datanya tetap tersimpan." },
+  "bad-category": { tone: "error", text: "Kategori tidak dikenal, jadi event belum disimpan. Pilih salah satu kategori dari daftar." },
+  "wrong-confirm": { tone: "error", text: "Tulisan konfirmasi tidak cocok, jadi tidak ada yang dihapus." },
   created: { tone: "success", text: "Event dibuat." },
   error: { tone: "error", text: "Perubahan gagal disimpan." },
 };
@@ -24,7 +34,7 @@ export default async function EditEventPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { id } = await params;
   const { status } = await searchParams;
 
@@ -45,6 +55,8 @@ export default async function EditEventPage({
     end_date: event.end_date.toISOString().slice(0, 10),
   } as unknown as EventRow;
 
+  const stats = (await statsByOwner("event_id", [id])).get(id);
+  const eventCount = await db.events.count();
   const revenue = Number(paidSum._sum.amount ?? 0);
   const present = presentCount;
 
@@ -91,6 +103,8 @@ export default async function EditEventPage({
   };
 
   const notice = status ? NOTICES[status] : undefined;
+  const live = row.status === "PUBLISHED" || row.status === "ONGOING";
+  const statusText = EVENT_STATUS_LABEL[row.status]?.text ?? row.status;
 
   return (
     <div className="space-y-5">
@@ -104,7 +118,7 @@ export default async function EditEventPage({
 
       <PageHeader
         title={row.title}
-        description={`${row.registered}/${row.capacity} peserta · status ${row.status}`}
+        description={`${row.registered}/${row.capacity} peserta · ${live ? "tampil di website" : `belum tampil di website (${statusText.toLowerCase()})`}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -122,20 +136,96 @@ export default async function EditEventPage({
               Lihat di website
               <ExternalLink className="size-3.5" aria-hidden />
             </Link>
+            {session.role === "SUPER_ADMIN" ? (
+              <DeleteDialog
+                action={deleteEventAction}
+                hidden={{ id: row.id }}
+                code={row.title}
+                title="Hapus event?"
+                triggerLabel="Hapus event"
+                triggerClassName="inline-flex min-h-10 items-center gap-1.5 rounded-pill border border-brand/40 px-4 text-sm font-semibold text-brand hover:bg-brand-soft"
+                summary={[
+                  { label: "Judul", value: row.title },
+                  { label: "Terdaftar", value: `${row.registered}/${row.capacity}` },
+                ]}
+                consequences={[
+                  "Event ini dan halamannya di website",
+                  ...describeStats(stats),
+                  "Data pendamping dan anak tetap ada",
+                  ...(eventCount === 1
+                    ? [
+                        "Ini event terakhir: setelah dihapus, website kembali menampilkan katalog bawaan sampai ada event baru",
+                      ]
+                    : []),
+                ]}
+              />
+            ) : null}
           </div>
         }
       />
 
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
 
+      {row.status === "DRAFT" ? (
+        <div className="flex flex-col gap-3 rounded-card border-2 border-sun bg-sun-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <EyeOff className="mt-0.5 size-5 shrink-0 text-sun-dark" aria-hidden />
+            <div>
+              <p className="text-sm font-extrabold text-ink">Event ini belum tampil di website</p>
+              <p className="text-sm text-ink-soft">Statusnya masih draft. Tekan tombol di samping kalau sudah siap dilihat pengunjung.</p>
+            </div>
+          </div>
+          <form action={setEventStatusAction}>
+            <input type="hidden" name="id" value={row.id} />
+            <input type="hidden" name="status" value="PUBLISHED" />
+            <input type="hidden" name="next" value="detail" />
+            <button
+              type="submit"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-pill bg-brand px-5 text-sm font-bold text-white hover:bg-brand-dark sm:w-auto"
+            >
+              <Eye className="size-4" aria-hidden />
+              Tayangkan di website
+            </button>
+          </form>
+        </div>
+      ) : live ? (
+        <div className="flex flex-col gap-3 rounded-card border border-pine/30 bg-pine-soft/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Eye className="mt-0.5 size-5 shrink-0 text-pine-dark" aria-hidden />
+            <p className="text-sm font-extrabold text-pine-dark">Event ini tampil di website</p>
+          </div>
+          <form action={setEventStatusAction}>
+            <input type="hidden" name="id" value={row.id} />
+            <input type="hidden" name="status" value="DRAFT" />
+            <input type="hidden" name="next" value="detail" />
+            <button
+              type="submit"
+              className="inline-flex min-h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-pill border border-line bg-surface px-4 text-sm font-semibold text-ink-soft hover:border-brand/40 hover:text-brand sm:w-auto"
+            >
+              <EyeOff className="size-4" aria-hidden />
+              Sembunyikan dari website
+            </button>
+          </form>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Terdaftar" value={`${row.registered}`} hint={`Kapasitas ${row.capacity}`} />
         <StatCard label="Hadir" value={String(present)} />
         <StatCard label="Pendapatan (lunas)" value={formatRupiah(revenue)} />
-        <StatCard label="Status" value={row.status} />
+        <StatCard
+          label="Di website"
+          value={live ? "Tampil" : "Tersembunyi"}
+          hint={live ? statusText : `Status: ${statusText}`}
+        />
       </div>
 
-      <EventForm initial={initial} action={updateEventAction} submitLabel="Simpan Perubahan" />
+      <EventForm
+        initial={initial}
+        action={updateEventAction}
+        submitLabel="Simpan Perubahan"
+        categories={(await getEventCategories()).map((item) => item.name)}
+      />
     </div>
   );
 }

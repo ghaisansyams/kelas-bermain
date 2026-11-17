@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Sticker } from "@/components/home/stickers";
 import { Reveal } from "@/components/ui/reveal";
+import { Eyebrow } from "@/components/ui/section-heading";
 
 export function CtaBanner() {
   return (
@@ -21,10 +22,9 @@ export function CtaBanner() {
             <Sticker kind="confetti" className="bottom-6 right-[7%] hidden h-10 w-16 sm:block" delay={2} />
 
             <div className="relative mx-auto max-w-2xl">
-              <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-sun">
-                <Sparkles className="size-3.5" aria-hidden />
+              <Eyebrow plain className="text-[0.8125rem] text-sun sm:text-sm">
                 Kuota terbatas
-              </span>
+              </Eyebrow>
               <h2 className="mt-5 text-[1.75rem] leading-tight font-extrabold text-white sm:text-4xl">
                 Siap ikut kelas berikutnya?
               </h2>

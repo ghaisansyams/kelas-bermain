@@ -12,8 +12,11 @@ import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
  * rows are real people whose records are attached to money. Typing the code
  * forces the admin to read which row they are actually about to remove.
  *
- * `blockedReason` disables deletion entirely — used when the record still has
- * registrations, where the database itself would refuse anyway.
+ * Teks yang diketik dikirim sebagai `confirm`; server mencocokkannya lagi
+ * dengan data aslinya, jadi tombol yang diakali lewat inspect element pun
+ * tidak bisa menghapus apa-apa.
+ *
+ * `blockedReason` disables deletion entirely, for rows that must not go.
  */
 export function DeleteDialog({
   action,
@@ -23,6 +26,9 @@ export function DeleteDialog({
   summary,
   consequences,
   blockedReason,
+  triggerClassName,
+  triggerLabel = "Hapus",
+  permanent = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   hidden: Record<string, string>;
@@ -33,6 +39,15 @@ export function DeleteDialog({
   /** What else disappears along with this record. */
   consequences: string[];
   blockedReason?: string;
+  /** Mengganti gaya tombol pemicu, mis. untuk tombol besar di halaman detail. */
+  triggerClassName?: string;
+  triggerLabel?: string;
+  /**
+   * Penghapusan biasa hanya memindahkan ke menu Terhapus (bisa dipulihkan 30
+   * hari). `permanent` dipakai di dalam menu Terhapus itu sendiri, untuk
+   * membuang entri sebelum 30 hari habis.
+   */
+  permanent?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -48,10 +63,13 @@ export function DeleteDialog({
           setTyped("");
           setOpen(true);
         }}
-        className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-pill border border-line px-3 text-xs font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+        className={
+          triggerClassName ??
+          "inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-pill border border-line px-3 text-xs font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+        }
       >
         <Trash2 className="size-3.5" aria-hidden />
-        Hapus
+        {triggerLabel}
       </button>
 
       {open
@@ -97,7 +115,7 @@ export function DeleteDialog({
                   <>
                     <div className="mt-4 rounded-xl border border-brand/25 bg-brand-soft/40 p-3">
                       <p className="text-xs font-bold uppercase tracking-wider text-brand-ink">
-                        Ikut terhapus permanen
+                        {permanent ? "Ikut terhapus permanen" : "Ikut dipindahkan ke Terhapus"}
                       </p>
                       <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-ink-soft">
                         {consequences.map((item) => (
@@ -105,7 +123,9 @@ export function DeleteDialog({
                         ))}
                       </ul>
                       <p className="mt-2 text-sm font-semibold text-brand-ink">
-                        Tindakan ini tidak bisa dibatalkan.
+                        {permanent
+                          ? "Tindakan ini tidak bisa dibatalkan."
+                          : "Masih bisa dipulihkan dari menu Terhapus selama 30 hari. Setelah itu terhapus permanen."}
                       </p>
                     </div>
 
@@ -113,6 +133,7 @@ export function DeleteDialog({
                       Ketik <span className="font-mono font-bold text-brand">{code}</span> untuk
                       mengonfirmasi
                       <input
+                        name="confirm"
                         value={typed}
                         onChange={(event) => setTyped(event.target.value)}
                         autoComplete="off"
@@ -120,6 +141,11 @@ export function DeleteDialog({
                         placeholder={code}
                         className="h-11 w-full rounded-xl border border-line bg-surface px-3 font-mono text-[0.9375rem] text-ink"
                       />
+                      {typed.trim() !== "" && !matches ? (
+                        <span className="text-xs font-medium text-muted">
+                          Belum sama. Tombol aktif setelah tulisannya persis sama.
+                        </span>
+                      ) : null}
                     </label>
                   </>
                 )}
@@ -144,7 +170,7 @@ export function DeleteDialog({
                       ) : (
                         <Trash2 className="size-4" aria-hidden />
                       )}
-                      Hapus Permanen
+                      {permanent ? "Hapus Permanen" : "Pindahkan ke Terhapus"}
                     </button>
                   ) : null}
                 </div>
