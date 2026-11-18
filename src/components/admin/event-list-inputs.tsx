@@ -2,9 +2,10 @@
 
 import { ImageDropArea } from "@/components/admin/image-drop-area";
 import { useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ClipboardPaste, Plus, Trash2 } from "lucide-react";
 import { MediaPicker } from "@/components/admin/media-picker";
-import { TextInput } from "@/components/forms/field";
+import { TextArea, TextInput } from "@/components/forms/field";
+import { parseAgendaText } from "@/lib/utils/agenda";
 
 let rowSeq = 0;
 const rowKey = () => `row-${Date.now().toString(36)}-${rowSeq++}`;
@@ -141,8 +142,25 @@ export function AgendaInput({ initial }: { initial: AgendaDraft[] }) {
     })),
   );
 
+  const [pasteText, setPasteText] = useState("");
+  const [pasteNote, setPasteNote] = useState("");
+
   function update(key: string, patch: Partial<AgendaDraft>) {
     setRows((current) => current.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  function applyPaste() {
+    const parsed = parseAgendaText(pasteText);
+    if (parsed.length === 0) {
+      setPasteNote("Belum ada teks yang bisa dibaca. Tulis satu sesi per baris, contoh: 09.00 Registrasi.");
+      return;
+    }
+    setRows((current) => [
+      ...current.filter((r) => r.time.trim() || r.title.trim()),
+      ...parsed.map((item) => ({ key: rowKey(), ...item })),
+    ]);
+    setPasteText("");
+    setPasteNote(`${parsed.length} sesi ditambahkan ke daftar di atas. Cek lagi jam dan kegiatannya.`);
   }
 
   return (
@@ -192,6 +210,36 @@ export function AgendaInput({ initial }: { initial: AgendaDraft[] }) {
         <Plus className="size-4" aria-hidden />
         Tambah rundown
       </button>
+      <details className="rounded-xl border border-line bg-canvas-deep/40 p-3 text-sm">
+        <summary className="flex cursor-pointer items-center gap-2 font-semibold text-ink-soft hover:text-brand">
+          <ClipboardPaste className="size-4" aria-hidden />
+          Punya rundown dari WhatsApp atau Word? Tempel sekaligus
+        </summary>
+        <div className="mt-3 space-y-2.5">
+          <TextArea
+            id="agenda-paste"
+            aria-label="Tempel rundown"
+            rows={6}
+            value={pasteText}
+            onChange={(event) => setPasteText(event.target.value)}
+            placeholder={"09.00 Registrasi\n09.30 Opening\n09.40 Dancing\n09.50 Cooking\n11.00 Closing"}
+          />
+          <p className="text-xs text-muted">
+            Satu sesi per baris, jam di depan atau di belakang. Jam yang ditulis di baris sendiri
+            sebelum kegiatannya juga dikenali.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={applyPaste}
+              className="inline-flex min-h-10 items-center rounded-pill bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-dark"
+            >
+              Ubah jadi baris rundown
+            </button>
+            {pasteNote ? <span role="status" className="text-xs font-medium text-ink-soft">{pasteNote}</span> : null}
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
