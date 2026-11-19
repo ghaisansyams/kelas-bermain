@@ -4,10 +4,17 @@ import { YoutubeModal } from "@/components/media/youtube-modal";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import type { HeadingContent } from "@/lib/services/cms-website";
 import type { Testimonial } from "@/lib/types";
 import { getYoutubeThumbnail } from "@/lib/utils/youtube";
 
-export function Testimonials({ items }: { items: Testimonial[] }) {
+export function Testimonials({
+  items,
+  heading,
+}: {
+  items: Testimonial[];
+  heading: HeadingContent;
+}) {
   const withVideo = items.filter((item) => item.video);
 
   return (
@@ -18,9 +25,9 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
 
       <Container>
         <SectionHeading
-          eyebrow="Kata orang tua"
-          title="Cerita dari Ayah & Bunda"
-          description="Video singkat dari orang tua peserta, direkam setelah kelas selesai."
+          eyebrow={heading.eyebrow}
+          title={heading.title}
+          description={heading.description}
           align="center"
           className="mx-auto"
         />

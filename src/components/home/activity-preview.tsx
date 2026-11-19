@@ -6,18 +6,25 @@ import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import type { HeadingContent } from "@/lib/services/cms-website";
 import type { ActivityRecord } from "@/lib/types";
 
-export function ActivityPreview({ activities }: { activities: ActivityRecord[] }) {
+export function ActivityPreview({
+  activities,
+  heading,
+}: {
+  activities: ActivityRecord[];
+  heading: HeadingContent;
+}) {
   return (
     <section className="relative isolate overflow-hidden py-16 sm:py-20">
       <DecorScene name="sectionA" />
 
       <Container>
         <SectionHeading
-          eyebrow="Kegiatan terbaru"
-          title="Yang sudah kami jalankan"
-          description="Dokumentasi kelas yang sudah berlangsung — dari kebun di Tangerang Selatan sampai hangar pesawat di Jakarta."
+          eyebrow={heading.eyebrow}
+          title={heading.title}
+          description={heading.description}
           action={
             <Link
               href="/kegiatan"

@@ -72,6 +72,9 @@ function revalidatePublic() {
   revalidatePath("/galeri");
   revalidatePath("/update");
   revalidatePath("/kegiatan");
+  revalidatePath("/sertifikat");
+  revalidatePath("/affiliate");
+  revalidatePath("/cek-tiket");
 }
 
 /* ------------------------------------------------------------------ */

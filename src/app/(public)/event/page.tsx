@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { EventExplorer } from "@/components/event/event-explorer";
 import { PageHeader } from "@/components/layout/page-header";
+import { PAGE_HEADINGS } from "@/lib/cms/home-defaults";
+import { getPageContent, toHeading } from "@/lib/services/cms-website";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { getEvents } from "@/lib/services/content";
@@ -26,17 +28,18 @@ export const metadata: Metadata = {
 };
 
 export default async function EventPage() {
-  const [events, categories] = await Promise.all([getEvents(), getEventCategories()]);
+  const [events, categories, pages] = await Promise.all([getEvents(), getEventCategories(), getPageContent("pages")]);
+  const heading = toHeading(pages.sections.event, PAGE_HEADINGS.event);
   const openCount = events.filter((event) => event.availability === "open").length;
 
   return (
     <>
       <PageHeader
-        eyebrow="Agenda"
-        title="Jadwal Kelas Bermain"
+        eyebrow={heading.eyebrow}
+        title={heading.title}
         description={
           <>
-            Kelas satu hari untuk anak usia 3–15 tahun di Jabodetabek. Saat ini{" "}
+            {heading.description} Saat ini{" "}
             <strong className="font-bold text-ink">{openCount} kelas</strong> sedang membuka
             pendaftaran.
           </>

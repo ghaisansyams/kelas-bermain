@@ -17,7 +17,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { pillars as fallbackPillars, siteConfig, mainNav } from "@/data/site";
+import { joinSteps as fallbackJoinSteps, pillars as fallbackPillars, siteConfig, mainNav } from "@/data/site";
 
 export type SectionContent = Record<string, unknown>;
 
@@ -240,6 +240,24 @@ export function toPillars(items: CollectionItem[]): PillarItem[] {
     description: str(item.content, "description"),
     icon: str(item.content, "icon", "sparkles"),
     accent: str(item.content, "accent", "brand"),
+  }));
+}
+
+/** Isi bagian dengan kolom bebas; kolom kosong memakai teks bawaan. */
+export function toFields<T extends Record<string, string>>(
+  content: SectionContent | undefined,
+  fallback: T,
+): T {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(fallback)) result[key] = str(content, key, value);
+  return result as T;
+}
+
+export function toJoinSteps(items: CollectionItem[]): { title: string; description: string }[] {
+  if (items.length === 0) return fallbackJoinSteps.map((step) => ({ title: step.title, description: step.description }));
+  return items.map((item) => ({
+    title: str(item.content, "title"),
+    description: str(item.content, "description"),
   }));
 }
 

@@ -93,6 +93,22 @@ const PILLAR_ICONS = [
 /* Pages                                                               */
 /* ------------------------------------------------------------------ */
 
+/** Judul bagian atas halaman-halaman lain di website. */
+export const PAGES_PAGE: PageDef = {
+  key: "pages",
+  label: "Judul Halaman",
+  description: "Label, judul, dan kalimat pembuka di bagian atas halaman Event, Kegiatan, Update, dan lainnya.",
+  previewPath: "/event",
+  sections: [
+    { key: "event", label: "Halaman Event", description: "Kalimat tentang jumlah kelas yang membuka pendaftaran ditambahkan otomatis di belakang deskripsi.", fields: headingFields },
+    { key: "kegiatan", label: "Halaman Kegiatan", description: "Jumlah anak dan kegiatan ditambahkan otomatis di belakang deskripsi.", fields: headingFields },
+    { key: "update", label: "Halaman Update", description: "Bagian atas halaman Update.", fields: headingFields },
+    { key: "sertifikat", label: "Halaman Sertifikat", description: "Bagian atas halaman unduh sertifikat.", fields: headingFields },
+    { key: "affiliate", label: "Halaman Affiliate", description: "Bagian atas halaman affiliate.", fields: headingFields },
+    { key: "cek_tiket", label: "Halaman Cek Tiket", description: "Bagian atas halaman cek status pendaftaran. Label kecil tampil di lencana.", fields: headingFields },
+  ],
+};
+
 export const HOME_PAGE: PageDef = {
   key: "home",
   label: "Halaman Depan",
@@ -167,7 +183,8 @@ export const HOME_PAGE: PageDef = {
     {
       key: "join_steps",
       label: "Cara Ikut",
-      description: "Empat langkah pendaftaran.",
+      description: "Langkah-langkah pendaftaran, ditulis ulang di sini kalau alurnya berubah.",
+      collection: "join_steps",
       fields: headingFields,
     },
     {
@@ -212,10 +229,13 @@ export const HOME_PAGE: PageDef = {
       label: "Ajakan Daftar",
       description: "Kotak ajakan di bagian paling bawah sebelum footer.",
       fields: [
+        { key: "eyebrow", label: "Label kecil di atas judul", type: "text" },
         { key: "title", label: "Judul", type: "text" },
         { key: "description", label: "Deskripsi", type: "textarea" },
-        { key: "buttonLabel", label: "Tombol — tulisan", type: "text" },
-        { key: "buttonHref", label: "Tombol — tujuan", type: "url" },
+        { key: "buttonLabel", label: "Tombol utama — tulisan", type: "text" },
+        { key: "buttonHref", label: "Tombol utama — tujuan", type: "url" },
+        { key: "secondaryLabel", label: "Tombol kedua — tulisan", type: "text" },
+        { key: "secondaryHref", label: "Tombol kedua — tujuan", type: "url" },
       ],
     },
   ],
@@ -305,13 +325,23 @@ export const GLOBAL_PAGE: PageDef = {
   ],
 };
 
-export const PAGES: PageDef[] = [GLOBAL_PAGE, HOME_PAGE];
+export const PAGES: PageDef[] = [GLOBAL_PAGE, HOME_PAGE, PAGES_PAGE];
 
 /* ------------------------------------------------------------------ */
 /* Collections                                                         */
 /* ------------------------------------------------------------------ */
 
 export const COLLECTIONS: CollectionDef[] = [
+  {
+    key: "join_steps",
+    label: "Cara Ikut",
+    description: "Langkah pendaftaran yang tampil berurutan di beranda.",
+    itemNoun: "langkah",
+    fields: [
+      { key: "title", label: "Nama langkah", type: "text" },
+      { key: "description", label: "Penjelasan", type: "textarea" },
+    ],
+  },
   {
     key: "pillars",
     label: "Yang Diasah",

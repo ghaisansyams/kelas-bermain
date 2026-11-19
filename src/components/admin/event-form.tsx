@@ -185,6 +185,10 @@ export function EventForm({
         <p className="mt-1 text-sm text-muted">
           Seret gambar dari laptop ke kotak ini, atau pakai tombol Unggah.
         </p>
+        <ShownIn>
+          Kartu event di menu Event, kartu Jadwal Kegiatan di beranda, dan banner beranda (kalau
+          banner diatur Otomatis). Paling pas foto landscape, sekitar 1200 × 1000 px.
+        </ShownIn>
         <ImageDropArea
           className="mt-4 grid gap-4 sm:grid-cols-[12rem_1fr]"
           onUploaded={(url, fileName) =>
@@ -230,6 +234,7 @@ export function EventForm({
           <strong className="font-semibold text-ink">1350 × 1080 px</strong> (rasio 5:4); foto
           dengan ukuran lain dipotong dari tengah, seperti yang terlihat di pratinjau.
         </p>
+        <ShownIn>Halaman detail event saja, bukan di kartu event maupun banner beranda.</ShownIn>
         <div className="mt-4">
           <AboutImagesInput initial={initial.aboutImages} />
         </div>
@@ -243,6 +248,7 @@ export function EventForm({
           <strong className="font-semibold text-ink">lebar 1080 px</strong>; tingginya bebas,
           misalnya 1080 × 1350 atau 1080 × 1920 px. Kosongkan kalau event ini tidak punya poster.
         </p>
+        <ShownIn>Halaman detail event saja, bukan di kartu event maupun banner beranda.</ShownIn>
         <ImageDropArea
           className="mt-4 grid gap-4 sm:grid-cols-[12rem_1fr]"
           onUploaded={(url, fileName) =>
@@ -458,6 +464,18 @@ export function EventForm({
 
       {askPublish ? <PublishDialog formId={formId} onClose={() => setAskPublish(false)} /> : null}
     </form>
+  );
+}
+
+/** Label kecil "Tampil di": supaya admin tahu foto ini muncul di bagian website yang mana. */
+function ShownIn({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-2 flex items-start gap-2 rounded-xl bg-pine-soft/60 px-3 py-2 text-sm text-pine-dark">
+      <Eye className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        <strong className="font-extrabold">Tampil di:</strong> {children}
+      </span>
+    </p>
   );
 }
 

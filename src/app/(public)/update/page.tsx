@@ -6,6 +6,8 @@ import { Eyebrow } from "@/components/ui/section-heading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { siteConfig } from "@/data/site";
 import { getUpdates } from "@/lib/services/update";
+import { PAGE_HEADINGS } from "@/lib/cms/home-defaults";
+import { getPageContent, toHeading } from "@/lib/services/cms-website";
 
 export const metadata: Metadata = {
   title: "Update",
@@ -21,19 +23,19 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function UpdatePage() {
-  const result = await getUpdates();
+  const [result, pages] = await Promise.all([getUpdates(), getPageContent("pages")]);
+  const heading = toHeading(pages.sections.update, PAGE_HEADINGS.update);
 
   return (
     <>
       <section className="border-b border-line bg-canvas-deep/40 py-12 sm:py-16">
         <Container>
-          <Eyebrow>Update</Eyebrow>
+          <Eyebrow>{heading.eyebrow}</Eyebrow>
           <h1 className="mt-4 text-[1.75rem] leading-tight font-extrabold text-ink sm:text-4xl">
-            Update Kelas Bermain
+            {heading.title}
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-            Postingan terbaru langsung dari Instagram Kelas Bermain — kegiatan, cerita, dan
-            pengumuman kelas.
+            {heading.description}
           </p>
           <a
             href="https://instagram.com/kelasbermain.id"

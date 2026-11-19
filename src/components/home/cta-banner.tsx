@@ -5,8 +5,9 @@ import { Container } from "@/components/ui/container";
 import { Sticker } from "@/components/home/stickers";
 import { Reveal } from "@/components/ui/reveal";
 import { Eyebrow } from "@/components/ui/section-heading";
+import type { CTA_DEFAULTS } from "@/lib/cms/home-defaults";
 
-export function CtaBanner() {
+export function CtaBanner({ content }: { content: typeof CTA_DEFAULTS }) {
   return (
     <section className="pb-4 pt-6 sm:pb-8">
       <Container>
@@ -23,29 +24,28 @@ export function CtaBanner() {
 
             <div className="relative mx-auto max-w-2xl">
               <Eyebrow plain className="text-[0.8125rem] text-sun sm:text-sm">
-                Kuota terbatas
+                {content.eyebrow}
               </Eyebrow>
               <h2 className="mt-5 text-[1.75rem] leading-tight font-extrabold text-white sm:text-4xl">
-                Siap ikut kelas berikutnya?
+                {content.title}
               </h2>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-white/70 sm:text-base">
-                Pilih kelas yang sesuai usia anak, isi formulir singkat, selesaikan
-                pembayaran, dan sampai jumpa di lokasi.
+                {content.description}
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <Link href="/event" className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}>
-                  Daftar Kelas
+                <Link href={content.buttonHref} className={buttonStyles({ size: "lg", className: "w-full sm:w-auto" })}>
+                  {content.buttonLabel}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
                 <Link
-                  href="/galeri"
+                  href={content.secondaryHref}
                   className={buttonStyles({
                     variant: "light",
                     size: "lg",
                     className: "w-full sm:w-auto",
                   })}
                 >
-                  Lihat Galeri
+                  {content.secondaryLabel}
                 </Link>
               </div>
             </div>

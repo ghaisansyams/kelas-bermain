@@ -58,6 +58,8 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
 
   const active = slides[index];
   if (!active) return null;
+  // Slide tanpa event tujuan membuka daftar event, bukan alamat kosong.
+  const target = active.eventSlug ? `/event/${active.eventSlug}` : "/event";
 
   return (
     <div
@@ -100,6 +102,8 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/30 via-transparent to-transparent"
         />
+        {/* Seluruh foto bisa diklik; panah, titik, dan kartu di bawah berada di atasnya. */}
+        <Link href={target} aria-label={`Buka ${active.title}`} className="absolute inset-0" tabIndex={-1} />
 
         {slides.length > 1 ? (
           <>
@@ -147,7 +151,7 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
             putih, supaya menyatu dengan foto; lebar dibatasi agar tidak pernah
             menimpa titik-titik slide di kanan bawah. */}
         <Link
-          href={`/event/${active.eventSlug}`}
+          href={target}
           className={cn(
             "group absolute bottom-3 left-3 flex max-w-[calc(100%-6rem)] items-center gap-3 rounded-2xl border border-white/20 bg-ink/40 p-3 text-white backdrop-blur-md",
             "transition-colors duration-300 hover:bg-ink/55",

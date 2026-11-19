@@ -6,9 +6,8 @@ import { CollectionEditor, type CollectionRow } from "@/components/admin/cms/col
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { FieldInput } from "@/components/admin/cms/field-input";
 import { PresentationEditor } from "@/components/admin/cms/presentation-editor";
-import { PreviewPane } from "@/components/admin/cms/preview-pane";
 import { StructurePanel, type StructureItem } from "@/components/admin/cms/structure-panel";
-import { HeroSlidesEditor, type HeroSlideDraft } from "@/components/admin/hero-slides-editor";
+import { HeroSlidesEditor, type HeroEventOption, type HeroSlideDraft } from "@/components/admin/hero-slides-editor";
 import { heroMode } from "@/lib/cms/hero";
 import type { FieldDef } from "@/lib/cms/schema";
 import type { SectionPresentation } from "@/lib/cms/presentation";
@@ -55,27 +54,27 @@ export interface BuilderActions {
 export function HomeBuilder({
   pageKey,
   tab,
-  previewPath,
   sections,
   collections,
   pendingCount,
   lastPublishedAt,
   heroAutoPreview,
+  heroEventOptions,
   actions,
 }: {
   pageKey: string;
   tab: string;
-  previewPath: string;
   sections: BuilderSection[];
   collections: Record<string, { label: string; description: string; itemNoun: string; fields: FieldDef[]; rows: CollectionRow[] }>;
   pendingCount: number;
   lastPublishedAt: string | null;
   /** Slide yang tampil kalau banner diatur otomatis dari event. */
   heroAutoPreview: HeroSlideDraft[];
+  /** Event yang bisa dipilih sebagai tujuan klik slide. */
+  heroEventOptions: HeroEventOption[];
   actions: BuilderActions;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(sections[0]?.key ?? null);
-  const [previewDraft, setPreviewDraft] = useState(true);
 
   const selected = sections.find((section) => section.key === selectedKey) ?? null;
 
@@ -105,19 +104,6 @@ export function HomeBuilder({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Named differently from the header's "Buka Pratinjau" link on
-              purpose: this switches what the embedded preview shows, the
-              header link opens the site in a new tab. */}
-          <label className="flex items-center gap-2 whitespace-nowrap text-xs font-semibold text-ink">
-            <input
-              type="checkbox"
-              checked={previewDraft}
-              onChange={(event) => setPreviewDraft(event.target.checked)}
-              className="size-4 accent-brand"
-            />
-            Tampilkan draf di pratinjau
-          </label>
-
           {pendingCount === 0 ? (
             <span className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-canvas-deep/60 px-4 text-sm font-bold text-muted">
               <Rocket className="size-4" aria-hidden />
@@ -143,7 +129,7 @@ export function HomeBuilder({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)_22rem]">
+      <div className="grid items-start gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
         <aside className="rounded-card border border-line bg-surface p-3">
           <StructurePanel
             pageKey={pageKey}
@@ -159,15 +145,12 @@ export function HomeBuilder({
           />
         </aside>
 
-        <section className="min-w-0">
-          <PreviewPane path={previewPath} draftMode={previewDraft} />
-        </section>
-
         <aside className="min-w-0 space-y-4 rounded-card border border-line bg-surface p-4">
           {!selected ? (
             <p className="text-sm text-muted">Pilih salah satu bagian di sebelah kiri.</p>
           ) : (
-            <>
+            // key: tiap bagian dimuat ulang, supaya isian bagian sebelumnya tidak terbawa
+            <div key={selected.key} className="space-y-4">
               <div>
                 <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-ink">
                   <Settings2 className="size-4 text-brand" aria-hidden />
@@ -213,6 +196,7 @@ export function HomeBuilder({
                     }
                     initialMode={heroMode(selected.content)}
                     autoPreview={heroAutoPreview}
+                    eventOptions={heroEventOptions}
                   />
                   <button
                     type="submit"
@@ -255,7 +239,7 @@ export function HomeBuilder({
                   />
                 </div>
               </details>
-            </>
+            </div>
           )}
         </aside>
       </div>

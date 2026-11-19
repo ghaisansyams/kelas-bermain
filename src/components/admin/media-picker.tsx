@@ -99,7 +99,7 @@ export function MediaPicker({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-brand px-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-pill bg-brand px-3.5 text-sm font-bold text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
         >
           {uploading ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -113,7 +113,7 @@ export function MediaPicker({
           type="button"
           onClick={() => setOpen(true)}
           disabled={uploading}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-pill border border-line px-3.5 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-pill border border-line px-3.5 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:opacity-50"
         >
           <ImageIcon className="size-4" aria-hidden />
           {label}

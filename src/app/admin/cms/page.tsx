@@ -41,12 +41,13 @@ import { normaliseConfig, type CertificateTemplate } from "@/lib/cms/certificate
 import { SectionCard } from "@/components/admin/cms/section-card";
 import { NavigationEditor, type NavRow } from "@/components/admin/cms/navigation-editor";
 import { requireAdmin } from "@/lib/admin/auth";
-import { findCollection, GLOBAL_PAGE, HOME_PAGE, type PageDef } from "@/lib/cms/schema";
+import { findCollection, GLOBAL_PAGE, HOME_PAGE, PAGES_PAGE, type PageDef } from "@/lib/cms/schema";
 import { findTemplate } from "@/lib/cms/section-templates";
 import { toPresentation } from "@/lib/cms/presentation";
 import { getEvents, getUpcomingEvents } from "@/lib/services/content";
 import { eventsToHeroSlides } from "@/lib/cms/hero";
-import { ensureHomeSections } from "@/lib/cms/seed-home";
+import { formatDateRange } from "@/lib/utils/date";
+import { ensureCmsDefaults } from "@/lib/cms/seed-cms";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,7 @@ interface ItemRow {
 const TABS: { key: string; label: string }[] = [
   { key: "global", label: "Website" },
   { key: "home", label: "Halaman Depan" },
+  { key: "pages", label: "Judul Halaman" },
   { key: "events", label: "Event" },
   { key: "updates", label: "Update" },
   { key: "certificates", label: "Sertifikat" },
@@ -138,11 +140,22 @@ export default async function CmsWebsitePage({
   const tab = TABS.some((item) => item.key === rawTab) ? rawTab! : "global";
 
   // Server baru punya tabel CMS kosong; tanpa ini daftar bagian Halaman Depan kosong.
-  if (tab === "home") await ensureHomeSections(session.userId);
+  if (tab === "home" || tab === "global" || tab === "pages") await ensureCmsDefaults(session.userId);
   const heroAutoPreview = tab === "home" ? eventsToHeroSlides(await getUpcomingEvents(6)) : [];
+  const heroEventOptions =
+    tab === "home"
+      ? (await getEvents()).map((event) => ({
+          slug: event.slug,
+          title: event.title,
+          date: formatDateRange(event.startDate, event.endDate),
+          location: event.location.city || event.location.venue,
+          image: event.cover?.src ?? "",
+          alt: event.cover?.alt || `Foto ${event.title}`,
+        }))
+      : [];
 
   const pageDef: PageDef | null =
-    tab === "global" ? GLOBAL_PAGE : tab === "home" ? HOME_PAGE : null;
+    tab === "global" ? GLOBAL_PAGE : tab === "home" ? HOME_PAGE : tab === "pages" ? PAGES_PAGE : null;
 
   const [sectionData, collectionData, navData, versionData] = await Promise.all([
     pageDef
@@ -369,10 +382,10 @@ export default async function CmsWebsitePage({
         <HomeBuilder
           pageKey={pageDef.key}
           tab={tab}
-          previewPath={pageDef.previewPath}
           sections={builderSections}
           collections={builderCollections}
           heroAutoPreview={heroAutoPreview}
+          heroEventOptions={heroEventOptions}
           pendingCount={pendingDrafts}
           lastPublishedAt={
             lastPublishedAt ? new Date(lastPublishedAt).toLocaleString("id-ID") : null

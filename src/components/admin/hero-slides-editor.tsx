@@ -5,7 +5,17 @@ import { CalendarClock, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import type { HeroMode } from "@/lib/cms/hero";
 import { cn } from "@/lib/utils/cn";
 import { MediaPicker } from "@/components/admin/media-picker";
-import { Field, TextInput } from "@/components/forms/field";
+import { Field, Select, TextInput } from "@/components/forms/field";
+
+/** Event yang bisa dipilih sebagai tujuan klik slide. */
+export interface HeroEventOption {
+  slug: string;
+  title: string;
+  date: string;
+  location: string;
+  image: string;
+  alt: string;
+}
 
 export interface HeroSlideDraft {
   id: string;
@@ -38,8 +48,10 @@ export function HeroSlidesEditor({
   initial,
   initialMode,
   autoPreview,
+  eventOptions,
 }: {
   initial: HeroSlideDraft[];
+  eventOptions: HeroEventOption[];
   initialMode: HeroMode;
   /** Slide yang akan tampil kalau mode otomatis dipilih, dihitung dari event yang tayang. */
   autoPreview: HeroSlideDraft[];
@@ -155,7 +167,7 @@ export function HeroSlidesEditor({
             ) : null}
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-[10rem_1fr]">
+          <div className="mt-4 grid gap-4 sm:grid-cols-[13rem_1fr]">
             <div className="space-y-2">
               <div className="aspect-[4/3] overflow-hidden rounded-xl border border-line bg-surface">
                 {slide.image ? (
@@ -200,15 +212,40 @@ export function HeroSlidesEditor({
                 />
               </Field>
               <Field
-                label="Slug event"
+                label="Event tujuan"
                 htmlFor={`slide-slug-${index}`}
-                hint="Tujuan saat kartu diklik, contoh: pemadam-cilik-oktober-2026"
+                hint="Halaman yang terbuka saat banner diklik. Memilih event mengisi judul, tanggal, lokasi, dan gambar otomatis (masih bisa diubah)."
               >
-                <TextInput
+                <Select
                   id={`slide-slug-${index}`}
                   value={slide.eventSlug}
-                  onChange={(event) => update(index, { eventSlug: event.target.value })}
-                />
+                  onChange={(event) => {
+                    const chosen = eventOptions.find((item) => item.slug === event.target.value);
+                    update(
+                      index,
+                      chosen
+                        ? {
+                            eventSlug: chosen.slug,
+                            title: chosen.title,
+                            date: chosen.date,
+                            location: chosen.location,
+                            image: chosen.image || slide.image,
+                            alt: chosen.alt || slide.alt,
+                          }
+                        : { eventSlug: event.target.value },
+                    );
+                  }}
+                >
+                  <option value="">Daftar semua event (/event)</option>
+                  {slide.eventSlug && !eventOptions.some((item) => item.slug === slide.eventSlug) ? (
+                    <option value={slide.eventSlug}>{slide.eventSlug} (event tidak ditemukan)</option>
+                  ) : null}
+                  {eventOptions.map((item) => (
+                    <option key={item.slug} value={item.slug}>
+                      {item.title} · {item.date}
+                    </option>
+                  ))}
+                </Select>
               </Field>
               <Field
                 label="Teks alternatif gambar"

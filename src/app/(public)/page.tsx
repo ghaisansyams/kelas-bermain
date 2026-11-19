@@ -13,13 +13,24 @@ import { siteConfig } from "@/data/site";
 import { getDraftPageContent } from "@/lib/cms/draft";
 import { presentationClass, presentationStyle, toPresentation } from "@/lib/cms/presentation";
 import { isPreviewRequest } from "@/lib/cms/preview";
+import {
+  ACTIVITIES_HEADING,
+  CTA_DEFAULTS,
+  GALLERY_HEADING,
+  JOIN_STEPS_HEADING,
+  PILLARS_HEADING,
+  SOCIAL_FEED_DEFAULTS,
+  TESTIMONIALS_HEADING,
+} from "@/lib/cms/home-defaults";
 import { resolveHeroSlides } from "@/lib/cms/hero";
 import { getHomeContent } from "@/lib/services/cms";
 import {
   getCollectionItems,
   getPageContent,
   sectionLimit,
+  toFields,
   toHeading,
+  toJoinSteps,
   toPillars,
   toSeoContent,
 } from "@/lib/services/cms-website";
@@ -51,7 +62,7 @@ export default async function HomePage() {
   // published content from the same URL.
   const preview = await isPreviewRequest();
 
-  const [events, activities, testimonials, updates, gallery, content, publishedPage, pillarItems] =
+  const [events, activities, testimonials, updates, gallery, content, publishedPage, pillarItems, joinStepItems] =
     await Promise.all([
       getUpcomingEvents(6),
       getActivities(),
@@ -61,6 +72,7 @@ export default async function HomePage() {
       getHomeContent(),
       getPageContent("home"),
       getCollectionItems("pillars"),
+      getCollectionItems("join_steps"),
     ]);
 
   const page = preview ? await getDraftPageContent("home") : publishedPage;
@@ -88,30 +100,28 @@ export default async function HomePage() {
     pillars: (
       <Pillars
         items={toPillars(pillarItems)}
-        heading={toHeading(s.pillars, {
-          eyebrow: "Yang diasah",
-          title: "Empat keterampilan yang diasah di setiap kegiatan",
-          description:
-            "Temanya berganti setiap pekan — memasak, bertani, mengenal profesi. Tapi empat hal ini selalu jadi tujuannya.",
-        })}
+        heading={toHeading(s.pillars, PILLARS_HEADING)}
       />
     ),
     events_teaser: <UpcomingEvents events={events.slice(0, 6)} heading={content.eventsTeaser} />,
-    join_steps: <JoinSteps />,
-    activities: <ActivityPreview activities={activities.slice(0, sectionLimit(s.activities, 3))} />,
+    join_steps: (
+      <JoinSteps heading={toHeading(s.join_steps, JOIN_STEPS_HEADING)} steps={toJoinSteps(joinStepItems)} />
+    ),
+    activities: (
+      <ActivityPreview
+        activities={activities.slice(0, sectionLimit(s.activities, 3))}
+        heading={toHeading(s.activities, ACTIVITIES_HEADING)}
+      />
+    ),
     gallery: (
       <GalleryPreview
         drive={gallery}
-        heading={toHeading(s.gallery, {
-          eyebrow: "Galeri",
-          title: "Sekilas keseruan di kelas",
-          description: "Momen yang sempat kami abadikan di beberapa kegiatan terakhir.",
-        })}
+        heading={toHeading(s.gallery, GALLERY_HEADING)}
       />
     ),
-    testimonials: <Testimonials items={testimonials} />,
-    social_feed: <SocialFeed updates={updates} />,
-    cta: <CtaBanner />,
+    testimonials: <Testimonials items={testimonials} heading={toHeading(s.testimonials, TESTIMONIALS_HEADING)} />,
+    social_feed: <SocialFeed updates={updates} content={toFields(s.social_feed, SOCIAL_FEED_DEFAULTS)} />,
+    cta: <CtaBanner content={toFields(s.cta, CTA_DEFAULTS)} />,
   };
 
   // Falls back to the shipped order when the CMS has nothing published yet.

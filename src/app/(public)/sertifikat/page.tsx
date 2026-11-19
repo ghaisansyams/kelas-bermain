@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Award, Hash, ShieldCheck } from "lucide-react";
 import { CertificateFinder } from "@/components/certificate/certificate-finder";
 import { PageHeader } from "@/components/layout/page-header";
+import { PAGE_HEADINGS } from "@/lib/cms/home-defaults";
+import { getPageContent, toHeading } from "@/lib/services/cms-website";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { certificatesEnabled } from "@/lib/features";
@@ -38,7 +40,8 @@ const facts = [
   },
 ];
 
-export default function CertificateLookupPage() {
+export default async function CertificateLookupPage() {
+  const heading = toHeading((await getPageContent("pages")).sections.sertifikat, PAGE_HEADINGS.sertifikat);
   // Kelas Bermain issues no e-certificates (R-06 / K-07). The page stays in
   // the tree behind the flag so it can be switched back on later.
   if (!certificatesEnabled) notFound();
@@ -46,9 +49,9 @@ export default function CertificateLookupPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Sertifikat"
-        title="Unduh sertifikat anak"
-        description="Masukkan nomor WhatsApp yang dipakai saat mendaftar, lalu nomor pendaftaran atau nama anak. Sertifikat yang sudah terbit bisa langsung diunduh sebagai PDF atau gambar."
+        eyebrow={heading.eyebrow}
+        title={heading.title}
+        description={heading.description}
       />
 
       <Container className="py-10 sm:py-14">

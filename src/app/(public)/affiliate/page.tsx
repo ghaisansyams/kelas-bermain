@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { CalendarCheck, Percent, Share2, UserPlus, Wallet } from "lucide-react";
 import { AffiliateApplicationForm } from "@/components/affiliate/affiliate-application-form";
 import { PageHeader } from "@/components/layout/page-header";
+import { PAGE_HEADINGS } from "@/lib/cms/home-defaults";
+import { getPageContent, toHeading } from "@/lib/services/cms-website";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { COMMISSION_PER_PARTICIPANT } from "@/lib/config/affiliate";
@@ -43,13 +45,14 @@ const steps = [
   },
 ];
 
-export default function AffiliatePage() {
+export default async function AffiliatePage() {
+  const heading = toHeading((await getPageContent("pages")).sections.affiliate, PAGE_HEADINGS.affiliate);
   return (
     <>
       <PageHeader
-        eyebrow="Affiliate"
-        title="Dapat penghasilan tambahan, modal HP"
-        description="Bagikan kelas Kelas Bermain ke jaringanmu dengan kode pribadi. Setiap peserta yang mendaftar dan membayar memakai kodemu, kamu dapat komisi."
+        eyebrow={heading.eyebrow}
+        title={heading.title}
+        description={heading.description}
       />
 
       <Container className="py-10 sm:py-14">

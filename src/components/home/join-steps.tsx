@@ -3,9 +3,15 @@ import { JoinStepsCollage } from "@/components/home/join-steps-collage";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { joinSteps } from "@/data/site";
+import type { HeadingContent } from "@/lib/services/cms-website";
 
-export function JoinSteps() {
+export function JoinSteps({
+  heading,
+  steps,
+}: {
+  heading: HeadingContent;
+  steps: { title: string; description: string }[];
+}) {
   return (
     <section className="relative isolate overflow-hidden py-16 sm:py-20">
       <DecorScene name="sectionD" />
@@ -15,17 +21,17 @@ export function JoinSteps() {
           <div className="lg:col-span-5">
             <SectionHeading
               stagger
-              eyebrow="Cara ikut"
-              title="Empat langkah, selesai dalam lima menit"
-              description="Pendaftaran dibuat sesederhana mungkin untuk Ayah dan Bunda. Tidak perlu membuat akun, tidak perlu mengunduh aplikasi."
+              eyebrow={heading.eyebrow}
+              title={heading.title}
+              description={heading.description}
             />
 
             <ol className="mt-9 space-y-6">
-              {joinSteps.map((step, index) => (
+              {steps.map((step, index) => (
                 <Reveal key={step.title} delay={210 + index * 70} as="li" className="flex gap-4">
                   <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-extrabold text-white">
                     {index + 1}
-                    {index < joinSteps.length - 1 ? (
+                    {index < steps.length - 1 ? (
                       <span
                         aria-hidden
                         className="absolute left-1/2 top-full h-6 w-px -translate-x-1/2 bg-line"

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { ActivityExplorer } from "@/components/kegiatan/activity-explorer";
 import { PageHeader } from "@/components/layout/page-header";
+import { PAGE_HEADINGS } from "@/lib/cms/home-defaults";
+import { getPageContent, toHeading } from "@/lib/services/cms-website";
 import { Container } from "@/components/ui/container";
 import { siteConfig } from "@/data/site";
 import { getActivities } from "@/lib/services/content";
@@ -19,17 +21,18 @@ export const metadata: Metadata = {
 };
 
 export default async function KegiatanPage() {
-  const activities = await getActivities();
+  const [activities, pages] = await Promise.all([getActivities(), getPageContent("pages")]);
+  const heading = toHeading(pages.sections.kegiatan, PAGE_HEADINGS.kegiatan);
   const participants = activities.reduce((total, item) => total + item.participants, 0);
 
   return (
     <>
       <PageHeader
-        eyebrow="Jejak kami"
-        title="Kegiatan Kelas Bermain"
+        eyebrow={heading.eyebrow}
+        title={heading.title}
         description={
           <>
-            Kelas yang sudah berlangsung — total{" "}
+            {heading.description} Total{" "}
             <strong className="font-bold text-ink">
               {participants.toLocaleString("id-ID")} anak
             </strong>{" "}

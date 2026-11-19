@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { mainNav } from "@/data/site";
+import { EVENTS_TEASER_HEADING } from "@/lib/cms/home-defaults";
 
 /**
  * CMS read layer for the public site.
@@ -57,12 +58,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     statValue: "Jabodetabek",
     statLabel: "Area kegiatan",
   },
-  eventsTeaser: {
-    eyebrow: "Jadwal kegiatan",
-    title: "Kelas yang bisa diikuti si kecil",
-    description:
-      "Pilih yang paling sesuai usia dan minat anak. Detail agenda, biaya, dan fasilitas ada di setiap halaman kelas.",
-  },
+  eventsTeaser: EVENTS_TEASER_HEADING,
 };
 
 const DEFAULT_NAV: NavItem[] = mainNav.map((link) => ({

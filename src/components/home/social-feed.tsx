@@ -7,6 +7,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
+import type { SOCIAL_FEED_DEFAULTS } from "@/lib/cms/home-defaults";
 import type { UpdatesResult } from "@/lib/services/update";
 import { formatDateShort } from "@/lib/utils/date";
 
@@ -15,30 +16,36 @@ import { formatDateShort } from "@/lib/utils/date";
  * /update, so the two never disagree. Each tile opens the internal detail
  * page; the Instagram profile stays a secondary link.
  */
-export function SocialFeed({ updates }: { updates: UpdatesResult }) {
+export function SocialFeed({
+  updates,
+  content,
+}: {
+  updates: UpdatesResult;
+  content: typeof SOCIAL_FEED_DEFAULTS;
+}) {
   return (
     <section className="relative isolate overflow-hidden py-16 sm:py-20">
       <DecorScene name="sectionB" />
 
       <Container>
         <SectionHeading
-          eyebrow="Update terbaru"
-          title="Ikuti keseruan Kelas Bermain"
-          description="Kabar kegiatan, pengumuman, dan dokumentasi kelas terbaru kami."
+          eyebrow={content.eyebrow}
+          title={content.title}
+          description={content.description}
           action={
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Link href="/update" className={buttonStyles({ variant: "secondary" })}>
-                Lihat Semua Update
+              <Link href={content.buttonHref} className={buttonStyles({ variant: "secondary" })}>
+                {content.buttonLabel}
                 <ArrowRight className="size-4" aria-hidden />
               </Link>
               <a
-                href="https://instagram.com/kelasbermain.id"
+                href={content.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-brand"
               >
                 <InstagramIcon className="size-4" />
-                Lihat di Instagram
+                {content.instagramLabel}
                 <ExternalLink className="size-3.5" aria-hidden />
               </a>
             </div>
