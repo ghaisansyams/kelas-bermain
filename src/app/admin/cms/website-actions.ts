@@ -433,6 +433,9 @@ export async function saveHeroSlidesAction(formData: FormData) {
   const session = await requireAdmin();
   const tab = String(formData.get("tab") ?? "home");
   const raw = String(formData.get("hero_slides.json") ?? "[]");
+  // Slide buatan admin tetap disimpan walau mode otomatis dipilih, supaya
+  // kembali ke manual tidak membuat semuanya hilang.
+  const mode = formData.get("hero_slides.mode") === "manual" ? "manual" : "auto";
 
   let slides: unknown;
   try {
@@ -453,7 +456,7 @@ export async function saveHeroSlidesAction(formData: FormData) {
       await db.cms_sections.updateMany({
         where: { page_key: "home", section_key: "hero_slides" },
         data: {
-          draft: { slides: cleaned } as Prisma.InputJsonValue,
+          draft: { mode, slides: cleaned } as Prisma.InputJsonValue,
           updated_at: new Date(),
           updated_by: session.userId,
         },
@@ -465,6 +468,7 @@ export async function saveHeroSlidesAction(formData: FormData) {
   if (failed) back(tab, "error");
 
   await logActivity("CMS_UPDATE", "cms_sections", "home.hero_slides", null, {
+    mode,
     slides: cleaned.length,
   });
   revalidatePath("/admin/cms");

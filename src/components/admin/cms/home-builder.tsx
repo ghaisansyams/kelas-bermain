@@ -9,6 +9,7 @@ import { PresentationEditor } from "@/components/admin/cms/presentation-editor";
 import { PreviewPane } from "@/components/admin/cms/preview-pane";
 import { StructurePanel, type StructureItem } from "@/components/admin/cms/structure-panel";
 import { HeroSlidesEditor, type HeroSlideDraft } from "@/components/admin/hero-slides-editor";
+import { heroMode } from "@/lib/cms/hero";
 import type { FieldDef } from "@/lib/cms/schema";
 import type { SectionPresentation } from "@/lib/cms/presentation";
 
@@ -59,6 +60,7 @@ export function HomeBuilder({
   collections,
   pendingCount,
   lastPublishedAt,
+  heroAutoPreview,
   actions,
 }: {
   pageKey: string;
@@ -68,6 +70,8 @@ export function HomeBuilder({
   collections: Record<string, { label: string; description: string; itemNoun: string; fields: FieldDef[]; rows: CollectionRow[] }>;
   pendingCount: number;
   lastPublishedAt: string | null;
+  /** Slide yang tampil kalau banner diatur otomatis dari event. */
+  heroAutoPreview: HeroSlideDraft[];
   actions: BuilderActions;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(sections[0]?.key ?? null);
@@ -207,6 +211,8 @@ export function HomeBuilder({
                         ? (selected.content.slides as HeroSlideDraft[])
                         : []) as HeroSlideDraft[]
                     }
+                    initialMode={heroMode(selected.content)}
+                    autoPreview={heroAutoPreview}
                   />
                   <button
                     type="submit"

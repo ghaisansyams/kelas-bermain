@@ -2,7 +2,6 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { heroSlides, type HeroSlide } from "@/data/hero-slides";
 import { mainNav } from "@/data/site";
 
 /**
@@ -35,7 +34,6 @@ export interface SectionHeadingContent {
 
 export interface HomeContent {
   hero: HomeHeroContent;
-  heroSlides: HeroSlide[];
   eventsTeaser: SectionHeadingContent;
 }
 
@@ -59,7 +57,6 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
     statValue: "Jabodetabek",
     statLabel: "Area kegiatan",
   },
-  heroSlides,
   eventsTeaser: {
     eyebrow: "Jadwal kegiatan",
     title: "Kelas yang bisa diikuti si kecil",
@@ -87,25 +84,6 @@ function merge<T extends object>(fallback: T, content: Record<string, unknown> |
   return result as T;
 }
 
-/** A slide only reaches the public site once it has an image to show. */
-function readSlides(content: Record<string, unknown> | null): HeroSlide[] {
-  const raw = content?.slides;
-  if (!Array.isArray(raw)) return heroSlides;
-  const slides = raw
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .map((item, index) => ({
-      id: String(item.id ?? `slide-${index}`),
-      image: String(item.image ?? ""),
-      alt: String(item.alt ?? ""),
-      title: String(item.title ?? ""),
-      date: String(item.date ?? ""),
-      location: String(item.location ?? ""),
-      eventSlug: String(item.eventSlug ?? ""),
-    }))
-    .filter((slide) => slide.image !== "");
-  return slides.length > 0 ? slides : heroSlides;
-}
-
 export async function getHomeContent(): Promise<HomeContent> {
   try {
     const found = await db.cms_sections.findMany({
@@ -120,7 +98,6 @@ export async function getHomeContent(): Promise<HomeContent> {
 
     return {
       hero: merge(DEFAULT_HOME_CONTENT.hero, find("hero")),
-      heroSlides: readSlides(find("hero_slides")),
       eventsTeaser: merge(DEFAULT_HOME_CONTENT.eventsTeaser, find("events_teaser")),
     };
   } catch {

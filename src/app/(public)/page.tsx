@@ -13,6 +13,7 @@ import { siteConfig } from "@/data/site";
 import { getDraftPageContent } from "@/lib/cms/draft";
 import { presentationClass, presentationStyle, toPresentation } from "@/lib/cms/presentation";
 import { isPreviewRequest } from "@/lib/cms/preview";
+import { resolveHeroSlides } from "@/lib/cms/hero";
 import { getHomeContent } from "@/lib/services/cms";
 import {
   getCollectionItems,
@@ -82,7 +83,7 @@ export default async function HomePage() {
    * so hiding one is not a special case anywhere in the markup.
    */
   const blocks: Record<string, React.ReactNode> = {
-    hero: <Hero content={content.hero} slides={content.heroSlides} />,
+    hero: <Hero content={content.hero} slides={resolveHeroSlides(s.hero_slides, events)} />,
     hero_slides: null,
     pillars: (
       <Pillars

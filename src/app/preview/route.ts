@@ -1,6 +1,6 @@
 import { draftMode } from "next/headers";
-import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
+import { relativeRedirect, safeSitePath } from "@/lib/utils/relative-redirect";
 
 /**
  * Turns draft preview on for this browser.
@@ -13,12 +13,11 @@ import { requireAdmin } from "@/lib/admin/auth";
 export async function GET(request: Request) {
   await requireAdmin();
 
-  const url = new URL(request.url);
-  const path = url.searchParams.get("path") ?? "/";
   // Same-site paths only, so this can never become an open redirect.
-  const safePath = path.startsWith("/") && !path.startsWith("//") ? path : "/";
+  const safePath = safeSitePath(new URL(request.url).searchParams.get("path"));
 
   (await draftMode()).enable();
 
-  return NextResponse.redirect(new URL(safePath, url.origin));
+  // Relatif: di hosting request.url berisi alamat dalam proxy (localhost:3001).
+  return relativeRedirect(safePath);
 }

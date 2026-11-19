@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { CalendarClock, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import type { HeroMode } from "@/lib/cms/hero";
+import { cn } from "@/lib/utils/cn";
 import { MediaPicker } from "@/components/admin/media-picker";
 import { Field, TextInput } from "@/components/forms/field";
 
@@ -32,7 +34,17 @@ function emptySlide(): HeroSlideDraft {
  * JSON in a hidden field, so adding or removing a slide never needs a round
  * trip to the server.
  */
-export function HeroSlidesEditor({ initial }: { initial: HeroSlideDraft[] }) {
+export function HeroSlidesEditor({
+  initial,
+  initialMode,
+  autoPreview,
+}: {
+  initial: HeroSlideDraft[];
+  initialMode: HeroMode;
+  /** Slide yang akan tampil kalau mode otomatis dipilih, dihitung dari event yang tayang. */
+  autoPreview: HeroSlideDraft[];
+}) {
+  const [mode, setMode] = useState<HeroMode>(initialMode);
   const [slides, setSlides] = useState<HeroSlideDraft[]>(
     initial.length > 0 ? initial : [emptySlide()],
   );
@@ -46,8 +58,88 @@ export function HeroSlidesEditor({ initial }: { initial: HeroSlideDraft[] }) {
   return (
     <div className="space-y-4">
       <input type="hidden" name="hero_slides.json" value={JSON.stringify(slides)} />
+      <input type="hidden" name="hero_slides.mode" value={mode} />
 
-      {slides.map((slide, index) => (
+      <div role="radiogroup" aria-label="Cara mengisi banner" className="grid gap-3">
+        {(
+          [
+            {
+              value: "auto",
+              title: "Otomatis dari event (disarankan)",
+              text: "Banner mengambil event yang sedang tayang. Yang tanggalnya paling dekat tampil paling depan, event baru langsung masuk, dan event yang sudah lewat keluar sendiri. Foto banner = foto sampul event.",
+              icon: CalendarClock,
+            },
+            {
+              value: "manual",
+              title: "Atur sendiri",
+              text: "Pilih gambar, judul, tanggal, dan tujuan klik untuk setiap slide. Tidak berubah sampai kamu mengeditnya lagi.",
+              icon: SlidersHorizontal,
+            },
+          ] as const
+        ).map((choice) => {
+          const Icon = choice.icon;
+          const active = mode === choice.value;
+          return (
+            <label
+              key={choice.value}
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-card border-2 p-3.5 transition-colors",
+                active ? "border-pine bg-pine-soft/60" : "border-line bg-surface hover:border-brand/40",
+              )}
+            >
+              <input
+                type="radio"
+                name="hero-mode-choice"
+                value={choice.value}
+                checked={active}
+                onChange={() => setMode(choice.value)}
+                className="mt-1 size-4"
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-extrabold text-ink">
+                  <Icon className="size-4" aria-hidden />
+                  {choice.title}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{choice.text}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {mode === "auto" ? (
+        <div className="rounded-card border border-line bg-canvas-deep/30 p-4">
+          <p className="text-sm font-extrabold text-ink">Yang tampil di banner sekarang</p>
+          {autoPreview.length > 0 ? (
+            <ol className="mt-3 space-y-2.5">
+              {autoPreview.map((slide, index) => (
+                <li key={slide.id} className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- admin preview */}
+                  <img src={slide.image} alt="" className="h-12 w-16 shrink-0 rounded-lg border border-line object-cover" />
+                  <span className="min-w-0 text-sm">
+                    <span className="block truncate font-bold text-ink">
+                      {index + 1}. {slide.title}
+                    </span>
+                    <span className="block text-xs text-muted">
+                      {slide.date}
+                      {slide.location ? ` · ${slide.location}` : ""}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-2 text-xs text-muted">
+              Belum ada event tayang yang punya foto sampul, jadi banner memakai gambar bawaan.
+            </p>
+          )}
+          <p className="mt-3 text-xs text-muted">
+            Maksimal 5 event. Foto dan judulnya diubah dari menu Event, bukan di sini.
+          </p>
+        </div>
+      ) : null}
+
+      {mode === "manual" ? slides.map((slide, index) => (
         <div key={slide.id} className="rounded-card border border-line bg-canvas-deep/30 p-4">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-extrabold text-ink">Slide {index + 1}</span>
@@ -133,16 +225,18 @@ export function HeroSlidesEditor({ initial }: { initial: HeroSlideDraft[] }) {
             </div>
           </div>
         </div>
-      ))}
+      )) : null}
 
-      <button
-        type="button"
-        onClick={() => setSlides((current) => [...current, emptySlide()])}
-        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line text-sm font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
-      >
-        <Plus className="size-4" aria-hidden />
-        Tambah slide
-      </button>
+      {mode === "manual" ? (
+        <button
+          type="button"
+          onClick={() => setSlides((current) => [...current, emptySlide()])}
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line text-sm font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand"
+        >
+          <Plus className="size-4" aria-hidden />
+          Tambah slide
+        </button>
+      ) : null}
     </div>
   );
 }

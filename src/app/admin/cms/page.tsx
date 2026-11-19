@@ -44,7 +44,9 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { findCollection, GLOBAL_PAGE, HOME_PAGE, type PageDef } from "@/lib/cms/schema";
 import { findTemplate } from "@/lib/cms/section-templates";
 import { toPresentation } from "@/lib/cms/presentation";
-import { getEvents } from "@/lib/services/content";
+import { getEvents, getUpcomingEvents } from "@/lib/services/content";
+import { eventsToHeroSlides } from "@/lib/cms/hero";
+import { ensureHomeSections } from "@/lib/cms/seed-home";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -131,9 +133,13 @@ export default async function CmsWebsitePage({
 }: {
   searchParams: Promise<{ tab?: string; status?: string; message?: string; edit?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { tab: rawTab, status, message, edit: rawEdit } = await searchParams;
   const tab = TABS.some((item) => item.key === rawTab) ? rawTab! : "global";
+
+  // Server baru punya tabel CMS kosong; tanpa ini daftar bagian Halaman Depan kosong.
+  if (tab === "home") await ensureHomeSections(session.userId);
+  const heroAutoPreview = tab === "home" ? eventsToHeroSlides(await getUpcomingEvents(6)) : [];
 
   const pageDef: PageDef | null =
     tab === "global" ? GLOBAL_PAGE : tab === "home" ? HOME_PAGE : null;
@@ -366,6 +372,7 @@ export default async function CmsWebsitePage({
           previewPath={pageDef.previewPath}
           sections={builderSections}
           collections={builderCollections}
+          heroAutoPreview={heroAutoPreview}
           pendingCount={pendingDrafts}
           lastPublishedAt={
             lastPublishedAt ? new Date(lastPublishedAt).toLocaleString("id-ID") : null
