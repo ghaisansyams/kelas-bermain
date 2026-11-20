@@ -9,6 +9,8 @@ import { PresentationEditor } from "@/components/admin/cms/presentation-editor";
 import { StructurePanel, type StructureItem } from "@/components/admin/cms/structure-panel";
 import { HeroSlidesEditor, type HeroEventOption, type HeroSlideDraft } from "@/components/admin/hero-slides-editor";
 import { heroMode } from "@/lib/cms/hero";
+import { ChangeList } from "@/components/admin/cms/change-list";
+import type { SectionChange } from "@/lib/cms/changes";
 import type { FieldDef } from "@/lib/cms/schema";
 import type { SectionPresentation } from "@/lib/cms/presentation";
 
@@ -60,6 +62,7 @@ export function HomeBuilder({
   lastPublishedAt,
   heroAutoPreview,
   heroEventOptions,
+  changes,
   actions,
 }: {
   pageKey: string;
@@ -72,6 +75,8 @@ export function HomeBuilder({
   heroAutoPreview: HeroSlideDraft[];
   /** Event yang bisa dipilih sebagai tujuan klik slide. */
   heroEventOptions: HeroEventOption[];
+  /** Rincian perubahan yang akan terbit, ditampilkan di pop-up Publikasikan. */
+  changes: SectionChange[];
   actions: BuilderActions;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(sections[0]?.key ?? null);
@@ -124,6 +129,8 @@ export function HomeBuilder({
                 { label: "Terakhir terbit", value: lastPublishedAt ?? "Belum pernah" },
               ]}
               confirmLabel="Ya, publikasikan"
+              wide
+              details={<ChangeList changes={changes} />}
             />
           )}
         </div>

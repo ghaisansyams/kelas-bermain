@@ -215,6 +215,15 @@ export async function publishPageAction(formData: FormData) {
   }
   if (failed) back(tab, "error");
 
+  // Koleksi yang dipakai bagian-bagian halaman ini ikut terbit; tanpa ini
+  // perubahan di Yang Diasah atau Cara Ikut tidak pernah tayang.
+  const collections = [...new Set((findPage(pageKey)?.sections ?? []).map((section) => section.collection).filter(Boolean))];
+  try {
+    for (const key of collections) await publishCollectionRows(key as string, session.userId, true);
+  } catch {
+    back(tab, "error");
+  }
+
   revalidatePublic();
   revalidatePath("/admin/cms");
   back(tab, "published");
@@ -352,44 +361,58 @@ export async function setCollectionItemVisibilityAction(formData: FormData) {
  * disimpan dulu ke cms_versions supaya bisa dipulihkan, lalu draf disalin ke
  * `published` — hanya untuk baris yang drafnya memang berbeda.
  */
+/**
+ * Menerbitkan draf sebuah koleksi (dan menyimpan versinya). Dipakai tombol
+ * Publikasikan tab koleksi, dan juga tombol Publikasikan sebuah halaman untuk
+ * koleksi yang dipakai bagian-bagiannya (Yang Diasah, Cara Ikut, Cerita).
+ */
+async function publishCollectionRows(
+  collectionKey: string,
+  userId: string,
+  onlyIfChanged: boolean,
+): Promise<number> {
+  const rows = await db.cms_collections.findMany({ where: { collection_key: collectionKey } });
+  const changed = rows.filter(
+    (row) => JSON.stringify(row.draft ?? null) !== JSON.stringify(row.published ?? null),
+  );
+  if (onlyIfChanged && changed.length === 0) return 0;
+
+  await db.$transaction([
+    db.cms_versions.create({
+      data: {
+        scope: "collection",
+        scope_key: collectionKey,
+        snapshot: rows.map((row) => ({
+          itemKey: row.item_key,
+          published: row.published,
+          sortOrder: row.sort_order,
+          isVisible: row.is_visible,
+        })) as Prisma.InputJsonValue,
+        created_by: userId,
+      },
+    }),
+    ...changed.map((row) =>
+      db.cms_collections.update({
+        where: { id: row.id },
+        data: {
+          published: row.draft as Prisma.InputJsonValue,
+          published_at: new Date(),
+          updated_by: userId,
+        },
+      }),
+    ),
+  ]);
+  await logActivity("CMS_PUBLISH", "cms_collections", collectionKey, null, { items: changed.length });
+  return changed.length;
+}
+
 export async function publishCollectionAction(formData: FormData) {
   const session = await requireAdmin();
   const collectionKey = String(formData.get("collectionKey") ?? "");
   const tab = String(formData.get("tab") ?? "home");
 
   try {
-    const rows = await db.cms_collections.findMany({ where: { collection_key: collectionKey } });
-    const changed = rows.filter(
-      (row) => JSON.stringify(row.draft ?? null) !== JSON.stringify(row.published ?? null),
-    );
-
-    await db.$transaction([
-      db.cms_versions.create({
-        data: {
-          scope: "collection",
-          scope_key: collectionKey,
-          snapshot: rows.map((row) => ({
-            itemKey: row.item_key,
-            published: row.published,
-            sortOrder: row.sort_order,
-            isVisible: row.is_visible,
-          })) as Prisma.InputJsonValue,
-          created_by: session.userId,
-        },
-      }),
-      ...changed.map((row) =>
-        db.cms_collections.update({
-          where: { id: row.id },
-          data: {
-            published: row.draft as Prisma.InputJsonValue,
-            published_at: new Date(),
-            updated_by: session.userId,
-          },
-        }),
-      ),
-    ]);
-
-    await logActivity("CMS_PUBLISH", "cms_collections", collectionKey, null, { items: changed.length });
+    await publishCollectionRows(collectionKey, session.userId, false);
   } catch {
     back(tab, "error");
   }

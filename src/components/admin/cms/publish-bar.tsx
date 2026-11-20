@@ -1,5 +1,7 @@
 import { Rocket } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { ChangeList } from "@/components/admin/cms/change-list";
+import type { SectionChange } from "@/lib/cms/changes";
 
 /**
  * Draft count plus the publish button, as one strip above the editor.
@@ -14,6 +16,7 @@ export function PublishBar({
   lastPublishedAt,
   action,
   hidden,
+  changes = [],
 }: {
   /** What is being published, shown in the confirmation. */
   label: string;
@@ -21,6 +24,8 @@ export function PublishBar({
   lastPublishedAt?: string | null;
   action: (formData: FormData) => void | Promise<void>;
   hidden: Record<string, string>;
+  /** Rincian perubahan yang akan terbit, ditampilkan di pop-up. */
+  changes?: SectionChange[];
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
@@ -55,6 +60,8 @@ export function PublishBar({
             { label: "Terakhir terbit", value: lastPublishedAt ?? "Belum pernah" },
           ]}
           confirmLabel="Ya, publikasikan"
+          wide
+          details={<ChangeList changes={changes} />}
         />
       )}
     </div>

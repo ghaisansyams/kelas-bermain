@@ -22,6 +22,8 @@ export function ConfirmDialog({
   reasonField,
   size = "sm",
   icon,
+  details,
+  wide = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   hidden: Record<string, string>;
@@ -42,6 +44,9 @@ export function ConfirmDialog({
   /** "md" matches the other buttons in a page header. */
   size?: "sm" | "md";
   icon?: ReactNode;
+  /** Rincian tambahan di bawah ringkasan; bagian ini bisa digulir kalau panjang. */
+  details?: ReactNode;
+  wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +81,7 @@ export function ConfirmDialog({
                 action={action}
                 onSubmit={() => setSubmitting(true)}
                 onClick={(event) => event.stopPropagation()}
-                className="w-full max-w-md rounded-card bg-canvas p-5 shadow-lift sm:p-6"
+                className={cn("w-full rounded-card bg-canvas p-5 shadow-lift sm:p-6", wide ? "max-w-2xl" : "max-w-md")}
               >
                 {Object.entries(hidden).map(([name, value]) => (
                   <input key={name} type="hidden" name={name} value={value} />
@@ -93,6 +98,8 @@ export function ConfirmDialog({
                     </div>
                   ))}
                 </dl>
+
+                {details ? <div className="mt-4 max-h-[45vh] overflow-y-auto pr-1">{details}</div> : null}
 
                 {reasonField ? (
                   <label className="mt-4 block text-sm font-semibold text-ink">

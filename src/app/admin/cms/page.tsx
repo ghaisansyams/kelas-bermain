@@ -46,6 +46,7 @@ import { findTemplate } from "@/lib/cms/section-templates";
 import { toPresentation } from "@/lib/cms/presentation";
 import { getEvents, getUpcomingEvents } from "@/lib/services/content";
 import { eventsToHeroSlides } from "@/lib/cms/hero";
+import { describeSectionChange } from "@/lib/cms/changes";
 import { formatDateRange } from "@/lib/utils/date";
 import { ensureCmsDefaults } from "@/lib/cms/seed-cms";
 import { db } from "@/lib/db";
@@ -296,6 +297,40 @@ export default async function CmsWebsitePage({
     };
   }
 
+  // Rincian untuk pop-up Publikasikan: hanya bagian halaman ini yang benar-benar ikut terbit.
+  const changes = activeRows
+    .map((row) => {
+      const defined = pageDef?.sections.find((item) => item.key === row.section_key);
+      const template = findTemplate(row.section_type);
+      return describeSectionChange({
+        label: defined?.label ?? row.label ?? row.section_key,
+        fields: defined?.fields ?? template?.fields ?? [],
+        draft: row.draft,
+        published: row.published,
+        customEditor: defined?.customEditor ?? null,
+      });
+    })
+    .filter((change): change is NonNullable<typeof change> => change !== null);
+
+  // Koleksi yang dipakai halaman ini (Yang Diasah, Cara Ikut, Cerita) ikut terbit bersama halamannya.
+  const linkedCollections = new Set(
+    (pageDef?.sections ?? []).map((section) => section.collection).filter(Boolean),
+  );
+  const linkedItems = allItems.filter((row) => linkedCollections.has(row.collection_key));
+  const collectionChanges = linkedItems
+    .map((row) => {
+      const definition = findCollection(row.collection_key);
+      const name = String(row.draft?.title ?? row.draft?.name ?? row.item_key);
+      return describeSectionChange({
+        label: `${definition?.label ?? row.collection_key}: ${name}`,
+        fields: definition?.fields ?? [],
+        draft: row.draft,
+        published: row.published,
+      });
+    })
+    .filter((change): change is NonNullable<typeof change> => change !== null);
+  const allChanges = [...changes, ...collectionChanges];
+
   const lastPublishedAt = activeRows
     .map((row) => row.published_at)
     .filter(Boolean)
@@ -305,7 +340,7 @@ export default async function CmsWebsitePage({
   const notice = status ? NOTICES[status] : undefined;
   const pendingDrafts =
     sectionRows.filter((row) => !sameContent(row.draft, row.published)).length +
-    allItems.filter((row) => !sameContent(row.draft, row.published)).length;
+    (pageDef ? linkedItems : allItems).filter((row) => !sameContent(row.draft, row.published)).length;
 
   return (
     <div className="space-y-5">
@@ -374,6 +409,7 @@ export default async function CmsWebsitePage({
           }
           action={pageDef ? publishPageAction : publishCollectionAction}
           hidden={pageDef ? { pageKey: pageDef.key, tab } : { collectionKey: tab, tab }}
+          changes={pageDef ? allChanges : []}
         />
       ) : null}
 
@@ -386,6 +422,7 @@ export default async function CmsWebsitePage({
           collections={builderCollections}
           heroAutoPreview={heroAutoPreview}
           heroEventOptions={heroEventOptions}
+          changes={allChanges}
           pendingCount={pendingDrafts}
           lastPublishedAt={
             lastPublishedAt ? new Date(lastPublishedAt).toLocaleString("id-ID") : null
